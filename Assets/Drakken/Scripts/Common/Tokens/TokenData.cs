@@ -1,4 +1,4 @@
-namespace Drakken.Tokens
+namespace Drakken.Common.Tokens
 {
     public class TokenData
     {

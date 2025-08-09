@@ -1,4 +1,4 @@
-namespace Drakken.Data
+namespace Drakken.Common.Data
 {
     public class Dice
     {

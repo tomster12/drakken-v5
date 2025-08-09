@@ -1,8 +1,8 @@
-using Drakken.Tokens.Implementation;
+using Drakken.Common.Tokens.Implementation;
 using System;
 using System.Collections.Generic;
 
-namespace Drakken.Tokens
+namespace Drakken.Common.Tokens
 {
     public class TokenRegistryEntry
     {

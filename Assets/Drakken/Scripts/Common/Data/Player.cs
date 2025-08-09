@@ -1,7 +1,7 @@
-using Drakken.Tokens;
+using Drakken.Common.Tokens;
 using System.Collections.Generic;
 
-namespace Drakken.Data
+namespace Drakken.Common.Data
 {
     public class Player
     {

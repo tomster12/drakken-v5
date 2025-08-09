@@ -1,7 +1,7 @@
-using Drakken.Data;
+using Drakken.Common.Data;
 using System;
 
-namespace Drakken.Tokens
+namespace Drakken.Common.Tokens
 {
     public interface IToken
     {

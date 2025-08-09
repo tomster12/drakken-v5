@@ -1,6 +1,6 @@
-using Drakken.Data;
+using Drakken.Common.Data;
 
-namespace Drakken.Tokens.Implementation
+namespace Drakken.Common.Tokens.Implementation
 {
     public class DragonTokenIntent
     {
