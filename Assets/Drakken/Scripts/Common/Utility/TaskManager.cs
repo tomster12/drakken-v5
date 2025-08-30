@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Drakken.Common
 {
-    public class TaskManager
+    internal class TaskManager
     {
         private ulong nextTaskId = 1;
         private readonly Dictionary<ulong, TaskCompletionSource<object>> current = new();
@@ -15,13 +15,15 @@ namespace Drakken.Common
             return (taskId, current[taskId].Task.ContinueWith(t => (T)t.Result));
         }
 
-        public void Complete<T>(ulong taskId, T result)
+        public bool Complete<T>(ulong taskId, T result)
         {
             if (current.TryGetValue(taskId, out var tcs))
             {
                 current.Remove(taskId);
                 tcs.SetResult(result!);
+                return true;
             }
+            return false;
         }
     }
 }

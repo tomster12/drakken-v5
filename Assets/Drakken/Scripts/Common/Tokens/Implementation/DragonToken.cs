@@ -2,19 +2,19 @@ using Drakken.Common.Data;
 
 namespace Drakken.Common.Tokens.Implementation
 {
-    public class DragonTokenIntent
+    internal class DragonTokenIntent
     {
         public int SelectedDiceIndex;
     }
 
-    public class DragonTokenResponse
+    internal class DragonTokenResponse
     {
         public int RolledValue;
     }
 
-    public class DragonToken : Token<DragonTokenIntent, DragonTokenResponse>
+    internal class DragonToken : TokenImplementation<DragonTokenIntent, DragonTokenResponse>
     {
-        protected override DragonTokenResponse Execute(State state, DragonTokenIntent intent)
+        protected override DragonTokenResponse Execute(GameState state, DragonTokenIntent intent)
         {
             return new DragonTokenResponse { RolledValue = 2 };
         }
