@@ -28,5 +28,14 @@ namespace Drakken.Common.Utility
                 throw new System.Exception($"Assertion failed: {message}");
             }
         }
+
+        public static void NotNullOrEmpty(string obj, string message = null)
+        {
+            if (string.IsNullOrEmpty(obj))
+            {
+                Log.Error("Assert", message);
+                throw new System.Exception($"Assertion failed: {message}");
+            }
+        }
     }
 }

@@ -1,22 +1,30 @@
+using Drakken.Common.Utility;
+using UnityEngine;
+
 namespace Drakken.Domain.Tokens
 {
     public class TokenVisualContext
     {
-        //public List<DiceVisual>[] ClientDiceVisuals { get; }
-        //public List<TokenVisual>[] ClientTokenVisuals { get; }
-        //public ParticleManager ParticleManager { get; }
-        //public int LocalClientIndex { get; }
+        public int LocalClientIndex { get; }
+        public Vector3 BoardCenter { get; }
 
-        //public TokenVisualContext(
-        //    IReadOnlyList<List<DiceVisual>> clientDiceVisuals,
-        //    IReadOnlyList<List<TokenVisual>> clientTokenVisuals,
-        //    ParticleManager particleManager,
-        //    int localClientIndex)
-        //{
-        //    ClientDiceVisuals = clientDiceVisuals;
-        //    ClientTokenVisuals = clientTokenVisuals;
-        //    ParticleManager = particleManager;
-        //    LocalClientIndex = localClientIndex;
-        //}
+        public TokenVisualContext(int localClientIndex, Vector3 boardCenter)
+        {
+            LocalClientIndex = localClientIndex;
+            BoardCenter = boardCenter;
+        }
+
+        public DiceViewPlaceholder GetDiceView(int clientIndex, int diceId)
+        {
+            Log.Info("TokenVisualContext", $"GetDiceView clientIndex={clientIndex} diceId={diceId}");
+            return null;
+        }
+    }
+
+    public class DiceViewPlaceholder
+    {
+        public void PlayShatterAnimation() { }
+        public void PlayLandAnimation(int value) { }
+        public void AttachEffect(string effectId) { }
     }
 }

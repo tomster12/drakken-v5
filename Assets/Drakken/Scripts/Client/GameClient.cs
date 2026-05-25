@@ -1,67 +1,45 @@
-using Drakken.Common.Utility;
-using System.Threading.Tasks;
-using Unity.Netcode.Transports.UTP;
-using Unity.Netcode;
-using UnityEngine;
-using Drakken.Networking;
-using UnityEngine.Events;
-using Drakken.Domain;
 using Drakken.Client.States;
-using System.Collections.Generic;
+using Drakken.Common.Utility;
+using Drakken.Domain.Tokens;
+using System.Threading.Tasks;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEngine;
 
 namespace Drakken.Client
 {
     public class GameClient : MonoBehaviour
     {
-        public static GameClient Singleton { get; private set; }
-
         [Header("Config")]
-        [SerializeField] public string serverAddress = "0.0.0.0";
-        [SerializeField] public ushort serverPort = 7777;
+        [SerializeField] private string serverAddress = "127.0.0.1";
+        [SerializeField] private ushort serverPort = 7777;
 
-        public bool IsConnecting { get; private set; } = false;
-        public bool IsConnected { get; private set; } = false;
-        public ClientConnection Connection { get; private set; } = null;
-        public ClientMatch Match { get; private set; } = null;
-        public bool IsInMatch => Match != null;
-
-        private Dictionary<ClientStateType, ClientState> states;
-        private ClientStateType currentStateType = ClientStateType.None;
+        public static GameClient Singleton { get; private set; }
+        public ClientConnection Connection { get; private set; }
+        public ClientMatch Match { get; private set; }
+        public TokenRegistry TokenRegistry { get; private set; }
         private ClientState currentState = null;
+        public bool IsConnecting { get; private set; }
+        public bool IsConnected => NetworkManager.Singleton.IsConnectedClient;
+        public bool IsInMatch => Match != null;
 
         private void Awake()
         {
             Singleton = this;
+            TokenRegistry = TokenRegistryBuilder.Build();
         }
 
         public async Task StartApplication()
         {
-            states = new()
-            {
-              { ClientStateType.Connecting, new ClientConnectingState() },
-              { ClientStateType.Playing, new ClientPlayingState() }
-            };
-
-            states[ClientStateType.Connecting].Init(this);
-            states[ClientStateType.Playing].Init(this);
-
-            currentState = null;
-            currentStateType = ClientStateType.None;
-            await GotoState(ClientStateType.Connecting);
+            Connection = new ClientConnection(this);
+            await GotoState(new ConnectingClientState());
         }
 
-        public async Task GotoState(ClientStateType stateType)
+        public async Task GotoState(ClientState newState)
         {
-            Assert.False(currentStateType == stateType);
-            Assert.False(stateType == ClientStateType.None);
-
-            states.TryGetValue(stateType, out var newState);
-            Assert.NotNull(newState);
-
-            currentStateType = stateType;
             currentState = newState;
-
-            await currentState.Enter();
+            newState.Init(this);
+            await newState.Enter();
         }
 
         public Task<bool> Connect()
@@ -70,31 +48,28 @@ namespace Drakken.Client
             Log.Info("Client", $"Connecting to game server at {serverAddress}:{serverPort}...");
 
             IsConnecting = true;
-            IsConnected = false;
             Connection = null;
             var tcs = new TaskCompletionSource<bool>();
 
             void OnConnected(ulong clientId)
             {
-                Log.Info("Client", $"Client connected clientId={clientId}");
+                Log.Info("Client", $"Connected as clientId={clientId}");
 
                 NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
 
                 IsConnecting = false;
-                IsConnected = true;
                 Connection = new ClientConnection(this);
                 tcs.TrySetResult(true);
             }
 
             void OnDisconnected(ulong clientId)
             {
-                Log.Info("Client", $"Client disconnected clientId={clientId}");
+                Log.Info("Client", $"Disconnected as clientId={clientId}");
                 NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
 
                 IsConnecting = false;
-                IsConnected = false;
                 tcs.TrySetResult(false);
             }
 
@@ -125,6 +100,4 @@ namespace Drakken.Client
             return false;
         }
     }
-
-    public enum ClientStateType { None, Connecting, Playing }
 }

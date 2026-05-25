@@ -1,33 +1,38 @@
+using System.Collections.Generic;
 using Unity.Netcode;
+using UnityEngine;
 
 namespace Drakken.Domain
 {
     public class DiceInstance : INetworkSerializable
     {
-        public static int nextUid;
-        public int Uid;
+        private static int nextId = 1;
+        public int Id;
         public int Sides;
         public int Value;
+        public List<DiceEffect> Effects = new();
 
         public static DiceInstance Create(int sides)
         {
             return new()
             {
-                Uid = nextUid++,
+                Id = nextId++,
                 Sides = sides
             };
         }
 
         public void Roll()
         {
-            Value = UnityEngine.Random.Range(1, Sides + 1);
+            Value = Random.Range(1, Sides + 1);
         }
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeValue(ref Uid);
+            serializer.SerializeValue(ref Id);
             serializer.SerializeValue(ref Sides);
             serializer.SerializeValue(ref Value);
+            serializer.SerializeList(Effects);
         }
     }
+
 }

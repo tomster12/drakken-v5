@@ -1,83 +1,206 @@
 using Drakken.Common.Utility;
-using Unity.Netcode;
 using Drakken.Domain;
+using Drakken.Domain.Tokens;
 using Drakken.Networking;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Drakken.Server
 {
-
     public class ServerMatch
     {
-        public static ulong nextMatchId = 1;
+        private static ulong nextMatchId = 1;
 
-        private GameServer server;
-        public ulong MatchId { get; private set; }
-        private ulong[] clientClientIds;
-        private ulong connectedClientCount;
-        private ulong readyClientCount;
+        public ulong MatchId { get; }
+        private readonly GameServer server;
         private GameState gameState;
+        private readonly ulong[] clientIds = new ulong[2];
+        private readonly Dictionary<ulong, int> clientIndexAssignment = new();
         private bool isStarted;
-        private ClientRpcParams broadcastRpcParams;
+        private int connectedCount;
+        private int startReadyCount = 0;
+        private int discardReadyCount = 0;
 
         public ServerMatch(GameServer server)
         {
             this.server = server;
             MatchId = nextMatchId++;
-            clientClientIds = new ulong[2];
-            connectedClientCount = 0;
-            readyClientCount = 0;
-            isStarted = false;
+
             Log.Info($"ServerMatch-{MatchId}", $"Created new match");
         }
 
         public void OnRequestJoinMatch(ulong clientId)
         {
-            JoinMatchResponse response;
-
-            if (isStarted || connectedClientCount >= 2)
+            if (isStarted || connectedCount >= 2)
             {
-                response = new() { Success = false };
-                Log.Info($"ServerMatch-{MatchId}", $"Denied client clientId={clientId} join request, match is full");
-                server.Connection.RespondJoinMatch(response, clientId);
+                server.Connection.RespondJoinMatch(new() { Success = false }, clientId);
                 return;
             }
 
-            ulong clientIndex = connectedClientCount++;
-            clientClientIds[clientIndex] = clientId;
-            response = new() { Success = true, MatchId = MatchId, ClientIndex = clientIndex };
-            Log.Info($"ServerMatch-{MatchId}", $"Accepted client clientId={clientId} join request, assigned clientIndex={response.ClientIndex}");
-            server.Connection.RespondJoinMatch(response, clientId);
+            int index = connectedCount++;
+            clientIds[index] = clientId;
+            clientIndexAssignment[clientId] = index;
+
+            Log.Info($"ServerMatch-{MatchId}", $"ClientId={clientId} joined as clientIndex={index}");
+
+            server.Connection.RespondJoinMatch(new()
+            {
+                Success = true,
+                MatchId = MatchId,
+                ClientIndex = (ulong)index
+            }, clientId);
         }
 
-        public void OnClientReady(ulong clientId)
+        public void OnReady(ulong clientId)
         {
-            Assert.False(isStarted);
-            Log.Info($"ServerMatch-{MatchId}", $"Client clientId={clientId} is ready");
-            readyClientCount++;
-            if (readyClientCount == 2) StartGame();
+            startReadyCount++;
+
+            Log.Info($"ServerMatch-{MatchId}", $"Client {clientId} ready ({startReadyCount}/2)");
+
+            if (startReadyCount == 2) StartGame();
         }
 
         private void StartGame()
         {
-            Assert.True(connectedClientCount == 2 && readyClientCount == 2 && !isStarted);
-            Log.Info($"ServerMatch-{MatchId}", $"All clients are ready, starting match...");
+            Log.Info($"ServerMatch-{MatchId}", $"Starting game");
 
-            gameState = new();
+            gameState = new GameState();
+            isStarted = true;
 
-            for (int i = 0; i < 2; i++)
+            StartDrawPhase();
+        }
+
+        private void StartDrawPhase()
+        {
+            // Give each client 4 new D6s
+            for (int p = 0; p < 2; p++)
             {
                 for (int d = 0; d < 4; d++)
                 {
-                    DiceInstance die = DiceInstance.Create(sides: 6);
-                    die.Roll();
-
-                    gameState.Clients[i].Dice.Add(die);
+                    var dice = DiceInstance.Create(sides: 6);
+                    dice.Roll();
+                    gameState.Clients[p].Dice.Add(dice);
                 }
             }
 
-            isStarted = true;
+            // Build a pool from all available token definitions and shuffle it
+            var allIds = new List<string>();
+            foreach (var def in server.TokenRegistry.AllDefinitions)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    allIds.Add(def.TokenId);
+                }
+            }
 
-            server.Connection.MessageMatchStarted(gameState, clientClientIds);
+            Shuffle(allIds);
+
+            // Deal 6 to each player, store in gameState hand as "dealt" (pre-discard)
+            for (int p = 0; p < 2; p++)
+            {
+                var dealt = new List<TokenInstance>();
+                for (int i = 0; i < 6; i++)
+                {
+                    string tokenId = allIds[(p * 6 + i) % allIds.Count];
+                    var instance = TokenInstance.Create(tokenId);
+                    dealt.Add(instance);
+                    gameState.Clients[p].Hand.Add(instance);
+                }
+
+                var msg = new DrawPhaseMessage
+                {
+                    DealtTokens = dealt,
+                    OpponentTokenCount = 6,
+                };
+
+            }
+
+            server.Connection.BroadcastMatchStartDraftingPhase(gameState, clientIds);
+        }
+
+        public void OnDraftDiscard(ulong clientId, DraftDiscardMessage msg)
+        {
+            if (!clientIndexAssignment.TryGetValue(clientId, out int playerIndex)) return;
+
+            var hand = gameState.Clients[playerIndex].Hand;
+            var discard0 = hand.Find(t => t.InstanceId == msg.DiscardInstanceId0);
+            var discard1 = hand.Find(t => t.InstanceId == msg.DiscardInstanceId1);
+
+            if (discard0 != null) hand.Remove(discard0);
+            if (discard1 != null) hand.Remove(discard1);
+
+            Log.Info($"ServerMatch-{MatchId}", $"Player {playerIndex} discarded 2, hand={hand.Count}");
+
+            discardReadyCount++;
+            if (discardReadyCount == 2) BeginTokenPhase();
+        }
+        
+        private void BeginTokenPhase()
+        {
+            Log.Info($"ServerMatch-{MatchId}", "Both players drafted, starting token phase");
+            server.Connection.BroadcastMatchStartTokenPhase(gameState, clientIds);
+        }
+
+        /*
+        public void OnPlayToken(ulong clientId, TokenIntentMessage intentMsg)
+        {
+            if (!clientIndexAssignment.TryGetValue(clientId, out int sourceClientIndex))
+            {
+                Log.Error($"ServerMatch-{MatchId}", $"Unknown sender {clientId}");
+                return;
+            }
+
+            if (gameState.TurnClientIndex != sourceClientIndex)
+            {
+                Log.Error($"ServerMatch-{MatchId}", $"ClientIndex={sourceClientIndex} tried to play out of turn");
+                return;
+            }
+
+            Log.Info($"ServerMatch-{MatchId}", $"ClientIndex={sourceClientIndex} played token {intentMsg.TokenId}");
+
+            TokenIntent intent = server.TokenRegistry.DeserialiseIntent(
+                intentMsg.TokenId,
+                intentMsg.IntentJson
+            );
+
+            var tokenExecutor = server.TokenRegistry.GetExecutor(intentMsg.TokenId);
+
+            var resolution = tokenExecutor.Execute(gameState, intent, sourceClientIndex);
+
+            string resolutionJson = JsonUtility.ToJson(resolution);
+
+            var resolutionMsg = new TokenResolutionMessage
+            {
+                TokenId = intentMsg.TokenId,
+                SourceClientIndex = sourceClientIndex,
+                ResolutionJson = resolutionJson,
+            };
+
+            server.Connection.BroadcastMatchPlayTokenResolved(resolutionMsg, clientIds);
+
+            AdvanceTurn();
+        }
+
+        public void OnPassTurn(ulong clientId)
+        {
+            AdvanceTurn();
+        }
+
+        private void AdvanceTurn()
+        {
+            gameState.TurnClientIndex = 1 - gameState.TurnClientIndex;
+            gameState.Turn++;
+            server.Connection.BroadcastMatchStartTurn(gameState.TurnClientIndex, clientIds);
+        }
+        */
+
+        private static void Shuffle<T>(List<T> list)
+        {
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
         }
     }
 }

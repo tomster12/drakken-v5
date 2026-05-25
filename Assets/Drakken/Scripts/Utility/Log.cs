@@ -9,6 +9,11 @@ namespace Drakken.Common.Utility
             Debug.Log($"[INFO {tag}] {message}");
         }
 
+        public static void Warning(string tag, string message)
+        {
+            Debug.LogError($"[WARNING {tag}] {message}");
+        }
+
         public static void Error(string tag, string message)
         {
             Debug.LogError($"[ERROR {tag}] {message}");

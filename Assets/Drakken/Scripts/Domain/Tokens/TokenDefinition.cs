@@ -1,16 +1,19 @@
-using UnityEngine;
-
 namespace Drakken.Domain.Tokens
 {
-    [CreateAssetMenu]
-    public class TokenDefinition : ScriptableObject
+    public enum TokenRarity { Common, Rare, Epic, Legendary }
+    
+    public enum TokenCategory { DiceGrowth, Attack, Effect, Chaos }
+
+    public enum TargetOwner { None, Self, Opponent, Any }
+
+    public class TokenDefinition
     {
-        public int TokenId;
+        public string TokenId;
         public string DisplayName;
         public string Description;
-        public Rarity Rarity;
-        public Sprite Artwork;
-        public bool RequiresTarget;
+        public TokenRarity Rarity;
+        public TokenCategory[] Categories;
         public TargetOwner TargetOwner;
+        public bool RequiresTarget;
     }
 }

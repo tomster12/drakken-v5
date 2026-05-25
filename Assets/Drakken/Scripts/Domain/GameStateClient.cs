@@ -4,15 +4,18 @@ using Unity.Netcode;
 
 namespace Drakken.Domain
 {
-    public class GameClientState : INetworkSerializable
+    public class GameStateClient : INetworkSerializable
     {
-        public List<TokenInstance> Hand { get; set; } = new();
-        public List<DiceInstance> Dice { get; set; } = new();
+        public List<DiceInstance> Dice = new();
+        public List<TokenInstance> Hand = new();
+        public int Score;
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeList(Hand);
             serializer.SerializeList(Dice);
+            serializer.SerializeList(Hand);
+            serializer.SerializeValue(ref Score);
         }
+
     }
 }

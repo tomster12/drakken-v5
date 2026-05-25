@@ -3,11 +3,11 @@ using System.Threading.Tasks;
 
 namespace Drakken.Client.States
 {
-    public class ClientConnectingState : ClientState
+    public class ConnectingClientState : ClientState
     {
         public override async Task Enter()
         {
-            Assert.True(!client.IsConnecting, "Client is already connecting");
+            Assert.True(!client.IsConnected, "Client is already connecting");
             Assert.True(!client.IsInMatch, "Client is already in a match");
 
             if (!client.IsConnected)
@@ -25,14 +25,14 @@ namespace Drakken.Client.States
                 return;
             }
 
-            client.Match.GameStarted += OnGameStarted;
-        }
-
-        private async void OnGameStarted()
-        {
-            await client.GotoState(ClientStateType.Playing);
+            client.Match.MatchStarted += MatchStarted;
 
             client.Match.SetReady();
+        }
+
+        private async void MatchStarted()
+        {
+            await client.GotoState(new PlayingClientState());
         }
     }
 }

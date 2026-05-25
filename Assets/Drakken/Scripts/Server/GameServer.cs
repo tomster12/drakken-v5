@@ -1,4 +1,5 @@
 using Drakken.Common.Utility;
+using Drakken.Domain.Tokens;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -10,43 +11,46 @@ namespace Drakken.Server
         public static GameServer Singleton { get; private set; }
 
         [Header("References")]
-        [SerializeField] public UnityTransport transport;
+        [SerializeField] private UnityTransport transport;
 
         [Header("Config")]
-        [SerializeField] public string hostAddress = "0.0.0.0";
-        [SerializeField] public ushort hostPort = 7777;
+        [SerializeField] private string hostAddress = "0.0.0.0";
+        [SerializeField] private ushort hostPort = 7777;
 
-        public ServerConnection Connection { get; private set; } = null;
+        public ServerConnection Connection { get; private set; }
+        public TokenRegistry TokenRegistry { get; private set; }
         private ServerMatch currentMatch;
 
         private void Awake()
         {
             Singleton = this;
+            TokenRegistry = TokenRegistryBuilder.Build();
         }
 
         public void StartApplication()
         {
-            Log.Info("Server", $"Starting game server at {hostAddress}:{hostPort}");
+            Log.Info("Client", $"Starting game server at {hostAddress}:{hostPort}");
 
-            Connection = new ServerConnection(this);
-
-            UnityTransport transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport as UnityTransport;
+            var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
             transport.ConnectionData.Address = hostAddress;
             transport.ConnectionData.Port = hostPort;
             NetworkManager.Singleton.StartServer();
+
+            Connection = new ServerConnection(this);
         }
 
-        public void OnRequestJoinMatch(ulong clientId)
-        {
-            currentMatch ??= new ServerMatch(this);
-            currentMatch.OnRequestJoinMatch(clientId);
-        }
+        public ServerMatch GetOrCreateMatch()
+            => currentMatch ??= new ServerMatch(this);
 
         public ServerMatch GetMatch(ulong matchId)
         {
-            if (currentMatch != null && currentMatch.MatchId == matchId) return currentMatch;
-            Log.Error("Server", $"No match found with matchId={matchId}");
-            return null;
+            Assert.True(currentMatch?.MatchId == matchId, $"No match with matchId={matchId}");
+            return currentMatch;
+        }
+        
+        public ServerMatch GetMatchForClient(ulong clientId)
+        {
+            return currentMatch;
         }
     }
 }

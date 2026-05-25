@@ -1,25 +1,26 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Drakken.Common.Utility;
 
 namespace Drakken.Common
 {
     internal class TaskManager
     {
-        private ulong nextTaskId = 1;
-        private readonly Dictionary<ulong, TaskCompletionSource<object>> current = new();
+        private readonly Dictionary<string, TaskCompletionSource<object>> current = new();
 
-        public (ulong taskId, Task<T> task) Create<T>()
+        public Task<T> Create<T>(string key)
         {
-            var taskId = nextTaskId++;
-            current[taskId] = new TaskCompletionSource<object>();
-            return (taskId, current[taskId].Task.ContinueWith(t => (T)t.Result));
+            Assert.False(current.ContainsKey(key), $"Task '{key}' is already in progress");
+            var tcs = new TaskCompletionSource<object>();
+            current[key] = tcs;
+            return tcs.Task.ContinueWith(t => (T)t.Result);
         }
 
-        public bool Complete<T>(ulong taskId, T result)
+        public bool Complete<T>(string key, T result)
         {
-            if (current.TryGetValue(taskId, out var tcs))
+            if (current.TryGetValue(key, out var tcs))
             {
-                current.Remove(taskId);
+                current.Remove(key);
                 tcs.SetResult(result!);
                 return true;
             }

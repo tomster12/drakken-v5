@@ -1,27 +1,26 @@
-using Drakken.Domain.Tokens;
 using Unity.Netcode;
 
-namespace Drakken.Domain
+namespace Drakken.Domain.Tokens
 {
     public class TokenInstance : INetworkSerializable
     {
-        public static int nextUid;
-        public int Uid;
-        public int DefinitionUid;
+        private static int nextId = 1;
+        public int InstanceId;
+        public string TokenId;
 
-        public static TokenInstance Get(TokenDefinition definition)
+        public static TokenInstance Create(string tokenId)
         {
-            return new TokenInstance
+            return new()
             {
-                Uid = nextUid++,
-                DefinitionUid = definition.Uid
+                InstanceId = nextId++,
+                TokenId = tokenId
             };
         }
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeValue(ref Uid);
-            serializer.SerializeValue(ref DefinitionUid);
+            serializer.SerializeValue(ref InstanceId);
+            serializer.SerializeValue(ref TokenId);
         }
     }
 }
