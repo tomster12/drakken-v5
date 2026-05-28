@@ -1,6 +1,7 @@
 using Drakken.Client.States;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
+using System;
 using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -14,8 +15,12 @@ namespace Drakken.Client
         [SerializeField] private string serverAddress = "127.0.0.1";
         [SerializeField] private ushort serverPort = 7777;
 
+        [Header("Assets")]
+        [SerializeField] private DrakkenAssetDatabase assets;
+
         public static GameClient Singleton { get; private set; }
         public ClientConnection Connection { get; private set; }
+        public DrakkenAssetDatabase Assets => assets;
         public ClientMatch Match { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
         private ClientState currentState = null;
@@ -31,12 +36,12 @@ namespace Drakken.Client
 
         public async Task StartApplication()
         {
-            Connection = new ClientConnection(this);
             await GotoState(new ConnectingClientState());
         }
 
         public async Task GotoState(ClientState newState)
         {
+            if (currentState != null) await currentState.Exit();
             currentState = newState;
             newState.Init(this);
             await newState.Enter();

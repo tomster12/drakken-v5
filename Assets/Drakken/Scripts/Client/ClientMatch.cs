@@ -1,21 +1,21 @@
 using Drakken.Domain;
 using Drakken.Common.Utility;
 using Drakken.Networking;
-using UnityEngine;
-using Drakken.Domain.Tokens;
 using System.Threading.Tasks;
+using System;
 
 namespace Drakken.Client
 {
     public class ClientMatch
     {
-        public System.Action MatchStarted = delegate { };
-        // public System.Action<int> TurnStarted = delegate { };
-        // public System.Action<int, int> RoundEnded = delegate { };
+        public Action DraftingPhaseStarted = delegate { };
+        public Action PlayingPhaseStarted = delegate { };
 
         public ulong MatchId { get; }
         public int ClientIndex { get; }
         public GameState GameState { get; private set; }
+        public bool IsReadiedUp { get; private set; }
+        public bool IsStarted { get; private set; }
         public bool IsMyTurn => GameState?.TurnClientIndex == ClientIndex;
 
         private readonly GameClient client;
@@ -32,20 +32,29 @@ namespace Drakken.Client
 
         public void SetReady()
         {
-            client.Connection.SendMatchReady();
+            Assert.False(IsReadiedUp);
+            
+            IsReadiedUp = true;
+            client.Connection.MessageMatchReady();
         }
 
         public void OnStartDraftingPhase(GameState state)
         {
+            Assert.False(IsStarted);
+            IsStarted = true;
+
             Log.Info($"ClientMatch-{MatchId}", $"Match started Drafting phase");
             GameState = state;
-            MatchStarted.Invoke();
+            DraftingPhaseStarted.Invoke();
         }
 
-        public void OnStartTokenPhase(GameState state)
+        public void OnStartPlayingPhase(GameState state)
         {
-            Log.Info($"ClientMatch-{MatchId}", $"Match started Token phase");
+            Assert.True(IsStarted);
+
+            Log.Info($"ClientMatch-{MatchId}", $"Match started Playing phase");
             GameState = state;
+            PlayingPhaseStarted.Invoke();
         }
 
         /*

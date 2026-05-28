@@ -37,8 +37,8 @@ namespace Drakken.Server
         public void OnMatchDraftDiscard(ulong clientId, DraftDiscardMessage msg)
             => server.GetMatchForClient(clientId)?.OnDraftDiscard(clientId, msg);
 
-        public void BroadcastMatchStartTokenPhase(GameState state, ulong[] clientIds)
-            => GameConnection.Singleton.BroadcastMatchStartTokenPhaseRpc(state,
+        public void BroadcastMatchStartPlayingPhase(GameState state, ulong[] clientIds)
+            => GameConnection.Singleton.BroadcastMatchStartPlayingPhaseRpc(state,
                 GameConnection.Singleton.RpcTarget.Group(clientIds, RpcTargetUse.Temp));
 
         /*

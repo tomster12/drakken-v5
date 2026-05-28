@@ -32,7 +32,7 @@ namespace Drakken.Client
         public void OnRespondJoinMatch(JoinMatchResponse response)
             => tasks.Complete(JoinMatchTask, response);
 
-        public void SendMatchReady()
+        public void MessageMatchReady()
             => GameConnection.Singleton.MessageServerMatchClientReadyRpc();
 
         // -------------------------------------- Match Flow
@@ -40,8 +40,11 @@ namespace Drakken.Client
         public void OnMatchStartDraftingPhase(GameState state)
             => client.Match?.OnStartDraftingPhase(state);
 
-        public void OnMatchStartTokenPhase(GameState state)
-            => client.Match?.OnStartTokenPhase(state);
+        public void MessageMatchDraftDiscard(DraftDiscardMessage msg)
+            => GameConnection.Singleton.MessageServerMatchDraftDiscardRpc(msg);
+
+        public void OnMatchStartPlayingPhase(GameState state)
+            => client.Match?.OnStartPlayingPhase(state);
 
         /*
         public void SendMatchPlayToken(TokenIntentMessage intentMsg)

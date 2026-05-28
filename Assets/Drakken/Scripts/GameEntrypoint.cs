@@ -4,6 +4,7 @@ using UnityEngine;
 using Drakken.Common.Utility;
 using Drakken.Client;
 using Drakken.Server;
+using System;
 
 namespace Drakken
 {
@@ -13,7 +14,7 @@ namespace Drakken
         [SerializeField] private GameClient client;
         [SerializeField] private GameServer server;
 
-        private void Start()
+        private async void Start()
         {
             var isServer =
                 UnityEngine.Application.isBatchMode ||
@@ -27,7 +28,7 @@ namespace Drakken
             else
             {
                 Log.Info("Application", "Running as client");
-                var _ = client.StartApplication();
+                await client.StartApplication();
             }
         }
     }

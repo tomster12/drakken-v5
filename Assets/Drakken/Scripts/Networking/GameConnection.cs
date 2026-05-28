@@ -36,8 +36,8 @@ namespace Drakken.Networking
             => ServerConnection.Singleton.OnMatchDraftDiscard(rpc.Receive.SenderClientId, msg);
 
         [Rpc(SendTo.SpecifiedInParams)]
-        public void BroadcastMatchStartTokenPhaseRpc(GameState gameState, RpcParams rpc = default)
-            => ClientConnection.Singleton.OnMatchStartTokenPhase(gameState);
+        public void BroadcastMatchStartPlayingPhaseRpc(GameState gameState, RpcParams rpc = default)
+            => ClientConnection.Singleton.OnMatchStartPlayingPhase(gameState);
 
         /*
         [Rpc(SendTo.Server)]
