@@ -3,14 +3,14 @@ using Drakken.Client.GameObjects;
 using Drakken.Common.Utility;
 using UnityEngine;
 
-namespace Drakken
+namespace Drakken.Client
 {
     [CreateAssetMenu(menuName = "Drakken/Asset Database")]
-    public class DrakkenAssetDatabase : ScriptableObject
+    public class AssetDatabase : ScriptableObject
     {
         [Header("Prefabs")]
-        public TokenView TokenViewPrefab;
-        public DiceView DiceViewPrefab;
+        [SerializeField] private TokenView TokenViewPrefab;
+        [SerializeField] private DiceView DiceViewPrefab;
         [SerializeField] private TokenPrefabEntry[] tokenMeshPrefabs;
 
         public GameObject GetTokenPrefab(string tokenId)
@@ -21,7 +21,7 @@ namespace Drakken
                     return entry.Prefab;
             }
 
-            Log.Warning("DrakkenAssetDatabase", $"No prefab found for tokenId='{tokenId}'");
+            Log.Warning("AssetDatabase", $"No prefab found for tokenId='{tokenId}'");
             return null;
         }
     }

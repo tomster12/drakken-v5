@@ -1,7 +1,7 @@
 using Drakken.Client.States;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
-using System;
+using Drakken.Networking;
 using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -16,11 +16,10 @@ namespace Drakken.Client
         [SerializeField] private ushort serverPort = 7777;
 
         [Header("Assets")]
-        [SerializeField] private DrakkenAssetDatabase assets;
+        [SerializeField] private AssetDatabase assets;
 
         public static GameClient Singleton { get; private set; }
-        public ClientConnection Connection { get; private set; }
-        public DrakkenAssetDatabase Assets => assets;
+        public AssetDatabase Assets => assets;
         public ClientMatch Match { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
         private ClientState currentState = null;
@@ -31,8 +30,7 @@ namespace Drakken.Client
         private void Awake()
         {
             Singleton = this;
-
-            TokenRegistry = TokenRegistryBuilder.BuildWithVisuals(assets.GetTokenPrefab);
+            TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefab);
         }
 
         public async Task StartApplication()
@@ -54,7 +52,6 @@ namespace Drakken.Client
             Log.Info("Client", $"Connecting to game server at {serverAddress}:{serverPort}...");
 
             IsConnecting = true;
-            Connection = null;
             var tcs = new TaskCompletionSource<bool>();
 
             void OnConnected(ulong clientId)
@@ -65,7 +62,7 @@ namespace Drakken.Client
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
 
                 IsConnecting = false;
-                Connection = new ClientConnection(this);
+                GameConnection.Singleton.SetClient(this);
                 tcs.TrySetResult(true);
             }
 
@@ -95,11 +92,11 @@ namespace Drakken.Client
             Assert.True(IsConnected && !IsInMatch);
             Log.Info("Client", "Requesting to join match...");
 
-            var response = await Connection.RequestJoinMatch();
+            var response = await GameConnection.Singleton.Client_RequestJoinMatch();
 
             if (response.Success)
             {
-                Match = new ClientMatch(this, response);
+                Match = new ClientMatch(response.MatchId, (int)response.ClientIndex);
                 return true;
             }
 

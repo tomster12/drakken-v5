@@ -1,5 +1,6 @@
 using Drakken.Common.Utility;
 using Drakken.Domain;
+using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens;
 using Drakken.Networking;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ namespace Drakken.Server
         private static ulong nextMatchId = 1;
 
         private readonly GameServer server;
-        public ulong MatchId { get; private set; }
+        private readonly ulong matchId;
         private readonly GameState gameState;
         private readonly ulong[] clientIds = new ulong[2];
         private readonly Dictionary<ulong, int> clientIndexAssignment = new();
@@ -23,32 +24,34 @@ namespace Drakken.Server
         public ServerMatch(GameServer server)
         {
             this.server = server;
-            MatchId = nextMatchId++;
+            matchId = nextMatchId++;
             gameState = new GameState();
 
-            Log.Info($"ServerMatch-{MatchId}", $"Created new match");
+            Log.Info($"ServerMatch-{matchId}", $"Created new match");
         }
 
-        public void OnRequestJoinMatch(ulong clientId)
+        public JoinMatchResponse OnRequestJoin(ulong clientId)
         {
             if (gameState.Phase != GamePhase.NotStarted || connectedCount >= 2)
             {
-                server.Connection.RespondJoinMatch(new() { Success = false }, clientId);
-                return;
+                return new()
+                {
+                    Success = false
+                };
             }
 
             int index = connectedCount++;
             clientIds[index] = clientId;
             clientIndexAssignment[clientId] = index;
 
-            Log.Info($"ServerMatch-{MatchId}", $"ClientId={clientId} joined as clientIndex={index}");
+            Log.Info($"ServerMatch-{matchId}", $"ClientId={clientId} joined as clientIndex={index}");
 
-            server.Connection.RespondJoinMatch(new()
+            return new()
             {
                 Success = true,
-                MatchId = MatchId,
+                MatchId = matchId,
                 ClientIndex = (ulong)index
-            }, clientId);
+            };
         }
 
         public void OnReady(ulong clientId)
@@ -57,7 +60,7 @@ namespace Drakken.Server
 
             startReadyCount++;
 
-            Log.Info($"ServerMatch-{MatchId}", $"Client {clientId} ready ({startReadyCount}/2)");
+            Log.Info($"ServerMatch-{matchId}", $"Client {clientId} ready ({startReadyCount}/2)");
 
             if (startReadyCount == 2) StartDraftingPhase();
         }
@@ -67,7 +70,7 @@ namespace Drakken.Server
             Assert.True(gameState.Phase == GamePhase.NotStarted);
 
             // Start game into drafting phase
-            Log.Info($"ServerMatch-{MatchId}", $"Starting game");
+            Log.Info($"ServerMatch-{matchId}", $"Starting game");
             gameState.Phase = GamePhase.Drafting;
 
             // Give each client 4 new D6s
@@ -104,7 +107,7 @@ namespace Drakken.Server
                 }
             }
 
-            server.Connection.BroadcastMatchStartDraftingPhase(gameState, clientIds);
+            GameConnection.Singleton.Server_BroadcastMatchStartDraftingPhase(clientIds, gameState);
         }
 
         public void OnDraftDiscard(ulong clientId, DraftDiscardMessage msg)
@@ -120,7 +123,7 @@ namespace Drakken.Server
             if (discard0 != null) hand.Remove(discard0);
             if (discard1 != null) hand.Remove(discard1);
 
-            Log.Info($"ServerMatch-{MatchId}", $"Player {playerIndex} discarded 2, hand={hand.Count}");
+            Log.Info($"ServerMatch-{matchId}", $"Player {playerIndex} discarded 2, hand={hand.Count}");
 
             discardReadyCount++;
             if (discardReadyCount == 2) BeginPlayingPhase();
@@ -131,8 +134,8 @@ namespace Drakken.Server
             Assert.True(gameState.Phase == GamePhase.Drafting);
             gameState.Phase = GamePhase.Playing;
 
-            Log.Info($"ServerMatch-{MatchId}", "Both players finished drafting, starting Playing phase");
-            server.Connection.BroadcastMatchStartPlayingPhase(gameState, clientIds);
+            Log.Info($"ServerMatch-{matchId}", "Both players finished drafting, starting Playing phase");
+            GameConnection.Singleton.Server_BroadcastMatchStartPlayingPhase(clientIds, gameState);
         }
 
         /*
@@ -195,6 +198,11 @@ namespace Drakken.Server
                 int j = Random.Range(0, i + 1);
                 (list[i], list[j]) = (list[j], list[i]);
             }
+        }
+
+        public bool IsMatch(ulong matchId)
+        {
+            return this.matchId == matchId;
         }
     }
 }

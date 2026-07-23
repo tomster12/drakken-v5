@@ -1,8 +1,6 @@
-using Drakken.Domain.Tokens;
-using System.Collections.Generic;
 using Unity.Netcode;
 
-namespace Drakken.Domain
+namespace Drakken.Domain.Networking
 {
     public struct DraftDiscardMessage : INetworkSerializable
     {

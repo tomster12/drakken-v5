@@ -1,19 +1,24 @@
 using System;
 using System.Collections.Generic;
 using Drakken.Common.Utility;
-using Unity.VisualScripting.Antlr3.Runtime;
 using UnityEngine;
 
 namespace Drakken.Domain.Tokens
 {
     public class TokenRegistry
     {
-        private readonly Dictionary<string, TokenDefinition> definitions = new();
-        private readonly Dictionary<string, ITokenExecutor> executors = new();
-        private readonly Dictionary<string, (Type intentType, Type resolutionType)> messageTypes = new();
-        private readonly Dictionary<string, TokenVisuals> visuals = new();
+        private readonly Dictionary<string, TokenRegistryEntry> entries = new();
 
-        public IEnumerable<TokenDefinition> AllDefinitions => definitions.Values;
+        public IEnumerable<TokenDefinition> AllDefinitions
+        {
+            get
+            {
+                foreach (var entry in entries.Values)
+                {
+                    yield return entry.Definition;
+                }
+            }
+        }
 
         internal void Register(
             TokenDefinition definition,
@@ -24,56 +29,84 @@ namespace Drakken.Domain.Tokens
         {
             Assert.NotNullOrEmpty(definition.TokenId, "TokenDefinition must have a non-empty TokenId");
 
-            this.definitions[definition.TokenId] = definition;
-            this.executors[definition.TokenId] = executor;
-            this.messageTypes[definition.TokenId] = (intentType, resolutionType);
-            if (visuals != null) this.visuals[definition.TokenId] = visuals;
+            entries[definition.TokenId] = new TokenRegistryEntry(definition, executor, intentType, resolutionType, visuals);
         }
 
         public TokenDefinition GetDefinition(string tokenId)
-        {
-            if (definitions.TryGetValue(tokenId, out var def)) return def;
-            throw new KeyNotFoundException($"No token definition for tokenId='{tokenId}'");
-        }
+            => GetEntryOrThrow(tokenId).Definition;
 
-        public bool TryGetDefinition(string tokenId, out TokenDefinition def)
-            => definitions.TryGetValue(tokenId, out def);
+        public bool TryGetDefinition(string tokenId, out TokenDefinition definition)
+        {
+            if (entries.TryGetValue(tokenId, out var entry))
+            {
+                definition = entry.Definition;
+                return true;
+            }
+            definition = default;
+            return false;
+        }
 
         public ITokenExecutor GetExecutor(string tokenId)
-        {
-            if (executors.TryGetValue(tokenId, out var exec)) return exec;
-            throw new KeyNotFoundException($"No executor registered for tokenId='{tokenId}'");
-        }
+            => GetEntryOrThrow(tokenId).Executor;
 
         public TokenIntent DeserialiseIntent(string tokenId, string json)
-        {
-            Assert.True(messageTypes.TryGetValue(tokenId, out var types), $"No types registered for tokenId='{tokenId}'");
-            return (TokenIntent)JsonUtility.FromJson(json, types.intentType);
-        }
+            => (TokenIntent)JsonUtility.FromJson(json, GetEntryOrThrow(tokenId).IntentType);
 
         public TokenResolution DeserialiseResolution(string tokenId, string json)
-        {
-            Assert.True(messageTypes.TryGetValue(tokenId, out var types), $"No types registered for tokenId='{tokenId}'");
-            return (TokenResolution)JsonUtility.FromJson(json, types.resolutionType);
-        }
+            => (TokenResolution)JsonUtility.FromJson(json, GetEntryOrThrow(tokenId).ResolutionType);
 
         public ITokenAnimator GetAnimator(string tokenId)
         {
-            if (visuals.TryGetValue(tokenId, out var v)) return v.Animator;
+            var visuals = GetEntryOrThrow(tokenId).Visuals;
+            if (visuals != null) return visuals.Animator;
             throw new KeyNotFoundException($"No animator registered for tokenId='{tokenId}'. Was the registry built with visuals?");
         }
 
         public GameObject GetMeshPrefab(string tokenId)
         {
-            if (visuals.TryGetValue(tokenId, out var v)) return v.MeshPrefab;
+            var visuals = GetEntryOrThrow(tokenId).Visuals;
+            if (visuals != null) return visuals.MeshPrefab;
             throw new KeyNotFoundException($"No mesh prefab registered for tokenId='{tokenId}'. Was the registry built with visuals?");
         }
 
         public bool TryGetMeshPrefab(string tokenId, out GameObject meshPrefab)
         {
-            if (visuals.TryGetValue(tokenId, out var v)) { meshPrefab = v.MeshPrefab; return true; }
+            if (entries.TryGetValue(tokenId, out var entry) && entry.Visuals != null)
+            {
+                meshPrefab = entry.Visuals.MeshPrefab;
+                return true;
+            }
             meshPrefab = null;
             return false;
+        }
+
+        private TokenRegistryEntry GetEntryOrThrow(string tokenId)
+        {
+            if (entries.TryGetValue(tokenId, out var entry)) return entry;
+            throw new KeyNotFoundException($"No token registered for tokenId='{tokenId}'");
+        }
+    }
+
+    internal sealed class TokenRegistryEntry
+    {
+        public readonly TokenDefinition Definition;
+        public readonly ITokenExecutor Executor;
+        public readonly Type IntentType;
+        public readonly Type ResolutionType;
+        public readonly TokenVisuals Visuals;
+
+        public TokenRegistryEntry(
+            TokenDefinition definition,
+            ITokenExecutor executor,
+            Type intentType,
+            Type resolutionType,
+            TokenVisuals visuals)
+        {
+            Definition = definition;
+            Executor = executor;
+            IntentType = intentType;
+            ResolutionType = resolutionType;
+            Visuals = visuals;
         }
     }
 

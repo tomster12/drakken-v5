@@ -26,6 +26,7 @@ namespace Drakken.Client.States
         {
             Layout.Connecting.JoinButton.Clicked -= OnJoinClicked;
             Layout.Connecting.ReadyButton.Clicked -= OnReadyClicked;
+            
             if (client.Match != null) client.Match.DraftingPhaseStarted -= OnGameStarted;
 
             Layout.Connecting.JoinButton.gameObject.SetActive(false);

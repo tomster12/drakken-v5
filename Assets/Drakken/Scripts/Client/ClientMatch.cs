@@ -1,7 +1,6 @@
 using Drakken.Domain;
 using Drakken.Common.Utility;
 using Drakken.Networking;
-using System.Threading.Tasks;
 using System;
 
 namespace Drakken.Client
@@ -11,21 +10,17 @@ namespace Drakken.Client
         public Action DraftingPhaseStarted = delegate { };
         public Action PlayingPhaseStarted = delegate { };
 
-        public ulong MatchId { get; }
-        public int ClientIndex { get; }
+        public ulong MatchId { get; private set; }
+        public int ClientIndex { get; private set; }
         public GameState GameState { get; private set; }
         public bool IsReadiedUp { get; private set; }
         public bool IsStarted { get; private set; }
         public bool IsMyTurn => GameState?.TurnClientIndex == ClientIndex;
 
-        private readonly GameClient client;
-        private Task currentResolutionTask;
-
-        public ClientMatch(GameClient client, JoinMatchResponse response)
+        public ClientMatch(ulong matchId, int clientIndex)
         {
-            this.client = client;
-            MatchId = response.MatchId;
-            ClientIndex = (int)response.ClientIndex;
+            MatchId = matchId;
+            ClientIndex = clientIndex;
 
             Log.Info($"ClientMatch-{MatchId}", $"Joined match as clientIndex={ClientIndex}");
         }
@@ -33,9 +28,9 @@ namespace Drakken.Client
         public void SetReady()
         {
             Assert.False(IsReadiedUp);
-            
+
             IsReadiedUp = true;
-            client.Connection.MessageMatchReady();
+            GameConnection.Singleton.C2S_MessageMatchClientReady_Rpc(MatchId);
         }
 
         public void OnStartDraftingPhase(GameState state)

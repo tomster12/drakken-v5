@@ -1,6 +1,6 @@
 using Unity.Netcode;
 
-namespace Drakken.Networking
+namespace Drakken.Domain.Networking
 {
     public class JoinMatchResponse : INetworkSerializable
     {
@@ -15,5 +15,4 @@ namespace Drakken.Networking
             serializer.SerializeValue(ref ClientIndex);
         }
     }
-
 }

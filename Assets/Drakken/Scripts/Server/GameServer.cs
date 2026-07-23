@@ -1,5 +1,7 @@
 using Drakken.Common.Utility;
+using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens;
+using Drakken.Networking;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -17,14 +19,13 @@ namespace Drakken.Server
         [SerializeField] private string hostAddress = "0.0.0.0";
         [SerializeField] private ushort hostPort = 7777;
 
-        public ServerConnection Connection { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
         private ServerMatch currentMatch;
 
         private void Awake()
         {
             Singleton = this;
-            TokenRegistry = TokenRegistryBuilder.Build();
+            TokenRegistry = TokenRegistryBuilder.BuildRegistry();
         }
 
         public void StartApplication()
@@ -32,27 +33,24 @@ namespace Drakken.Server
             Log.Info("Client", $"Starting game server at {hostAddress}:{hostPort}");
 
             var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
-            
+
             transport.ConnectionData.Address = hostAddress;
             transport.ConnectionData.Port = hostPort;
             NetworkManager.Singleton.StartServer();
 
-            Connection = new ServerConnection(this);
+            GameConnection.Singleton.SetServer(this);
         }
 
-        public ServerMatch GetOrCreateMatch()
+        public JoinMatchResponse OnRequestJoinMatch(ulong clientId)
         {
-            return currentMatch ??= new ServerMatch(this);
+            currentMatch ??= new ServerMatch(this);
+
+            return currentMatch.OnRequestJoin(clientId);
         }
 
         public ServerMatch GetMatch(ulong matchId)
         {
-            Assert.True(currentMatch?.MatchId == matchId, $"No match with matchId={matchId}");
-            return currentMatch;
-        }
-        
-        public ServerMatch GetMatchForClient(ulong clientId)
-        {
+            Assert.True(currentMatch.IsMatch(matchId), $"No match with matchId={matchId}");
             return currentMatch;
         }
     }

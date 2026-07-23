@@ -6,14 +6,14 @@ namespace Drakken.Domain.Tokens
 {
     public static class TokenRegistryBuilder
     {
-        public static TokenRegistry Build()
+        public static TokenRegistry BuildRegistry()
         {
             var registry = new TokenRegistry();
             RegisterAll(registry);
             return registry;
         }
 
-        public static TokenRegistry BuildWithVisuals(Func<string, GameObject> prefabFactory)
+        public static TokenRegistry BuildClientRegistry(Func<string, GameObject> prefabFactory)
         {
             var registry = new TokenRegistry();
             RegisterAll(registry, prefabFactory);

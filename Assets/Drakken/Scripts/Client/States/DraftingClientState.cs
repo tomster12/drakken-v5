@@ -1,7 +1,8 @@
 using Drakken.Client.GameObjects;
 using Drakken.Common.Utility;
 using Drakken.Domain;
-using Drakken.Domain.Tokens;
+using Drakken.Domain.Networking;
+using Drakken.Networking;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -118,13 +119,13 @@ namespace Drakken.Client.States
             Layout.Drafting.DraftConfirmButton.Interactable = false;
             foreach (var view in tokenViews) view.SetInteractable(false);
 
-            var msg = new DraftDiscardMessage
+            var message = new DraftDiscardMessage
             {
                 DiscardInstanceId0 = selectedTokenViews[0].TokenInstance.InstanceId,
                 DiscardInstanceId1 = selectedTokenViews[1].TokenInstance.InstanceId,
             };
 
-            client.Connection.MessageMatchDraftDiscard(msg);
+            GameConnection.Singleton.C2S_MessageMatchDraftDiscard_Rpc(client.Match.MatchId, message);
             Log.Info("DraftingState", "Discard sent, waiting for playing phase...");
 
             client.Match.PlayingPhaseStarted += OnPlayingPhaseStarted;
