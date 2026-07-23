@@ -31,7 +31,8 @@ namespace Drakken.Client
         private void Awake()
         {
             Singleton = this;
-            TokenRegistry = TokenRegistryBuilder.Build();
+
+            TokenRegistry = TokenRegistryBuilder.BuildWithVisuals(assets.GetTokenPrefab);
         }
 
         public async Task StartApplication()

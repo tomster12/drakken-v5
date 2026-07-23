@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using Unity.Profiling;
 using UnityEngine;
@@ -15,6 +16,7 @@ namespace Drakken.Client.GameObjects
         public SharedLayout Shared;
     }
 
+    [Serializable]
     public class ConnectingLayout
     {
 
@@ -22,13 +24,15 @@ namespace Drakken.Client.GameObjects
         public PhysicalButton ReadyButton;
     }
 
+    [Serializable]
     public class DraftingLayout
     {
         public Transform DraftTokenRow;
         public Transform DraftConfirmAnchor;
-        public PhysicalButton ConfirmButton;
+        public PhysicalButton DraftConfirmButton;
     }
 
+    [Serializable]
     public class SharedLayout
     {
 
@@ -36,7 +40,7 @@ namespace Drakken.Client.GameObjects
         public Transform OpponentDiceRow;
         public Transform MyHandRow;
         public Transform OpponentHandRow;
-        public float CardSpacing = 0.4f;
+        public float TokenSpacing = 0.4f;
         public float DiceSpacing = 0.35f;
     }
 }

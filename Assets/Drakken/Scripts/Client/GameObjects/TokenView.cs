@@ -1,95 +1,124 @@
+using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
-using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 namespace Drakken.Client.GameObjects
 {
-    public class TokenView : MonoBehaviour
+    public class TokenView : MonoBehaviour,
+        IPointerEnterHandler,
+        IPointerExitHandler,
+        IPointerDownHandler,
+        IPointerUpHandler
     {
         public UnityEvent<TokenView> OnClicked;
 
         [Header("References")]
         [SerializeField] private Outline outline;
-        [SerializeField] private new Renderer renderer;
-        [SerializeField] private TextMeshPro labelName;
-        [SerializeField] private TextMeshPro labelDescription;
-        [SerializeField] private SpriteRenderer spriteRenderer;
 
-        [Header("Config")]
-        [SerializeField] private Color colorNormal = new(0.19f, 0.15f, 0.133f);
-        [SerializeField] private Color colorDisabled = new(0.35f, 0.35f, 0.35f);
+        [Header("Hover / Select Offsets")]
         [SerializeField] private float hoverLiftY = 0.15f;
         [SerializeField] private float selectedLiftY = 0.30f;
-        [SerializeField] private float lerpSpeed = 12f;
+
+        [Header("Movement")]
+        [SerializeField] private float moveLerp = 10f;
+        [SerializeField] private float liftLerp = 20f;
 
         public TokenInstance TokenInstance { get; private set; }
         public bool IsSelected { get; private set; }
-        public bool IsInteractable { get; private set; } = true;
-
-        private Vector3 basePosition;
+        public Vector3 TargetPosition { get; set; }
         private bool isHovered;
+        private bool isInteractable = true;
+        private float currentOffsetY;
+
+        public static TokenView Create(TokenInstance instance, Transform parent = null)
+        {
+            var prefab = GameClient.Singleton.Assets.TokenViewPrefab;
+            var tokenGo = Instantiate(prefab, parent);
+            var tokenView = tokenGo.GetComponent<TokenView>();
+            tokenView.Bind(instance);
+            return tokenView;
+        }
 
         private void Awake()
         {
-            basePosition = transform.localPosition;
+            TargetPosition = transform.position;
             if (outline != null) outline.enabled = false;
         }
 
-        public void Bind(TokenInstance instance, TokenDefinition definition, Sprite mesh = null)
+        private void Update()
+        {
+            float targetOffsetY = IsSelected ? selectedLiftY
+                                : isHovered ? hoverLiftY
+                                : 0f;
+
+            currentOffsetY = Mathf.Lerp(currentOffsetY, targetOffsetY, liftLerp * Time.deltaTime);
+
+            transform.position = new Vector3(TargetPosition.x, TargetPosition.y + currentOffsetY, TargetPosition.z);
+        }
+
+        private void Bind(TokenInstance instance)
         {
             TokenInstance = instance;
-            if (labelName != null) labelName.text = definition?.DisplayName ?? instance.TokenId;
-            if (labelDescription != null) labelDescription.text = definition?.Description ?? "";
-            if (spriteRenderer != null && mesh != null) spriteRenderer.sprite = mesh;
+
+            var registry = GameClient.Singleton.TokenRegistry;
+            if (!registry.TryGetMeshPrefab(instance.TokenId, out var meshPrefab))
+            {
+                Log.Warning("TokenView", $"No mesh prefab registered for tokenId='{instance.TokenId}'");
+            }
+            else
+            {
+                var meshGo = Instantiate(meshPrefab, transform);
+                meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            }
+
             SetSelected(false);
         }
 
         public void SetInteractable(bool interactable)
         {
-            IsInteractable = interactable;
-            if (renderer != null)
-                renderer.material.color = interactable ? colorNormal : colorDisabled;
+            isInteractable = interactable;
 
-            // Force-clear hover/select state when disabled
             if (!interactable)
             {
                 isHovered = false;
-                SetSelected(false);
+                UpdateOutline();
             }
         }
 
         public void SetSelected(bool selected)
         {
             IsSelected = selected;
-            if (outline != null) outline.enabled = selected;
+            UpdateOutline();
         }
 
-        private void Update()
+        public void OnPointerEnter(PointerEventData eventData)
         {
-            // --- Input (only when interactable) ---
-            if (IsInteractable)
-            {
-                var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                bool hit = Physics.Raycast(ray, out var hitInfo)
-                           && hitInfo.collider.gameObject == gameObject;
+            if (!isInteractable) return;
+            isHovered = true;
+            UpdateOutline();
+        }
 
-                if (hit != isHovered)
-                    isHovered = hit;
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            isHovered = false;
+            UpdateOutline();
+        }
 
-                if (hit && Input.GetMouseButtonDown(0))
-                    OnClicked.Invoke(this);
-            }
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (!isInteractable) return;
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            OnClicked.Invoke(this);
+        }
 
-            // --- Position (always lerp, even after deselect) ---
-            float targetY = 0f;
-            if (IsSelected) targetY = selectedLiftY;
-            else if (isHovered) targetY = hoverLiftY;
+        public void OnPointerUp(PointerEventData eventData) { }
 
-            var target = basePosition + Vector3.up * targetY;
-            transform.localPosition = Vector3.Lerp(
-                transform.localPosition, target, lerpSpeed * Time.deltaTime);
+        private void UpdateOutline()
+        {
+            if (outline == null) return;
+            outline.enabled = IsSelected || (isHovered && isInteractable);
         }
     }
 }

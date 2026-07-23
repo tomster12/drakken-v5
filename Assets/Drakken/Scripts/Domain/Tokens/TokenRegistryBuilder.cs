@@ -1,4 +1,6 @@
+using System;
 using Drakken.Domain.Tokens.Implementation;
+using UnityEngine;
 
 namespace Drakken.Domain.Tokens
 {
@@ -6,9 +8,23 @@ namespace Drakken.Domain.Tokens
     {
         public static TokenRegistry Build()
         {
-            var db = new TokenRegistry();
+            var registry = new TokenRegistry();
+            RegisterAll(registry);
+            return registry;
+        }
 
-            db.Register(
+        public static TokenRegistry BuildWithVisuals(Func<string, GameObject> prefabFactory)
+        {
+            var registry = new TokenRegistry();
+            RegisterAll(registry, prefabFactory);
+            return registry;
+        }
+
+        private static void RegisterAll(TokenRegistry registry, Func<string, GameObject> prefabFactory = null)
+        {
+            bool includeVisuals = prefabFactory != null;
+
+            registry.Register(
                 new TokenDefinition
                 {
                     TokenId = "dragon",
@@ -20,12 +36,15 @@ namespace Drakken.Domain.Tokens
                     RequiresTarget = false
                 },
                 new DragonTokenExecutor(),
-                new DragonTokenAnimator(),
                 typeof(DragonTokenIntent),
-                typeof(DragonTokenResolution)
+                typeof(DragonTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new DragonTokenAnimator(),
+                    prefabFactory?.Invoke("dragon")
+                )
             );
 
-            db.Register(
+            registry.Register(
                 new TokenDefinition
                 {
                     TokenId = "parasite",
@@ -37,12 +56,13 @@ namespace Drakken.Domain.Tokens
                     RequiresTarget = true
                 },
                 new ParasiteTokenExecutor(),
-                new ParasiteTokenAnimator(),
                 typeof(ParasiteTokenIntent),
-                typeof(ParasiteTokenResolution)
+                typeof(ParasiteTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new ParasiteTokenAnimator(),
+                    prefabFactory?.Invoke("parasite")
+                )
             );
-
-            return db;
         }
     }
 }

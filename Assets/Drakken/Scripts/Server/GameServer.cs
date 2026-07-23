@@ -32,6 +32,7 @@ namespace Drakken.Server
             Log.Info("Client", $"Starting game server at {hostAddress}:{hostPort}");
 
             var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+            
             transport.ConnectionData.Address = hostAddress;
             transport.ConnectionData.Port = hostPort;
             NetworkManager.Singleton.StartServer();
@@ -40,7 +41,9 @@ namespace Drakken.Server
         }
 
         public ServerMatch GetOrCreateMatch()
-            => currentMatch ??= new ServerMatch(this);
+        {
+            return currentMatch ??= new ServerMatch(this);
+        }
 
         public ServerMatch GetMatch(ulong matchId)
         {
