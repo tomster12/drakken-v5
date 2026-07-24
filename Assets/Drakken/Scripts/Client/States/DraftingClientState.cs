@@ -46,7 +46,7 @@ namespace Drakken.Client.States
             SpawnDiceRow(Match.ClientIndex, Layout.Shared.MyDiceRow);
             SpawnDiceRow(1 - Match.ClientIndex, Layout.Shared.OpponentDiceRow);
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
-            Layout.Drafting.DraftConfirmButton.Interactable = true;
+            Layout.Drafting.DraftConfirmButton.Interactable = false;
             Layout.Drafting.DraftConfirmButton.Clicked += OnConfirmClicked;
 
             return Task.CompletedTask;

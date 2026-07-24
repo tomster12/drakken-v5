@@ -14,7 +14,7 @@ namespace Drakken.Client.GameObjects
         IPointerDownHandler,
         IPointerUpHandler
     {
-        public UnityEvent<TokenView> OnClicked;
+        public UnityEvent<TokenView> OnClicked = new();
 
         [Header("References")]
         [SerializeField] private Outline outline;
@@ -22,6 +22,8 @@ namespace Drakken.Client.GameObjects
         [Header("Hover / Select Offsets")]
         [SerializeField] private float hoverLiftY = 0.15f;
         [SerializeField] private float selectedLiftY = 0.30f;
+        [SerializeField] private Color hoverOutlineColor = Color.white;
+        [SerializeField] private Color selectedOutlineColor = Color.yellow;
 
         [Header("Movement")]
         [SerializeField] private float moveLerp = 10f;
@@ -49,7 +51,7 @@ namespace Drakken.Client.GameObjects
         private void Awake()
         {
             TargetPosition = transform.position;
-            if (outline != null) outline.enabled = false;
+            UpdateOutline();
         }
 
         private void Update()
@@ -76,6 +78,8 @@ namespace Drakken.Client.GameObjects
             {
                 var meshGo = Instantiate(meshPrefab, transform);
                 meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                outline = meshGo.GetComponent<Outline>() ?? meshGo.AddComponent<Outline>();
+                AddPointerColliders(meshGo);
             }
 
             SetSelected(false);
@@ -125,7 +129,21 @@ namespace Drakken.Client.GameObjects
         private void UpdateOutline()
         {
             if (outline == null) return;
-            outline.enabled = IsSelected || (isHovered && isInteractable);
+
+            bool shouldShow = IsSelected || (isHovered && isInteractable);
+            outline.OutlineColor = IsSelected ? selectedOutlineColor : hoverOutlineColor;
+            outline.enabled = shouldShow;
+        }
+
+        private static void AddPointerColliders(GameObject meshRoot)
+        {
+            foreach (var meshFilter in meshRoot.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (meshFilter.sharedMesh == null || meshFilter.GetComponent<Collider>() != null) continue;
+
+                var meshCollider = meshFilter.gameObject.AddComponent<MeshCollider>();
+                meshCollider.sharedMesh = meshFilter.sharedMesh;
+            }
         }
     }
 }
