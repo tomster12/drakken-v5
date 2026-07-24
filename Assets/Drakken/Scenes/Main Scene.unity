@@ -847,11 +847,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicalButton
   outline: {fileID: 598466358}
-  hoverY: 0.03
-  heldY: -0.03
-  normLerp: 20
-  heldLerp: 60
---- !u!1 &627475659
+  hoverY: 0.04
+  heldY: -0.04
+  normLerp: 40
+  heldLerp: 80
+--- !u!1 &734454804
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -859,21 +859,21 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 627475660}
+  - component: {fileID: 734454805}
   m_Layer: 0
-  m_Name: =============== SCENE
+  m_Name: '=============== SCENE: DRAFT'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
---- !u!4 &627475660
+--- !u!4 &734454805
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 627475659}
+  m_GameObject: {fileID: 734454804}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1625,10 +1625,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicalButton
   outline: {fileID: 1118095933}
-  hoverY: 0.03
-  heldY: -0.03
-  normLerp: 20
-  heldLerp: 60
+  hoverY: 0.04
+  heldY: -0.04
+  normLerp: 40
+  heldLerp: 80
 --- !u!114 &1118095933
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1683,7 +1683,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1127343891}
   m_Layer: 0
-  m_Name: Draft Confirm Anchor
+  m_Name: Draft Confirm Button Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1699,6 +1699,37 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0.79, z: -2.234}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1129743062
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1129743063}
+  m_Layer: 0
+  m_Name: '=============== SCENE: CONNECTING'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1129743063
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129743062}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1779,10 +1810,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicalButton
   outline: {fileID: 1177465401}
-  hoverY: 0.03
-  heldY: -0.03
-  normLerp: 20
-  heldLerp: 60
+  hoverY: 0.04
+  heldY: -0.04
+  normLerp: 40
+  heldLerp: 80
 --- !u!4 &1177465403
 Transform:
   m_ObjectHideFlags: 0
@@ -1981,6 +2012,37 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1463432584
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1463432585}
+  m_Layer: 0
+  m_Name: '=============== SCENE: PLAYING'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1463432585
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1463432584}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1701754554
 GameObject:
   m_ObjectHideFlags: 0
@@ -2397,17 +2459,19 @@ SceneRoots:
   - {fileID: 1044095447}
   - {fileID: 9118033882318529003}
   - {fileID: 865993103}
-  - {fileID: 627475660}
   - {fileID: 330585546}
   - {fileID: 782392042}
   - {fileID: 832575519}
   - {fileID: 410087041}
   - {fileID: 916353910}
+  - {fileID: 1129743063}
+  - {fileID: 1968077766}
   - {fileID: 1118095931}
   - {fileID: 598466357}
-  - {fileID: 1968077766}
+  - {fileID: 734454805}
   - {fileID: 1127343891}
   - {fileID: 1177465403}
+  - {fileID: 1463432585}
   - {fileID: 786596933}
   - {fileID: 749899255}
   - {fileID: 153358487}

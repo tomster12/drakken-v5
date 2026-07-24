@@ -18,11 +18,33 @@ namespace Drakken.Client.States
 
         private SceneLayout Layout => SceneLayout.Singleton;
 
+        // ------------------------------ Setup
+
         public override Task Enter()
         {
-            SpawnTokens();
-            SpawnDice();
+            var registry = client.TokenRegistry;
 
+            // Spawn tokens
+            var tokenAnchor = Layout.Drafting.DraftTokenRow;
+            var tokenHand = GameState.Clients[Match.ClientIndex].Hand;
+            for (int i = 0; i < tokenHand.Count; i++)
+            {
+                var tokenInstance = tokenHand[i];
+                var tokenView = TokenView.Create(client.Assets, client.TokenRegistry, tokenInstance, tokenAnchor);
+                if (tokenView == null) continue;
+
+                tokenView.OnClicked.AddListener(OnTokenClicked);
+                tokenViews.Add(tokenView);
+
+                float offset = (i - (tokenHand.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
+                Vector3 worldPos = tokenAnchor.TransformPoint(new Vector3(offset, 0f, 0f));
+                tokenView.TargetPosition = worldPos;
+                tokenView.transform.position = worldPos;
+            }
+
+            // Spawn own and opponent dice
+            SpawnDiceRow(Match.ClientIndex, Layout.Shared.MyDiceRow);
+            SpawnDiceRow(1 - Match.ClientIndex, Layout.Shared.OpponentDiceRow);
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
             Layout.Drafting.DraftConfirmButton.Interactable = true;
             Layout.Drafting.DraftConfirmButton.Clicked += OnConfirmClicked;
@@ -32,17 +54,14 @@ namespace Drakken.Client.States
 
         public override Task Exit()
         {
-            client.Match.PlayingPhaseStarted -= OnPlayingPhaseStarted;
+            Match.PlayingPhaseStarted -= OnPlayingPhaseStarted;
 
-            // foreach (var view in tokenViews)
-            // {
-            //     if (view != null)
-            //     {
-            //         Object.Destroy(view.gameObject);
-            //     }
-            // }
-            // tokenViews.Clear();
-            // selectedTokenViews.Clear();
+            foreach (var view in tokenViews)
+            {
+                Object.Destroy(view.gameObject);
+            }
+            tokenViews.Clear();
+            selectedTokenViews.Clear();
 
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
             Layout.Drafting.DraftConfirmButton.Interactable = false;
@@ -51,27 +70,22 @@ namespace Drakken.Client.States
             return Task.CompletedTask;
         }
 
-        private void SpawnTokens()
+        private void SpawnDiceRow(int playerIndex, Transform anchor)
         {
-            var registry = client.TokenRegistry;
-            var anchor = Layout.Drafting.DraftTokenRow;
-            var hand = GameState.Clients[Match.ClientIndex].Hand;
-
-            for (int i = 0; i < hand.Count; i++)
+            var dice = GameState.Clients[playerIndex].Dice;
+            for (int i = 0; i < dice.Count; i++)
             {
-                var tokenView = TokenView.Create(hand[i], anchor);
-                if (tokenView == null) continue;
+                var diceGo = Object.Instantiate(client.Assets.DiceViewPrefab, anchor);
+                var diceView = diceGo.GetComponent<DiceView>();
 
-                tokenView.OnClicked.AddListener(OnTokenClicked);
-                tokenViews.Add(tokenView);
+                diceView.Bind(dice[i]);
 
-                float offset = (i - (hand.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
-                Vector3 worldPos = anchor.TransformPoint(new Vector3(offset, 0f, 0f));
-                tokenView.TargetPosition = worldPos;
-                tokenView.transform.position = worldPos;
+                float offset = (i - (dice.Count - 1) / 2f) * Layout.Shared.DiceSpacing;
+                diceGo.transform.localPosition = new Vector3(offset, 0f, 0f);
             }
         }
 
+        // ------------------------------ Logic
 
         private void OnTokenClicked(TokenView tokenView)
         {
@@ -91,27 +105,6 @@ namespace Drakken.Client.States
             Layout.Drafting.DraftConfirmButton.Interactable = selectedTokenViews.Count == DiscardCount;
         }
 
-        private void SpawnDice()
-        {
-            SpawnDiceRow(Match.ClientIndex, Layout.Shared.MyDiceRow);
-            SpawnDiceRow(1 - Match.ClientIndex, Layout.Shared.OpponentDiceRow);
-        }
-
-        private void SpawnDiceRow(int playerIndex, Transform anchor)
-        {
-            var dice = GameState.Clients[playerIndex].Dice;
-            for (int i = 0; i < dice.Count; i++)
-            {
-                var diceGo = Object.Instantiate(client.Assets.DiceViewPrefab, anchor);
-                var diceView = diceGo.GetComponent<DiceView>();
-
-                diceView.Bind(dice[i]);
-
-                float offset = (i - (dice.Count - 1) / 2f) * Layout.Shared.DiceSpacing;
-                diceGo.transform.localPosition = new Vector3(offset, 0f, 0f);
-            }
-        }
-
         private async void OnConfirmClicked()
         {
             Assert.True(selectedTokenViews.Count == DiscardCount);
@@ -125,10 +118,10 @@ namespace Drakken.Client.States
                 DiscardInstanceId1 = selectedTokenViews[1].TokenInstance.InstanceId,
             };
 
-            GameConnection.Singleton.C2S_MessageMatchDraftDiscard_Rpc(client.Match.MatchId, message);
+            GameConnection.Singleton.C2S_MessageMatchDraftDiscard_Rpc(Match.MatchId, message);
             Log.Info("DraftingState", "Discard sent, waiting for playing phase...");
 
-            client.Match.PlayingPhaseStarted += OnPlayingPhaseStarted;
+            Match.PlayingPhaseStarted += OnPlayingPhaseStarted;
         }
 
         private async void OnPlayingPhaseStarted()

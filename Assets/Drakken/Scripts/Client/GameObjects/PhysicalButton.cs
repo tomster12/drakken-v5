@@ -1,5 +1,4 @@
 ﻿using System;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -48,7 +47,7 @@ public class PhysicalButton : MonoBehaviour,
         {
             currentPosition.y = Mathf.Lerp(transform.position.y, initialY + heldY, heldLerp * Time.deltaTime);
         }
-        else if (Interactable && isHeld)
+        else if (Interactable && isHovered)
         {
             currentPosition.y = Mathf.Lerp(transform.position.y, initialY + hoverY, normLerp * Time.deltaTime);
         }

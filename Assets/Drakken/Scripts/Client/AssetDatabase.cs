@@ -9,8 +9,8 @@ namespace Drakken.Client
     public class AssetDatabase : ScriptableObject
     {
         [Header("Prefabs")]
-        [SerializeField] private TokenView TokenViewPrefab;
-        [SerializeField] private DiceView DiceViewPrefab;
+        [SerializeField] public TokenView TokenViewPrefab;
+        [SerializeField] public DiceView DiceViewPrefab;
         [SerializeField] private TokenPrefabEntry[] tokenMeshPrefabs;
 
         public GameObject GetTokenPrefab(string tokenId)

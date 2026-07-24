@@ -11,11 +11,10 @@ namespace Drakken.Client.States
         public override async Task Enter()
         {
             Layout.Connecting.JoinButton.Clicked += OnJoinClicked;
-            Layout.Connecting.ReadyButton.Clicked += OnReadyClicked;
-
             Layout.Connecting.JoinButton.Interactable = true;
             Layout.Connecting.JoinButton.gameObject.SetActive(true);
-            
+
+            Layout.Connecting.ReadyButton.Clicked += OnReadyClicked;
             Layout.Connecting.ReadyButton.Interactable = false;
             Layout.Connecting.ReadyButton.gameObject.SetActive(false);
 
@@ -24,12 +23,12 @@ namespace Drakken.Client.States
 
         public override async Task Exit()
         {
-            Layout.Connecting.JoinButton.Clicked -= OnJoinClicked;
-            Layout.Connecting.ReadyButton.Clicked -= OnReadyClicked;
-            
             if (client.Match != null) client.Match.DraftingPhaseStarted -= OnGameStarted;
 
+            Layout.Connecting.JoinButton.Clicked -= OnJoinClicked;
             Layout.Connecting.JoinButton.gameObject.SetActive(false);
+
+            Layout.Connecting.ReadyButton.Clicked -= OnReadyClicked;
             Layout.Connecting.ReadyButton.gameObject.SetActive(false);
         }
 
@@ -39,25 +38,30 @@ namespace Drakken.Client.States
 
             Log.Info("ConnectingClientState", "Connecting...");
 
-            if (!await client.Connect())
+            Layout.Connecting.JoinButton.Interactable = false;
+
+            var connected = await client.Connect();
+            if (!connected)
             {
                 Log.Info("ConnectingClientState", "Connection failed.");
+                Layout.Connecting.JoinButton.Interactable = true;
                 return;
             }
 
             Log.Info("ConnectingClientState", "Connected. Joining match...");
 
-            if (!await client.JoinMatch())
+            var joined = await client.JoinMatch();
+            if (!joined)
             {
                 Log.Info("ConnectingClientState", "Failed to join match.");
+                Layout.Connecting.JoinButton.Interactable = true;
                 return;
             }
 
             Log.Info("ConnectingClientState", "Joined. Ready up!");
 
             client.Match.DraftingPhaseStarted += OnGameStarted;
-            
-            Layout.Connecting.JoinButton.Interactable = false;
+
             Layout.Connecting.ReadyButton.gameObject.SetActive(true);
             Layout.Connecting.ReadyButton.Interactable = true;
         }
@@ -65,9 +69,11 @@ namespace Drakken.Client.States
         private void OnReadyClicked()
         {
             Assert.False(client.Match.IsReadiedUp);
-            
+
             Log.Info("ConnectingClientState", "Waiting for opponent...");
+
             Layout.Connecting.ReadyButton.Interactable = false;
+
             client.Match.SetReady();
         }
 

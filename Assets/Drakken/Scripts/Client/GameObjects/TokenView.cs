@@ -1,5 +1,7 @@
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
+using System;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -28,16 +30,19 @@ namespace Drakken.Client.GameObjects
         public TokenInstance TokenInstance { get; private set; }
         public bool IsSelected { get; private set; }
         public Vector3 TargetPosition { get; set; }
+        private TokenRegistry registry;
         private bool isHovered;
         private bool isInteractable = true;
         private float currentOffsetY;
 
-        public static TokenView Create(TokenInstance instance, Transform parent = null)
+        // ------------------------------ Setup
+
+        public static TokenView Create(AssetDatabase assets, TokenRegistry registry, TokenInstance instance, Transform parent = null)
         {
-            var prefab = GameClient.Singleton.Assets.TokenViewPrefab;
+            var prefab = assets.TokenViewPrefab;
             var tokenGo = Instantiate(prefab, parent);
             var tokenView = tokenGo.GetComponent<TokenView>();
-            tokenView.Bind(instance);
+            tokenView.Bind(registry, instance);
             return tokenView;
         }
 
@@ -58,11 +63,11 @@ namespace Drakken.Client.GameObjects
             transform.position = new Vector3(TargetPosition.x, TargetPosition.y + currentOffsetY, TargetPosition.z);
         }
 
-        private void Bind(TokenInstance instance)
+        private void Bind(TokenRegistry registry, TokenInstance instance)
         {
+            this.registry = registry;
             TokenInstance = instance;
 
-            var registry = GameClient.Singleton.TokenRegistry;
             if (!registry.TryGetMeshPrefab(instance.TokenId, out var meshPrefab))
             {
                 Log.Warning("TokenView", $"No mesh prefab registered for tokenId='{instance.TokenId}'");
@@ -75,6 +80,8 @@ namespace Drakken.Client.GameObjects
 
             SetSelected(false);
         }
+
+        // ------------------------------ Interaction
 
         public void SetInteractable(bool interactable)
         {

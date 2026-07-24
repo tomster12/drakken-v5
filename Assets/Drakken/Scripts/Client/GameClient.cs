@@ -18,7 +18,6 @@ namespace Drakken.Client
         [Header("Assets")]
         [SerializeField] private AssetDatabase assets;
 
-        public static GameClient Singleton { get; private set; }
         public AssetDatabase Assets => assets;
         public ClientMatch Match { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
@@ -29,7 +28,6 @@ namespace Drakken.Client
 
         private void Awake()
         {
-            Singleton = this;
             TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefab);
         }
 
