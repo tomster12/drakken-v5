@@ -15,12 +15,15 @@ public class PhysicalButton : MonoBehaviour,
 
     [Header("References")]
     [SerializeField] private Outline outline;
+    [SerializeField] private MeshRenderer meshRenderer;
 
     [Header("Config")]
     [SerializeField] private float hoverY = 0.4f;
     [SerializeField] private float heldY = -0.15f;
     [SerializeField] private float normLerp = 12f;
     [SerializeField] private float heldLerp = 40f;
+    [SerializeField] private Color interactableColor;
+    [SerializeField] private Color notInteractableColor;
 
     private float initialY;
     private bool isHovered;
@@ -42,6 +45,8 @@ public class PhysicalButton : MonoBehaviour,
         Vector3 currentPosition = transform.position;
 
         outline.enabled = Interactable && isHovered;
+
+        meshRenderer.material.color = Interactable ? interactableColor : notInteractableColor;
 
         if (isHeld)
         {
@@ -65,8 +70,8 @@ public class PhysicalButton : MonoBehaviour,
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (isHovered && Interactable) Clicked?.Invoke();
         if (Interactable) isHeld = true;
+        if (isHovered && Interactable) Clicked?.Invoke();
     }
 
     public void OnPointerUp(PointerEventData eventData) => isHeld = false;

@@ -1,7 +1,9 @@
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
 using System;
+using System.Linq;
 using System.Reflection;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -32,7 +34,6 @@ namespace Drakken.Client.GameObjects
         public TokenInstance TokenInstance { get; private set; }
         public bool IsSelected { get; private set; }
         public Vector3 TargetPosition { get; set; }
-        private TokenRegistry registry;
         private bool isHovered;
         private bool isInteractable = true;
         private float currentOffsetY;
@@ -67,7 +68,6 @@ namespace Drakken.Client.GameObjects
 
         private void Bind(TokenRegistry registry, TokenInstance instance)
         {
-            this.registry = registry;
             TokenInstance = instance;
 
             if (!registry.TryGetMeshPrefab(instance.TokenId, out var meshPrefab))
@@ -78,11 +78,25 @@ namespace Drakken.Client.GameObjects
             {
                 var meshGo = Instantiate(meshPrefab, transform);
                 meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-                outline = meshGo.GetComponent<Outline>() ?? meshGo.AddComponent<Outline>();
-                AddPointerColliders(meshGo);
             }
 
             SetSelected(false);
+        }
+
+        [ContextMenu("Bind Random")]
+        private void DebugBindRandom()
+        {
+            var registry = TokenRegistryBuilder.BuildClientRegistry(GameEntrypoint.Singleton.Client.Assets.GetTokenPrefabById);
+
+            var tokenId = registry.AllDefinitions
+                .ToList()
+                .ShuffleInplace()
+                .First()
+                .TokenId;
+
+            var tokenInstance = TokenInstance.Create(tokenId);
+
+            Bind(registry, tokenInstance);
         }
 
         // ------------------------------ Interaction
@@ -133,17 +147,6 @@ namespace Drakken.Client.GameObjects
             bool shouldShow = IsSelected || (isHovered && isInteractable);
             outline.OutlineColor = IsSelected ? selectedOutlineColor : hoverOutlineColor;
             outline.enabled = shouldShow;
-        }
-
-        private static void AddPointerColliders(GameObject meshRoot)
-        {
-            foreach (var meshFilter in meshRoot.GetComponentsInChildren<MeshFilter>(true))
-            {
-                if (meshFilter.sharedMesh == null || meshFilter.GetComponent<Collider>() != null) continue;
-
-                var meshCollider = meshFilter.gameObject.AddComponent<MeshCollider>();
-                meshCollider.sharedMesh = meshFilter.sharedMesh;
-            }
         }
     }
 }

@@ -6,7 +6,7 @@ namespace Drakken.Client.States
 {
     public class ConnectingClientState : ClientState
     {
-        private SceneLayout Layout => SceneLayout.Singleton;
+        private SceneLayout Layout => GameEntrypoint.Singleton.Scene;
 
         public override async Task Enter()
         {
@@ -60,17 +60,15 @@ namespace Drakken.Client.States
 
             Log.Info("ConnectingClientState", "Joined. Ready up!");
 
-            client.Match.DraftingPhaseStarted += OnGameStarted;
-
             Layout.Connecting.ReadyButton.gameObject.SetActive(true);
             Layout.Connecting.ReadyButton.Interactable = true;
+
+            client.Match.DraftingPhaseStarted += OnGameStarted;
         }
 
         private void OnReadyClicked()
         {
             Assert.False(client.Match.IsReadiedUp);
-
-            Log.Info("ConnectingClientState", "Waiting for opponent...");
 
             Layout.Connecting.ReadyButton.Interactable = false;
 

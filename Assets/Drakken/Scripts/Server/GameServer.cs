@@ -1,4 +1,5 @@
 using Drakken.Common.Utility;
+using Drakken.Config;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens;
 using Drakken.Networking;
@@ -10,35 +11,24 @@ namespace Drakken.Server
 {
     public class GameServer : MonoBehaviour
     {
-        public static GameServer Singleton { get; private set; }
-
         [Header("References")]
         [SerializeField] private UnityTransport transport;
-
-        [Header("Config")]
-        [SerializeField] private string hostAddress = "0.0.0.0";
-        [SerializeField] private ushort hostPort = 7777;
 
         public TokenRegistry TokenRegistry { get; private set; }
         private ServerMatch currentMatch;
 
         private void Awake()
         {
-            Singleton = this;
             TokenRegistry = TokenRegistryBuilder.BuildRegistry();
         }
 
         public void StartApplication()
         {
-            Log.Info("Client", $"Starting game server at {hostAddress}:{hostPort}");
+            var config = NetworkConfigLoader.Load();
 
-            var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+            Log.Info("Client", $"Starting game server at {config.address}:{config.port}");
 
-            transport.ConnectionData.Address = hostAddress;
-            transport.ConnectionData.Port = hostPort;
-            NetworkManager.Singleton.StartServer();
-
-            GameConnection.Singleton.SetServer(this);
+            GameEntrypoint.Singleton.Connection.StartServer(this, config.address, config.port);
         }
 
         public JoinMatchResponse OnRequestJoinMatch(ulong clientId)

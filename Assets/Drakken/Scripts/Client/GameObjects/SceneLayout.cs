@@ -1,19 +1,27 @@
 using System;
-using TMPro;
-using Unity.Profiling;
 using UnityEngine;
 
 namespace Drakken.Client.GameObjects
 {
     public class SceneLayout : MonoBehaviour
     {
-        public static SceneLayout Singleton { get; private set; }
-
-        private void Awake() => Singleton = this;
-
         public ConnectingLayout Connecting;
         public DraftingLayout Drafting;
         public SharedLayout Shared;
+
+        private void Awake()
+        {
+            Connecting.JoinButton.gameObject.SetActive(false);
+            Connecting.ReadyButton.gameObject.SetActive(false);
+
+            Drafting.DraftTokenRow.gameObject.SetActive(true);
+            Drafting.DraftConfirmButton.gameObject.SetActive(false);
+
+            Shared.MyDiceRow.gameObject.SetActive(true);
+            Shared.OpponentDiceRow.gameObject.SetActive(true);
+            Shared.MyHandRow.gameObject.SetActive(true);
+            Shared.OpponentHandRow.gameObject.SetActive(true);
+        }
     }
 
     [Serializable]
@@ -28,7 +36,6 @@ namespace Drakken.Client.GameObjects
     public class DraftingLayout
     {
         public Transform DraftTokenRow;
-        public Transform DraftConfirmAnchor;
         public PhysicalButton DraftConfirmButton;
     }
 

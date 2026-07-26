@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Drakken.Common.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -21,9 +22,10 @@ namespace Drakken.Domain
             };
         }
 
-        public void Roll()
+        public DiceInstance Roll()
         {
             Value = Random.Range(1, Sides + 1);
+            return this;
         }
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter

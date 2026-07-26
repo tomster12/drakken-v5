@@ -13,7 +13,7 @@ namespace Drakken.Client
         [SerializeField] public DiceView DiceViewPrefab;
         [SerializeField] private TokenPrefabEntry[] tokenMeshPrefabs;
 
-        public GameObject GetTokenPrefab(string tokenId)
+        public GameObject GetTokenPrefabById(string tokenId)
         {
             foreach (var entry in tokenMeshPrefabs)
             {

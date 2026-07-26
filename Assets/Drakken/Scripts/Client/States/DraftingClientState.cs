@@ -15,8 +15,8 @@ namespace Drakken.Client.States
 
         private readonly List<TokenView> tokenViews = new();
         private readonly List<TokenView> selectedTokenViews = new();
-
-        private SceneLayout Layout => SceneLayout.Singleton;
+        private SceneLayout Layout => GameEntrypoint.Singleton.Scene;
+        private bool SelectedEnoughTokens => selectedTokenViews.Count >= DiscardCount;
 
         // ------------------------------ Setup
 
@@ -96,18 +96,18 @@ namespace Drakken.Client.States
             }
             else
             {
-                if (selectedTokenViews.Count >= DiscardCount) return;
+                if (SelectedEnoughTokens) return;
 
                 tokenView.SetSelected(true);
                 selectedTokenViews.Add(tokenView);
             }
 
-            Layout.Drafting.DraftConfirmButton.Interactable = selectedTokenViews.Count == DiscardCount;
+            Layout.Drafting.DraftConfirmButton.Interactable = SelectedEnoughTokens;
         }
 
         private async void OnConfirmClicked()
         {
-            Assert.True(selectedTokenViews.Count == DiscardCount);
+            Assert.True(SelectedEnoughTokens);
 
             Layout.Drafting.DraftConfirmButton.Interactable = false;
             foreach (var view in tokenViews) view.SetInteractable(false);
@@ -118,10 +118,9 @@ namespace Drakken.Client.States
                 DiscardInstanceId1 = selectedTokenViews[1].TokenInstance.InstanceId,
             };
 
-            GameConnection.Singleton.C2S_MessageMatchDraftDiscard_Rpc(Match.MatchId, message);
-            Log.Info("DraftingState", "Discard sent, waiting for playing phase...");
-
             Match.PlayingPhaseStarted += OnPlayingPhaseStarted;
+
+            Match.SendDraftDiscard(message);
         }
 
         private async void OnPlayingPhaseStarted()

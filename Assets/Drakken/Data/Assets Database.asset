@@ -16,6 +16,6 @@ MonoBehaviour:
   DiceViewPrefab: {fileID: 6660603119417165138, guid: 4eb5b6f0e6bf8d14d9b2dc4a3bf3f9ea, type: 3}
   tokenMeshPrefabs:
   - TokenId: dragon
-    Prefab: {fileID: 919132149155446097, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
+    Prefab: {fileID: 4482217670635567624, guid: 8cf7b91a941a9624cb13b9d159cee4f1, type: 3}
   - TokenId: parasite
-    Prefab: {fileID: 919132149155446097, guid: 410151dc9bddb63468806ca2cab75858, type: 3}
+    Prefab: {fileID: 8821973979540590540, guid: 47b1e727d2155544a827ef64c1faa58b, type: 3}

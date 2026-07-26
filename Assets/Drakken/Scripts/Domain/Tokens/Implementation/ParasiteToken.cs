@@ -29,10 +29,10 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class ParasiteTokenExecutor : TokenExecutor<ParasiteTokenIntent, ParasiteTokenResolution>
     {
-        protected override ParasiteTokenResolution Execute(GameState state, ParasiteTokenIntent intent, int sourceClientIndex)
+        protected override ParasiteTokenResolution Execute(GameState gameState, ParasiteTokenIntent intent, int sourceClientIndex)
         {
             int opponentIndex = 1 - sourceClientIndex;
-            var opponent = state.Clients[opponentIndex];
+            var opponent = gameState.Clients[opponentIndex];
 
             // Validate the users choice
             var targetDice = opponent.Dice.Find(d => d.Id == intent.TargetDiceId);

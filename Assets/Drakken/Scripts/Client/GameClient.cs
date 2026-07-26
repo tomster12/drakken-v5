@@ -1,5 +1,6 @@
 using Drakken.Client.States;
 using Drakken.Common.Utility;
+using Drakken.Config;
 using Drakken.Domain.Tokens;
 using Drakken.Networking;
 using System.Threading.Tasks;
@@ -11,11 +12,7 @@ namespace Drakken.Client
 {
     public class GameClient : MonoBehaviour
     {
-        [Header("Config")]
-        [SerializeField] private string serverAddress = "127.0.0.1";
-        [SerializeField] private ushort serverPort = 7777;
-
-        [Header("Assets")]
+        [Header("References")]
         [SerializeField] private AssetDatabase assets;
 
         public AssetDatabase Assets => assets;
@@ -23,12 +20,12 @@ namespace Drakken.Client
         public TokenRegistry TokenRegistry { get; private set; }
         private ClientState currentState = null;
         public bool IsConnecting { get; private set; }
-        public bool IsConnected => NetworkManager.Singleton.IsConnectedClient;
+        public bool IsConnected { get; private set; }
         public bool IsInMatch => Match != null;
 
         private void Awake()
         {
-            TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefab);
+            TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefabById);
         }
 
         public async Task StartApplication()
@@ -47,40 +44,34 @@ namespace Drakken.Client
         public Task<bool> Connect()
         {
             Assert.True(!IsConnecting && !IsConnected);
-            Log.Info("Client", $"Connecting to game server at {serverAddress}:{serverPort}...");
+
+            var config = NetworkConfigLoader.Load();
+
+            Log.Info("Client", $"Connecting to game server at {config.address}:{config.port}...");
 
             IsConnecting = true;
+            IsConnected = false;
             var tcs = new TaskCompletionSource<bool>();
 
             void OnConnected(ulong clientId)
             {
                 Log.Info("Client", $"Connected as clientId={clientId}");
-
-                NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
-                NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
-
                 IsConnecting = false;
-                GameConnection.Singleton.SetClient(this);
+                IsConnected = true;
                 tcs.TrySetResult(true);
             }
 
             void OnDisconnected(ulong clientId)
             {
                 Log.Info("Client", $"Disconnected as clientId={clientId}");
-                NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
-                NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
-
+                GameEntrypoint.Singleton.Connection.RemoveClientListeners(OnConnected, OnDisconnected);
                 IsConnecting = false;
+                IsConnected = false;
                 tcs.TrySetResult(false);
             }
 
-            NetworkManager.Singleton.OnClientConnectedCallback += OnConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback += OnDisconnected;
-
-            var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
-            transport.ConnectionData.Address = serverAddress;
-            transport.ConnectionData.Port = serverPort;
-            NetworkManager.Singleton.StartClient();
+            GameEntrypoint.Singleton.Connection.AddClientListeners(OnConnected, OnDisconnected);
+            GameEntrypoint.Singleton.Connection.StartClient(this, config.address, config.port);
 
             return tcs.Task;
         }
@@ -88,9 +79,10 @@ namespace Drakken.Client
         public async Task<bool> JoinMatch()
         {
             Assert.True(IsConnected && !IsInMatch);
+
             Log.Info("Client", "Requesting to join match...");
 
-            var response = await GameConnection.Singleton.Client_RequestJoinMatch();
+            var response = await GameEntrypoint.Singleton.Connection.Client_RequestJoinMatch();
 
             if (response.Success)
             {

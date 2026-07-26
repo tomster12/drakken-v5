@@ -4,7 +4,6 @@ using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens;
 using Drakken.Networking;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Drakken.Server
 {
@@ -85,40 +84,40 @@ namespace Drakken.Server
             }
 
             // Build a pool from all available token definitions and shuffle it
-            var allIds = new List<string>();
+            var allTokenIds = new List<string>();
             foreach (var def in server.TokenRegistry.AllDefinitions)
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    allIds.Add(def.TokenId);
+                    allTokenIds.Add(def.TokenId);
                 }
             }
 
-            Shuffle(allIds);
+            allTokenIds.ShuffleInplace();
 
             // Deal 6 to each player, store in gameState hand as "dealt" (pre-discard)
             for (int p = 0; p < 2; p++)
             {
                 for (int i = 0; i < 6; i++)
                 {
-                    string tokenId = allIds[(p * 6 + i) % allIds.Count];
-                    var instance = TokenInstance.Create(tokenId);
-                    gameState.Clients[p].Hand.Add(instance);
+                    string tokenId = allTokenIds[(p * 6 + i) % allTokenIds.Count];
+                    var tokenInstance = TokenInstance.Create(tokenId);
+                    gameState.Clients[p].Hand.Add(tokenInstance);
                 }
             }
 
-            GameConnection.Singleton.Server_BroadcastMatchStartDraftingPhase(clientIds, gameState);
+            GameEntrypoint.Singleton.Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, gameState);
         }
 
-        public void OnDraftDiscard(ulong clientId, DraftDiscardMessage msg)
+        public void OnDraftDiscard(ulong clientId, DraftDiscardMessage message)
         {
             Assert.True(gameState.Phase == GamePhase.Drafting);
 
             if (!clientIndexAssignment.TryGetValue(clientId, out int playerIndex)) return;
 
             var hand = gameState.Clients[playerIndex].Hand;
-            var discard0 = hand.Find(t => t.InstanceId == msg.DiscardInstanceId0);
-            var discard1 = hand.Find(t => t.InstanceId == msg.DiscardInstanceId1);
+            var discard0 = hand.Find(t => t.InstanceId == message.DiscardInstanceId0);
+            var discard1 = hand.Find(t => t.InstanceId == message.DiscardInstanceId1);
 
             if (discard0 != null) hand.Remove(discard0);
             if (discard1 != null) hand.Remove(discard1);
@@ -135,69 +134,7 @@ namespace Drakken.Server
             gameState.Phase = GamePhase.Playing;
 
             Log.Info($"ServerMatch-{matchId}", "Both players finished drafting, starting Playing phase");
-            GameConnection.Singleton.Server_BroadcastMatchStartPlayingPhase(clientIds, gameState);
-        }
-
-        /*
-        public void OnPlayToken(ulong clientId, TokenIntentMessage intentMsg)
-        {
-            if (!clientIndexAssignment.TryGetValue(clientId, out int sourceClientIndex))
-            {
-                Log.Error($"ServerMatch-{MatchId}", $"Unknown sender {clientId}");
-                return;
-            }
-
-            if (gameState.TurnClientIndex != sourceClientIndex)
-            {
-                Log.Error($"ServerMatch-{MatchId}", $"ClientIndex={sourceClientIndex} tried to play out of turn");
-                return;
-            }
-
-            Log.Info($"ServerMatch-{MatchId}", $"ClientIndex={sourceClientIndex} played token {intentMsg.TokenId}");
-
-            TokenIntent intent = server.TokenRegistry.DeserialiseIntent(
-                intentMsg.TokenId,
-                intentMsg.IntentJson
-            );
-
-            var tokenExecutor = server.TokenRegistry.GetExecutor(intentMsg.TokenId);
-
-            var resolution = tokenExecutor.Execute(gameState, intent, sourceClientIndex);
-
-            string resolutionJson = JsonUtility.ToJson(resolution);
-
-            var resolutionMsg = new TokenResolutionMessage
-            {
-                TokenId = intentMsg.TokenId,
-                SourceClientIndex = sourceClientIndex,
-                ResolutionJson = resolutionJson,
-            };
-
-            server.Connection.BroadcastMatchPlayTokenResolved(resolutionMsg, clientIds);
-
-            AdvanceTurn();
-        }
-
-        public void OnPassTurn(ulong clientId)
-        {
-            AdvanceTurn();
-        }
-
-        private void AdvanceTurn()
-        {
-            gameState.TurnClientIndex = 1 - gameState.TurnClientIndex;
-            gameState.Turn++;
-            server.Connection.BroadcastMatchStartTurn(gameState.TurnClientIndex, clientIds);
-        }
-        */
-
-        private static void Shuffle<T>(List<T> list)
-        {
-            for (int i = list.Count - 1; i > 0; i--)
-            {
-                int j = Random.Range(0, i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
-            }
+            GameEntrypoint.Singleton.Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, gameState);
         }
 
         public bool IsMatch(ulong matchId)

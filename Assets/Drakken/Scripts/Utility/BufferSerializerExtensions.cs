@@ -1,80 +1,82 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using Unity.Netcode;
 
-public static class BufferSerializerExtensions
+namespace Drakken.Common.Utility
 {
-    public static void SerializeList<TItem, TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<TItem> list)
-        where TReaderWriter : IReaderWriter
-        where TItem : INetworkSerializable, new()
+    public static class BufferSerializerExtensions
     {
-        int count = list.Count;
-        serializer.SerializeValue(ref count);
-
-        if (serializer.IsReader)
+        public static void SerializeList<TItem, TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<TItem> list)
+            where TReaderWriter : IReaderWriter
+            where TItem : INetworkSerializable, new()
         {
-            list.Clear();
-            for (int i = 0; i < count; i++)
+            int count = list.Count;
+            serializer.SerializeValue(ref count);
+
+            if (serializer.IsReader)
             {
-                TItem item = new();
-                serializer.SerializeValue(ref item);
-                list.Add(item);
+                list.Clear();
+                for (int i = 0; i < count; i++)
+                {
+                    TItem item = new();
+                    serializer.SerializeValue(ref item);
+                    list.Add(item);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var item = list[i];
+                    serializer.SerializeValue(ref item);
+                }
             }
         }
-        else
+
+        public static void SerializeList<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<int> list)
+            where TReaderWriter : IReaderWriter
         {
-            for (int i = 0; i < count; i++)
+            int count = list.Count;
+            serializer.SerializeValue(ref count);
+
+            if (serializer.IsReader)
             {
-                var item = list[i];
-                serializer.SerializeValue(ref item);
+                list.Clear();
+                for (int i = 0; i < count; i++)
+                {
+                    int item = new();
+                    serializer.SerializeValue(ref item);
+                    list.Add(item);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var item = list[i];
+                    serializer.SerializeValue(ref item);
+                }
             }
         }
-    }
 
-    public static void SerializeList<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<int> list)
-        where TReaderWriter : IReaderWriter
-    {
-        int count = list.Count;
-        serializer.SerializeValue(ref count);
-
-        if (serializer.IsReader)
+        public static void SerializeString<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, ref string value)
+            where TReaderWriter : IReaderWriter
         {
-            list.Clear();
-            for (int i = 0; i < count; i++)
+            if (serializer.IsWriter)
             {
-                int item = new();
-                serializer.SerializeValue(ref item);
-                list.Add(item);
+                byte[] bytes = Encoding.UTF8.GetBytes(value ?? "");
+                int len = bytes.Length;
+                serializer.SerializeValue(ref len);
+                for (int i = 0; i < len; i++) serializer.SerializeValue(ref bytes[i]);
             }
-        }
-        else
-        {
-            for (int i = 0; i < count; i++)
+            else
             {
-                var item = list[i];
-                serializer.SerializeValue(ref item);
+                int len = 0;
+                serializer.SerializeValue(ref len);
+                byte[] bytes = new byte[len];
+                for (int i = 0; i < len; i++) serializer.SerializeValue(ref bytes[i]);
+                value = Encoding.UTF8.GetString(bytes);
             }
-        }
-    }
-
-    public static void SerializeString<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, ref string value)
-        where TReaderWriter : IReaderWriter
-    {
-        if (serializer.IsWriter)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(value ?? "");
-            int len = bytes.Length;
-            serializer.SerializeValue(ref len);
-            for (int i = 0; i < len; i++) serializer.SerializeValue(ref bytes[i]);
-        }
-        else
-        {
-            int len = 0;
-            serializer.SerializeValue(ref len);
-            byte[] bytes = new byte[len];
-            for (int i = 0; i < len; i++) serializer.SerializeValue(ref bytes[i]);
-            value = Encoding.UTF8.GetString(bytes);
         }
     }
 }
