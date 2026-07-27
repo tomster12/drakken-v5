@@ -1,4 +1,5 @@
 ﻿using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -16,6 +17,7 @@ public class PhysicalButton : MonoBehaviour,
     [Header("References")]
     [SerializeField] private Outline outline;
     [SerializeField] private MeshRenderer meshRenderer;
+    [SerializeField] private TextMeshPro text;
 
     [Header("Config")]
     [SerializeField] private float hoverY = 0.4f;
@@ -24,6 +26,9 @@ public class PhysicalButton : MonoBehaviour,
     [SerializeField] private float heldLerp = 40f;
     [SerializeField] private Color interactableColor;
     [SerializeField] private Color notInteractableColor;
+    [SerializeField] private Color interactableTextColor;
+    [SerializeField] private Color notInteractableTextColor;
+    [SerializeField] private Color heldTextColor;
 
     private float initialY;
     private bool isHovered;
@@ -47,6 +52,13 @@ public class PhysicalButton : MonoBehaviour,
         outline.enabled = Interactable && isHovered;
 
         meshRenderer.material.color = Interactable ? interactableColor : notInteractableColor;
+
+        text.color =
+            (isHeld || (Interactable && isHovered))
+            ? heldTextColor
+            : (Interactable
+                ? interactableTextColor
+                : notInteractableTextColor);
 
         if (isHeld)
         {
