@@ -2,7 +2,7 @@ using Drakken.Domain;
 using TMPro;
 using UnityEngine;
 
-namespace Drakken.Client.GameObjects
+namespace Drakken.Client.World
 {
     public class DiceView : MonoBehaviour
     {

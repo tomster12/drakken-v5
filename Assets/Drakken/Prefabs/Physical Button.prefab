@@ -170,7 +170,7 @@ MonoBehaviour:
   notInteractableColor: {r: 0.16470589, g: 0.12941177, b: 0.105882354, a: 1}
   interactableTextColor: {r: 0.6431373, g: 0.56078434, b: 0.49803922, a: 1}
   notInteractableTextColor: {r: 0.3647059, g: 0.31764707, b: 0.28235295, a: 1}
-  heldTextColor: {r: 0.84313726, g: 0.7176471, b: 0.62352943, a: 1}
+  highlightedTextColor: {r: 0.84313726, g: 0.7176471, b: 0.62352943, a: 1}
 --- !u!114 &8834211073415024404
 MonoBehaviour:
   m_ObjectHideFlags: 0

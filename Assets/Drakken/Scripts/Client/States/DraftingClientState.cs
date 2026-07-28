@@ -1,4 +1,4 @@
-using Drakken.Client.GameObjects;
+using Drakken.Client.World;
 using Drakken.Common.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
@@ -33,18 +33,17 @@ namespace Drakken.Client.States
                 var tokenView = TokenView.Create(client.Assets, client.TokenRegistry, tokenInstance, tokenAnchor);
                 if (tokenView == null) continue;
 
+                float offset = (i - (tokenHand.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
+                Vector3 localPos = new(offset, 0f, 0f);
+                tokenView.TargetLocalPosition = localPos;
+                tokenView.transform.localPosition = localPos;
+
+                tokenView.SetInteractable(true);
+
                 tokenView.OnClicked.AddListener(OnTokenClicked);
                 tokenViews.Add(tokenView);
-
-                float offset = (i - (tokenHand.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
-                Vector3 worldPos = tokenAnchor.TransformPoint(new Vector3(offset, 0f, 0f));
-                tokenView.TargetPosition = worldPos;
-                tokenView.transform.position = worldPos;
             }
 
-            // Spawn own and opponent dice
-            SpawnDiceRow(Match.ClientIndex, Layout.Shared.MyDiceRow);
-            SpawnDiceRow(1 - Match.ClientIndex, Layout.Shared.OpponentDiceRow);
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
             Layout.Drafting.DraftConfirmButton.Interactable = false;
             Layout.Drafting.DraftConfirmButton.Clicked += OnConfirmClicked;
@@ -68,21 +67,6 @@ namespace Drakken.Client.States
             Layout.Drafting.DraftConfirmButton.Clicked -= OnConfirmClicked;
 
             return Task.CompletedTask;
-        }
-
-        private void SpawnDiceRow(int playerIndex, Transform anchor)
-        {
-            var dice = GameState.Clients[playerIndex].Dice;
-            for (int i = 0; i < dice.Count; i++)
-            {
-                var diceGo = Object.Instantiate(client.Assets.DiceViewPrefab, anchor);
-                var diceView = diceGo.GetComponent<DiceView>();
-
-                diceView.Bind(dice[i]);
-
-                float offset = (i - (dice.Count - 1) / 2f) * Layout.Shared.DiceSpacing;
-                diceGo.transform.localPosition = new Vector3(offset, 0f, 0f);
-            }
         }
 
         // ------------------------------ Logic

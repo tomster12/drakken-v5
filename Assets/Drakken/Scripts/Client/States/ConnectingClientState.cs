@@ -1,4 +1,4 @@
-using Drakken.Client.GameObjects;
+using Drakken.Client.World;
 using Drakken.Common.Utility;
 using System.Threading.Tasks;
 
@@ -10,6 +10,8 @@ namespace Drakken.Client.States
 
         public override async Task Enter()
         {
+            Layout.Connecting.Title.SetActive(true);
+
             Layout.Connecting.JoinButton.Clicked += OnJoinClicked;
             Layout.Connecting.JoinButton.Interactable = true;
             Layout.Connecting.JoinButton.gameObject.SetActive(true);
@@ -17,13 +19,13 @@ namespace Drakken.Client.States
             Layout.Connecting.ReadyButton.Clicked += OnReadyClicked;
             Layout.Connecting.ReadyButton.Interactable = false;
             Layout.Connecting.ReadyButton.gameObject.SetActive(false);
-
-            Log.Info("ConnectingClientState", "Not connected.");
         }
 
         public override async Task Exit()
         {
             if (client.Match != null) client.Match.DraftingPhaseStarted -= OnGameStarted;
+
+            Layout.Connecting.Title.SetActive(false);
 
             Layout.Connecting.JoinButton.Clicked -= OnJoinClicked;
             Layout.Connecting.JoinButton.gameObject.SetActive(false);

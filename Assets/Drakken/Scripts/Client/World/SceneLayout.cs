@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Drakken.Client.GameObjects
+namespace Drakken.Client.World
 {
     public class SceneLayout : MonoBehaviour
     {
@@ -11,6 +11,7 @@ namespace Drakken.Client.GameObjects
 
         private void Awake()
         {
+            Connecting.Title.SetActive(false);
             Connecting.JoinButton.gameObject.SetActive(false);
             Connecting.ReadyButton.gameObject.SetActive(false);
 
@@ -27,7 +28,7 @@ namespace Drakken.Client.GameObjects
     [Serializable]
     public class ConnectingLayout
     {
-
+        public GameObject Title;
         public PhysicalButton JoinButton;
         public PhysicalButton ReadyButton;
     }

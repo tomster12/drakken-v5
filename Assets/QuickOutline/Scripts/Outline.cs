@@ -93,6 +93,8 @@ public class Outline : MonoBehaviour
     {
         foreach (var renderer in GetComponentsInChildren<Renderer>())
         {
+            if (IsTextMeshProRenderer(renderer)) continue;
+
             var materials = renderer.sharedMaterials.ToList();
 
             materials.Add(outlineMaskMaterial);
@@ -106,6 +108,8 @@ public class Outline : MonoBehaviour
     {
         foreach (var renderer in GetComponentsInChildren<Renderer>())
         {
+            if (IsTextMeshProRenderer(renderer)) continue;
+
             var materials = renderer.sharedMaterials.ToList();
 
             materials.Remove(outlineMaskMaterial);
@@ -201,6 +205,11 @@ public class Outline : MonoBehaviour
         else DestroyImmediate(material);
     }
 
+    private static bool IsTextMeshProRenderer(Renderer renderer)
+    {
+        return renderer.TryGetComponent<TMPro.TMP_Text>(out _);
+    }
+
     // ----------------------------- Normals
 
     [SerializeField, HideInInspector] private List<Mesh> bakeKeys = new();
@@ -211,6 +220,9 @@ public class Outline : MonoBehaviour
         // Retrieve or generate smooth normals
         foreach (var meshFilter in GetComponentsInChildren<MeshFilter>())
         {
+            if (!meshFilter.TryGetComponent<Renderer>(out var renderer)) continue;
+            if (IsTextMeshProRenderer(renderer)) continue;
+
             // Skip if smooth normals have already been adopted
             if (!registeredMeshes.Add(meshFilter.sharedMesh)) continue;
 
@@ -222,10 +234,7 @@ public class Outline : MonoBehaviour
             meshFilter.sharedMesh.SetUVs(3, smoothNormals);
 
             // Combine submeshes
-            if (meshFilter.TryGetComponent<Renderer>(out var renderer))
-            {
-                CombineSubmeshes(meshFilter.sharedMesh, renderer.sharedMaterials);
-            }
+            CombineSubmeshes(meshFilter.sharedMesh, renderer.sharedMaterials);
         }
     }
 
@@ -252,6 +261,9 @@ public class Outline : MonoBehaviour
 
         foreach (var meshFilter in GetComponentsInChildren<MeshFilter>())
         {
+            if (!meshFilter.TryGetComponent<Renderer>(out var renderer)) continue;
+            if (IsTextMeshProRenderer(renderer)) continue;
+
             // Skip duplicates
             if (!bakedMeshes.Add(meshFilter.sharedMesh)) continue;
 

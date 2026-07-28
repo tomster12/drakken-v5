@@ -1,5 +1,5 @@
 using System;
-using Drakken.Client.GameObjects;
+using Drakken.Client.World;
 using Drakken.Common.Utility;
 using UnityEngine;
 

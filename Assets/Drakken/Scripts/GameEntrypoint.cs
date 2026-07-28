@@ -5,7 +5,7 @@ using Drakken.Common.Utility;
 using Drakken.Client;
 using Drakken.Server;
 using System;
-using Drakken.Client.GameObjects;
+using Drakken.Client.World;
 using Drakken.Networking;
 
 namespace Drakken
