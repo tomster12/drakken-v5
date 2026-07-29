@@ -52,15 +52,17 @@ namespace Drakken.Client.World
 
             Vector3 currentPosition = transform.position;
 
-            outline.enabled = Interactable && isHovered;
+            var isActive = (Interactable && isHovered) || isHeld;
+
+            outline.enabled = isActive;
 
             meshRenderer.material.color =
-                (isHeld || Interactable)
+                Interactable
                 ? interactableColor
                 : notInteractableColor;
 
             text.color =
-                (Interactable && isHovered && !isHeld)
+                isActive
                 ? highlightedTextColor
                 : (Interactable
                     ? interactableTextColor
@@ -89,9 +91,12 @@ namespace Drakken.Client.World
         public void OnPointerDown(PointerEventData eventData)
         {
             if (Interactable) isHeld = true;
-            if (isHovered && Interactable) Clicked?.Invoke();
         }
 
-        public void OnPointerUp(PointerEventData eventData) => isHeld = false;
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (isHovered && isHeld) Clicked?.Invoke();
+            isHeld = false;
+        }
     }
 }

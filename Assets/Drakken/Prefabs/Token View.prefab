@@ -48,7 +48,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Outline
   outlineMode: 0
   outlineColor: {r: 1, g: 1, b: 1, a: 1}
-  outlineWidth: 2
+  outlineWidth: 4
   precomputeOutline: 0
   bakeKeys: []
   bakeValues: []
@@ -68,10 +68,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   outline: {fileID: 3233400969084441307}
+  titleText: {fileID: 312605795378855331}
   hoverLiftY: 0.15
   selectedLiftY: 0.3
-  hoverOutlineColor: {r: 1, g: 1, b: 1, a: 1}
-  selectedOutlineColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverOutlineColor: {r: 0.83137256, g: 0.8039216, b: 0.79607844, a: 1}
+  selectedOutlineColor: {r: 0.61960787, g: 0.1882353, b: 0.16862746, a: 1}
+  hoverSelectedOutlineColor: {r: 0.89411765, g: 0.27058825, b: 0.23921569, a: 1}
   moveLerp: 10
   liftLerp: 20
 --- !u!1 &7091086445837357850
@@ -109,7 +111,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0.21}
-  m_SizeDelta: {x: 0.8, y: 5}
+  m_SizeDelta: {x: 1.61, y: 0.79}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &2000980179745118590
 MeshRenderer:
@@ -136,7 +138,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -183,14 +185,14 @@ MonoBehaviour:
   m_text: Dragon
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4285955460
-  m_fontColor: {r: 0.5188679, g: 0.49072176, b: 0.46257564, a: 1}
+    rgba: 4289182412
+  m_fontColor: {r: 0.8018868, g: 0.7281283, b: 0.6543699, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

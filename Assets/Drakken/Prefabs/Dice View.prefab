@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 860363117159924159}
   - component: {fileID: 6660603119417165138}
+  - component: {fileID: 35747135772928756}
   m_Layer: 0
   m_Name: Dice View
   m_TagString: Untagged
@@ -48,10 +49,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Drakken.Client.GameObjects.DiceView
   renderer: {fileID: 7559421851871752576}
-  labelValue: {fileID: 2805581268408611717}
-  labelSides: {fileID: 549562480122380906}
-  colorNormal: {r: 0.1882353, g: 0.14901961, b: 0.13333334, a: 1}
+  valueLabel: {fileID: 2805581268408611717}
+  sidesLabel: {fileID: 549562480122380906}
+  outline: {fileID: 35747135772928756}
+  normalColor: {r: 0.19, g: 0.15, b: 0.133, a: 1}
   colorAffected: {r: 1, g: 0.6, b: 0.2, a: 1}
+  hoverOutlineColor: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &35747135772928756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2586461162331707448}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fea29bb7c508c244a1f805a5fd3fc4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Outline
+  outlineMode: 0
+  outlineColor: {r: 1, g: 1, b: 1, a: 1}
+  outlineWidth: 2
+  precomputeOutline: 0
+  bakeKeys: []
+  bakeValues: []
 --- !u!1 &3769326924508879333
 GameObject:
   m_ObjectHideFlags: 0
@@ -64,7 +85,7 @@ GameObject:
   - component: {fileID: 624359673505562321}
   - component: {fileID: 2805581268408611717}
   m_Layer: 0
-  m_Name: Value
+  m_Name: Value Label
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -114,7 +135,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -161,7 +182,7 @@ MonoBehaviour:
   m_text: 5
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -245,12 +266,12 @@ GameObject:
   - component: {fileID: 2221399737751377691}
   - component: {fileID: 549562480122380906}
   m_Layer: 0
-  m_Name: Sides
+  m_Name: Sides Label
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &3259833593496022872
 RectTransform:
   m_ObjectHideFlags: 0
@@ -295,7 +316,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -342,14 +363,14 @@ MonoBehaviour:
   m_text: 6
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4282864738
-  m_fontColor: {r: 0.385, g: 0.32829455, b: 0.27755812, a: 1}
+    rgba: 4288190616
+  m_fontColor: {r: 0.5943396, g: 0.5943396, b: 0.5943396, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

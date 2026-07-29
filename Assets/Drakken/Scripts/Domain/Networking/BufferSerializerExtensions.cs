@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Unity.Netcode;
 
-namespace Drakken.Common.Utility
+namespace Drakken.Domain.Networking
 {
     public static class BufferSerializerExtensions
     {

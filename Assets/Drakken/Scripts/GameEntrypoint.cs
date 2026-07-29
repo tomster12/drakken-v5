@@ -18,8 +18,6 @@ namespace Drakken
         public GameServer Server => server;
         public SceneLayout Scene => scene;
         public IGameConnection Connection => resolvedConnection;
-        public bool DebugPreventApplication => debugPreventApplication;
-        public bool DebugPreventConnection => debugPreventConnection;
 
         [Header("References")]
         [SerializeField] private GameClient client;
@@ -46,7 +44,7 @@ namespace Drakken
 
         private async void Start()
         {
-            if (DebugPreventApplication) return;
+            if (debugPreventApplication) return;
 
             var isServer =
                 UnityEngine.Application.isBatchMode ||
@@ -61,6 +59,20 @@ namespace Drakken
             {
                 Log.Info("Application", "Running as client");
                 await client.StartApplication();
+            }
+        }
+
+        public void Quit()
+        {
+            Log.Info("Application", "Quitting...");
+
+            if (Application.isEditor)
+            {
+                UnityEditor.EditorApplication.isPlaying = false;
+            }
+            else
+            {
+                Application.Quit();
             }
         }
     }

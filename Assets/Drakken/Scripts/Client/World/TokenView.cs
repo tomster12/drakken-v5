@@ -1,6 +1,7 @@
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -17,24 +18,26 @@ namespace Drakken.Client.World
 
         [Header("References")]
         [SerializeField] private Outline outline;
+        [SerializeField] private TextMeshPro titleText;
 
-        [Header("Hover / Select Offsets")]
+        [Header("Config")]
         [SerializeField] private float hoverLiftY = 0.15f;
         [SerializeField] private float selectedLiftY = 0.30f;
         [SerializeField] private Color hoverOutlineColor = Color.white;
         [SerializeField] private Color selectedOutlineColor = Color.yellow;
+        [SerializeField] private Color hoverSelectedOutlineColor = Color.yellow;
 
         [Header("Movement")]
         [SerializeField] private float moveLerp = 10f;
         [SerializeField] private float liftLerp = 20f;
 
+        public TokenDefinition TokenDefinition { get; private set; }
         public TokenInstance TokenInstance { get; private set; }
         public Vector3 TargetLocalPosition { get; set; }
         public bool IsBinded => TokenInstance != null;
         public bool IsSelected { get; private set; } = false;
         public bool IsHovered { get; private set; } = false;
         public bool IsInteractable { get; set; } = false;
-        private bool toUpdateOutline = false;
 
         // ------------------------------ Setup
 
@@ -42,6 +45,7 @@ namespace Drakken.Client.World
         {
             var prefab = assets.TokenViewPrefab;
             var tokenGo = Instantiate(prefab, parent);
+            tokenGo.gameObject.SetActive(true);
             var tokenView = tokenGo.GetComponent<TokenView>();
 
             tokenView.Bind(registry, instance);
@@ -64,10 +68,19 @@ namespace Drakken.Client.World
                 return;
             }
 
+            if (!registry.TryGetDefinition(instance.TokenId, out var tokenDefinition))
+            {
+                Log.Error("TokenView", $"No token definition found for tokenId='{instance.TokenId}'");
+                return;
+            }
+
+            TokenDefinition = tokenDefinition;
+
             var meshGo = Instantiate(meshPrefab, transform);
+            meshGo.SetActive(true);
             meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
-            toUpdateOutline = true;
+            titleText.text = TokenDefinition.DisplayName;
         }
 
         [ContextMenu("Bind Random")]
@@ -90,11 +103,12 @@ namespace Drakken.Client.World
 
         private void Update()
         {
-            // Calculate offset from target with lift
+            // Calculate height offset
             float targetOffsetY = IsSelected ? selectedLiftY
                                 : IsHovered ? hoverLiftY
                                 : 0f;
 
+            // Lerp towards target position
             var targetLocalPosition = new Vector3(
                 TargetLocalPosition.x,
                 TargetLocalPosition.y + targetOffsetY,
@@ -105,11 +119,14 @@ namespace Drakken.Client.World
                 targetLocalPosition,
                 moveLerp * Time.deltaTime);
 
-            // Update outline if flagged
-            if (toUpdateOutline)
+            // Update outline
+            outline.enabled = IsSelected || (IsHovered && IsInteractable);
+
+            if (outline.enabled)
             {
-                toUpdateOutline = false;
-                UpdateOutline();
+                outline.OutlineColor = IsSelected
+                    ? (IsHovered ? hoverSelectedOutlineColor : selectedOutlineColor)
+                    : hoverOutlineColor;
             }
         }
 
@@ -122,17 +139,18 @@ namespace Drakken.Client.World
             if (!interactable && IsHovered)
             {
                 IsHovered = false;
-                toUpdateOutline = true;
             }
         }
 
-        public void SetSelected(bool selected)
+        public bool SetSelected(bool selected)
         {
-            if (IsInteractable && !selected)
+            if (IsInteractable && IsSelected != selected)
             {
                 IsSelected = selected;
-                toUpdateOutline = true;
+                return true;
             }
+
+            return false;
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -140,7 +158,6 @@ namespace Drakken.Client.World
             if (IsInteractable && !IsHovered)
             {
                 IsHovered = true;
-                toUpdateOutline = true;
             }
         }
 
@@ -149,7 +166,6 @@ namespace Drakken.Client.World
             if (IsHovered)
             {
                 IsHovered = false;
-                toUpdateOutline = true;
             }
         }
 
@@ -165,18 +181,5 @@ namespace Drakken.Client.World
         }
 
         public void OnPointerUp(PointerEventData eventData) { }
-
-        private void UpdateOutline()
-        {
-            if (outline == null) return;
-
-            bool shouldShow = IsSelected || (IsHovered && IsInteractable);
-            outline.enabled = shouldShow;
-
-            if (shouldShow)
-            {
-                outline.OutlineColor = IsSelected ? selectedOutlineColor : hoverOutlineColor;
-            }
-        }
     }
 }

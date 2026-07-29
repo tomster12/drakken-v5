@@ -8,40 +8,58 @@ namespace Drakken.Client.World
         [SerializeField] private Camera cam;
 
         [Header("Config")]
-        [SerializeField] private float mousePanAmount = 3.5f;
-        [SerializeField] private float rotationLerpSpeed = 5f;
+        [SerializeField] private float mousePanAmount = 1f;
+        [SerializeField] private float panLerpSpeed = 2f;
+        [SerializeField] private float rotationLerpSpeed = 4f;
+        [SerializeField] private float movementLerpSpeed = 4f;
 
-        private Quaternion baseRotation;
+        private Vector3 targetPosition;
+        private Quaternion targetRotation;
+        private Quaternion currentPanRotation;
 
         void Awake()
         {
-            baseRotation = transform.rotation;
+            targetPosition = transform.position;
+            targetRotation = transform.rotation;
         }
 
         private void Update()
         {
-            Quaternion pannedRotation = GetMousePannedRotation(baseRotation);
+            // Lerp pan rotation
+            Quaternion targetPanRotation = GetMousePanRotation();
 
-            cam.transform.rotation = Quaternion.Lerp(
-                cam.transform.rotation,
-                pannedRotation,
+            currentPanRotation = Quaternion.Lerp(
+                currentPanRotation,
+                targetPanRotation,
+                panLerpSpeed * Time.deltaTime);
+
+            // Lerp towards target
+            transform.position = Vector3.Lerp(
+                transform.position,
+                targetPosition,
+                movementLerpSpeed * Time.deltaTime);
+
+            transform.rotation = Quaternion.Lerp(
+                transform.rotation,
+                currentPanRotation * targetRotation,
                 rotationLerpSpeed * Time.deltaTime);
         }
 
-        private Quaternion GetMousePannedRotation(Quaternion rot)
+        private Quaternion GetMousePanRotation()
         {
-            float xCurrent = (rot.eulerAngles.x < 180f) ? rot.eulerAngles.x : (rot.eulerAngles.x - 360f);
-            float yCurrent = (rot.eulerAngles.y < 180f) ? rot.eulerAngles.y : (rot.eulerAngles.y - 360f);
-
             float xPct = Mathf.Min(Mathf.Max(2f * (Input.mousePosition.y / Screen.height - 0.5f), -1f), 1f);
             float yPct = Mathf.Min(Mathf.Max(2f * (Input.mousePosition.x / Screen.width - 0.5f), -1f), 1f);
 
-            float xPanned = xCurrent - mousePanAmount * xPct;
-            float yPanned = yCurrent + mousePanAmount * yPct;
+            float xPanned = -mousePanAmount * xPct;
+            float yPanned = mousePanAmount * yPct;
 
-            Quaternion target = Quaternion.Euler(xPanned, yPanned, rot.eulerAngles.z);
+            return Quaternion.Euler(xPanned, yPanned, 0);
+        }
 
-            return target;
+        public void SetTarget(Transform transform)
+        {
+            targetPosition = transform.position;
+            targetRotation = transform.rotation;
         }
     }
 }

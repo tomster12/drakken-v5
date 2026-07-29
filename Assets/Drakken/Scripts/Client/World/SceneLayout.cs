@@ -5,37 +5,42 @@ namespace Drakken.Client.World
 {
     public class SceneLayout : MonoBehaviour
     {
-        public ConnectingLayout Connecting;
+        public TitleLayout Title;
         public DraftingLayout Drafting;
         public SharedLayout Shared;
 
         private void Awake()
         {
-            Connecting.Title.SetActive(false);
-            Connecting.JoinButton.gameObject.SetActive(false);
-            Connecting.ReadyButton.gameObject.SetActive(false);
+            Title.Title.SetActive(false);
+            Title.JoinButton.gameObject.SetActive(false);
+            Title.ReadyButton.gameObject.SetActive(false);
+            Title.OptionsButton.gameObject.SetActive(false);
+            Title.ExitButton.gameObject.SetActive(false);
+            Title.Clutter.SetActive(false);
 
-            Drafting.DraftTokenRow.gameObject.SetActive(true);
             Drafting.DraftConfirmButton.gameObject.SetActive(false);
 
-            Shared.MyDiceRow.gameObject.SetActive(true);
-            Shared.OpponentDiceRow.gameObject.SetActive(true);
-            Shared.MyHandRow.gameObject.SetActive(true);
-            Shared.OpponentHandRow.gameObject.SetActive(true);
+            Shared.Mat1.SetActive(false);
+            Shared.Mat2.SetActive(false);
         }
     }
 
     [Serializable]
-    public class ConnectingLayout
+    public class TitleLayout
     {
+        public Transform CameraPosition;
         public GameObject Title;
         public PhysicalButton JoinButton;
         public PhysicalButton ReadyButton;
+        public PhysicalButton OptionsButton;
+        public PhysicalButton ExitButton;
+        public GameObject Clutter;
     }
 
     [Serializable]
     public class DraftingLayout
     {
+        public Transform CameraPosition;
         public Transform DraftTokenRow;
         public PhysicalButton DraftConfirmButton;
     }
@@ -43,11 +48,11 @@ namespace Drakken.Client.World
     [Serializable]
     public class SharedLayout
     {
-
         public Transform MyDiceRow;
         public Transform OpponentDiceRow;
         public Transform MyHandRow;
-        public Transform OpponentHandRow;
+        public GameObject Mat1;
+        public GameObject Mat2;
         public float TokenSpacing = 0.4f;
         public float DiceSpacing = 0.35f;
     }

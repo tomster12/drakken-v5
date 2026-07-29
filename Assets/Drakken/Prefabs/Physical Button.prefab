@@ -29,7 +29,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0.0000000037252903, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.8516424, y: 0.41479784, z: 2.6986}
+  m_LocalScale: {x: 0.8516424, y: 0.41479784, z: 3.19}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2674009570069269114}
@@ -140,7 +140,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.16342022, y: 0.68796355, z: -0.16342022, w: 0.68796355}
   m_LocalPosition: {x: 0, y: 0.717, z: 0}
-  m_LocalScale: {x: 1.1742018, y: 0.642337, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1753843003993937889}
@@ -167,7 +167,7 @@ MonoBehaviour:
   normLerp: 40
   heldLerp: 80
   interactableColor: {r: 0.2627451, g: 0.20392157, b: 0.16470589, a: 1}
-  notInteractableColor: {r: 0.16470589, g: 0.12941177, b: 0.105882354, a: 1}
+  notInteractableColor: {r: 0.21568628, g: 0.16862746, b: 0.13725491, a: 1}
   interactableTextColor: {r: 0.6431373, g: 0.56078434, b: 0.49803922, a: 1}
   notInteractableTextColor: {r: 0.3647059, g: 0.31764707, b: 0.28235295, a: 1}
   highlightedTextColor: {r: 0.84313726, g: 0.7176471, b: 0.62352943, a: 1}
@@ -183,9 +183,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5fea29bb7c508c244a1f805a5fd3fc4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Outline
-  outlineMode: 0
+  outlineMode: 1
   outlineColor: {r: 0.6509434, g: 0.5921569, b: 0.5568628, a: 1}
-  outlineWidth: 12
+  outlineWidth: 3.76
   precomputeOutline: 1
   bakeKeys:
   - {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}

@@ -1,8 +1,8 @@
 using Drakken.Common.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
+using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
-using Drakken.Networking;
 using System.Collections.Generic;
 
 namespace Drakken.Server
@@ -31,14 +31,13 @@ namespace Drakken.Server
 
         public JoinMatchResponse OnRequestJoin(ulong clientId)
         {
+            // Block if the match is started / or full
             if (gameState.Phase != GamePhase.NotStarted || connectedCount >= 2)
             {
-                return new()
-                {
-                    Success = false
-                };
+                return new() { Success = false };
             }
 
+            // Assign the client the next client ID
             int index = connectedCount++;
             clientIds[index] = clientId;
             clientIndexAssignment[clientId] = index;
@@ -58,10 +57,13 @@ namespace Drakken.Server
             Assert.True(gameState.Phase == GamePhase.NotStarted);
 
             startReadyCount++;
-
             Log.Info($"ServerMatch-{matchId}", $"Client {clientId} ready ({startReadyCount}/2)");
 
-            if (startReadyCount == 2) StartDraftingPhase();
+            // When both readied up start drafting phase
+            if (startReadyCount == 2)
+            {
+                StartDraftingPhase();
+            }
         }
 
         private void StartDraftingPhase()
@@ -72,12 +74,12 @@ namespace Drakken.Server
             Log.Info($"ServerMatch-{matchId}", $"Starting game");
             gameState.Phase = GamePhase.Drafting;
 
-            // Give each client 4 new D6s
+            // Give each client a set of new dice
             for (int p = 0; p < 2; p++)
             {
-                for (int d = 0; d < 4; d++)
+                for (int d = 0; d < GameConstants.StandardDiceCount; d++)
                 {
-                    var dice = DiceInstance.Create(sides: 6);
+                    var dice = DiceInstance.Create(sides: GameConstants.StandardDiceSideCount);
                     dice.Roll();
                     gameState.Clients[p].Dice.Add(dice);
                 }
@@ -87,7 +89,7 @@ namespace Drakken.Server
             var allTokenIds = new List<string>();
             foreach (var def in server.TokenRegistry.AllDefinitions)
             {
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < GameConstants.MaxCountOfEachToken; i++)
                 {
                     allTokenIds.Add(def.TokenId);
                 }
@@ -95,12 +97,13 @@ namespace Drakken.Server
 
             allTokenIds.ShuffleInplace();
 
-            // Deal 6 to each player, store in gameState hand as "dealt" (pre-discard)
+            // Deal all the draft tokens to each player
             for (int p = 0; p < 2; p++)
             {
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < GameConstants.DraftingTokenCount; i++)
                 {
-                    string tokenId = allTokenIds[(p * 6 + i) % allTokenIds.Count];
+                    var draftedIdIndex = (p * GameConstants.DraftingTokenCount + i) % allTokenIds.Count;
+                    var tokenId = allTokenIds[draftedIdIndex];
                     var tokenInstance = TokenInstance.Create(tokenId);
                     gameState.Clients[p].Hand.Add(tokenInstance);
                 }
@@ -116,11 +119,13 @@ namespace Drakken.Server
             if (!clientIndexAssignment.TryGetValue(clientId, out int playerIndex)) return;
 
             var hand = gameState.Clients[playerIndex].Hand;
-            var discard0 = hand.Find(t => t.InstanceId == message.DiscardInstanceId0);
-            var discard1 = hand.Find(t => t.InstanceId == message.DiscardInstanceId1);
 
-            if (discard0 != null) hand.Remove(discard0);
-            if (discard1 != null) hand.Remove(discard1);
+            foreach (var discardedId in message.DiscardedInstanceIds)
+            {
+                var tokenInstance = hand.Find(t => t.InstanceId == discardedId);
+                Assert.NotNull(tokenInstance);
+                hand.Remove(tokenInstance);
+            }
 
             Log.Info($"ServerMatch-{matchId}", $"Player {playerIndex} discarded 2, hand={hand.Count}");
 

@@ -1,11 +1,9 @@
 using Drakken.Client.States;
+using Drakken.Client.World;
 using Drakken.Common.Utility;
 using Drakken.Config;
 using Drakken.Domain.Tokens;
-using Drakken.Networking;
 using System.Threading.Tasks;
-using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 namespace Drakken.Client
@@ -14,31 +12,56 @@ namespace Drakken.Client
     {
         [Header("References")]
         [SerializeField] private AssetDatabase assets;
+        [SerializeField] private new CameraController camera;
 
-        public AssetDatabase Assets => assets;
+
         public ClientMatch Match { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
+        public AssetDatabase Assets => assets;
+        public CameraController Camera => camera;
+
+        private readonly TitleClientState titleState = new();
+        private readonly DraftingClientState draftingState = new();
+        private readonly PlayingClientState playingState = new();
         private ClientState currentState = null;
+        private ClientStateType currentStateType = ClientStateType.None;
         public bool IsConnecting { get; private set; }
         public bool IsConnected { get; private set; }
         public bool IsInMatch => Match != null;
+        public SceneShared Shared { get; private set; } = new();
 
         private void Awake()
         {
             TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefabById);
+
+            titleState.Init(this);
+            draftingState.Init(this);
+            playingState.Init(this);
         }
 
         public async Task StartApplication()
         {
-            await GotoState(new ConnectingClientState());
+            await GotoState(ClientStateType.Title);
         }
 
-        public async Task GotoState(ClientState newState)
+        public async Task GotoState(ClientStateType nextStateType)
         {
-            if (currentState != null) await currentState.Exit();
+            if (currentState != null) await currentState.Exit(nextStateType);
+
+            ClientState newState = nextStateType switch
+            {
+                ClientStateType.Title => titleState,
+                ClientStateType.Drafting => draftingState,
+                ClientStateType.Playing => playingState,
+                _ => throw new System.NotImplementedException(),
+            };
+
+            var oldStateType = currentStateType;
+
             currentState = newState;
-            newState.Init(this);
-            await newState.Enter();
+            currentStateType = nextStateType;
+
+            await newState.Enter(oldStateType);
         }
 
         public Task<bool> Connect()
@@ -49,6 +72,7 @@ namespace Drakken.Client
 
             Log.Info("Client", $"Connecting to game server at {config.address}:{config.port}...");
 
+            // Listen to connect / disconnect events
             IsConnecting = true;
             IsConnected = false;
             var tcs = new TaskCompletionSource<bool>();
@@ -70,6 +94,7 @@ namespace Drakken.Client
                 tcs.TrySetResult(false);
             }
 
+            // Start networking client
             GameEntrypoint.Singleton.Connection.AddClientListeners(OnConnected, OnDisconnected);
             GameEntrypoint.Singleton.Connection.StartClient(this, config.address, config.port);
 

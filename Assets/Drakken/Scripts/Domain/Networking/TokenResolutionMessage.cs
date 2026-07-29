@@ -1,4 +1,5 @@
 using Drakken.Common.Utility;
+using Drakken.Domain.Networking;
 using Unity.Netcode;
 
 namespace Drakken.Networking

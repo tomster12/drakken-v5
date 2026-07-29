@@ -1,9 +1,11 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Common.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
+using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
 using Drakken.Server;
 
@@ -18,12 +20,14 @@ namespace Drakken.Networking
 
         public void StartServer(GameServer server, string address, ushort port)
         {
+            Initialise();
         }
 
         public void StartClient(GameClient client, string address, ushort port)
         {
             this.client = client;
             onClientConnectedCallback?.Invoke(clientId);
+            Initialise();
         }
 
         public void AddClientListeners(Action<ulong> onClientConnected, Action<ulong> onClientDisconnected)
@@ -50,12 +54,12 @@ namespace Drakken.Networking
 
         public void Client_MessageMatchClientReady(ulong matchId)
         {
-            client.Match.OnStartDraftingPhase(DraftingGameState);
+            client.Match.OnStartDraftingPhase(draftingGameState);
         }
 
         public void Client_MessageMatchDraftDiscard(ulong matchId, DraftDiscardMessage message)
         {
-            client.Match.OnStartPlayingPhase(PlayingGameState);
+            client.Match.OnStartPlayingPhase(playingGameState);
         }
 
         public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState)
@@ -72,73 +76,49 @@ namespace Drakken.Networking
         private static readonly ulong clientId = 103;
         private static readonly ulong clientIndex = 0;
 
-        private static GameState DraftingGameState
+
+        private void Initialise()
         {
-            get
-            {
-                return new()
+            // Setup data randomisation
+            var tokenRegistry = TokenRegistryBuilder.BuildRegistry();
+            var shuffledTokenIds = tokenRegistry.AllDefinitions.Select(d => d.TokenId).ToList();
+
+            GameStateClient GetRandomClient() =>
+                new()
                 {
-                    Clients = new GameStateClient[2] {
-                        new()
-                        {
-                            Dice = new()
-                            {
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll()
-                            },
-                            Hand = new()
-                            {
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                            }
-                        },
-                        new()
-                        {
-                            Dice = new()
-                            {
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll(),
-                                DiceInstance.Create(6).Roll()
-                            },
-                            Hand = new()
-                            {
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                                TokenInstance.Create("parasite"),
-                                TokenInstance.Create("dragon"),
-                            }
-                        },
-                    },
-                    TurnClientIndex = 0,
-                    Phase = GamePhase.Drafting,
-                    Turn = 1,
-                    Round = 1
+                    Dice = Enumerable.Range(1, GameConstants.StandardDiceCount)
+                        .Select(_ => DiceInstance.Create(GameConstants.StandardDiceSideCount).Roll())
+                        .ToList(),
+
+                    Hand = Enumerable.Range(1, GameConstants.DraftingTokenCount)
+                        .Select(_ => TokenInstance.Create(shuffledTokenIds[UnityEngine.Random.Range(0, shuffledTokenIds.Count())]))
+                        .ToList(),
                 };
-            }
-        }
 
-        private static GameState PlayingGameState
-        {
-            get
+            // Setup drafting game state
+            draftingGameState = new()
             {
-                var state = DraftingGameState;
+                Clients = new GameStateClient[2]
+                {
+                        GetRandomClient(),
+                        GetRandomClient()
+                },
+                TurnClientIndex = 0,
+                Phase = GamePhase.Drafting,
+                Turn = 1,
+                Round = 1
+            };
 
-                state.Clients[0].Hand.RemoveRange(state.Clients[0].Hand.Count - 2, 2);
-                state.Clients[1].Hand.RemoveRange(state.Clients[1].Hand.Count - 2, 2);
+            // Setup playing game state
+            // playingGameState = draftingGameState;
 
-                state.Phase = GamePhase.Playing;
+            // playingGameState.Clients[0].Hand.RemoveRange(playingGameState.Clients[0].Hand.Count - 2, 2);
+            // playingGameState.Clients[1].Hand.RemoveRange(playingGameState.Clients[1].Hand.Count - 2, 2);
 
-                return state;
-            }
+            // playingGameState.Phase = GamePhase.Playing;
         }
+
+        private GameState draftingGameState;
+        private GameState playingGameState;
     }
 }

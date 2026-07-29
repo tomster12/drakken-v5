@@ -14,10 +14,13 @@ namespace Drakken.Client
             this.client = client;
         }
 
-        public virtual Task Enter() => Task.CompletedTask;
-        
-        public virtual Task Exit() => Task.CompletedTask;
+        public virtual Task Enter(ClientStateType fromType) => Task.CompletedTask;
+
+        public virtual Task Exit(ClientStateType toType) => Task.CompletedTask;
 
         public virtual Task Update() => Task.CompletedTask;
     }
+
+    public enum ClientStateType
+    { None, Title, Drafting, Playing };
 }
