@@ -1,8 +1,6 @@
-using Drakken.Common.Utility;
-using Drakken.Domain.Networking;
 using Unity.Netcode;
 
-namespace Drakken.Networking
+namespace Drakken.Domain.Networking
 {
     public struct TokenResolutionMessage : INetworkSerializable
     {

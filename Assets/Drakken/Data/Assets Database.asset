@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Assets Database
   m_EditorClassIdentifier: Assembly-CSharp::Drakken.DrakkenAssetDatabase
   TokenViewPrefab: {fileID: 3855784460158510969, guid: 97f47f7dda7e4554c9244eed5f04093d, type: 3}
+  EmptyTokenMeshPrefab: {fileID: 5067687471921541806, guid: a90b2d4ba41805c48a79fc3d7b4351b2, type: 3}
   DiceViewPrefab: {fileID: 6660603119417165138, guid: 4eb5b6f0e6bf8d14d9b2dc4a3bf3f9ea, type: 3}
   tokenMeshPrefabs:
   - TokenId: dragon

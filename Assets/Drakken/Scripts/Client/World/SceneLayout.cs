@@ -11,17 +11,9 @@ namespace Drakken.Client.World
 
         private void Awake()
         {
-            Title.Title.SetActive(false);
-            Title.JoinButton.gameObject.SetActive(false);
-            Title.ReadyButton.gameObject.SetActive(false);
-            Title.OptionsButton.gameObject.SetActive(false);
-            Title.ExitButton.gameObject.SetActive(false);
-            Title.Clutter.SetActive(false);
-
-            Drafting.DraftConfirmButton.gameObject.SetActive(false);
-
-            Shared.Mat1.SetActive(false);
-            Shared.Mat2.SetActive(false);
+            Title.SetInitialState();
+            Drafting.SetInitialState();
+            Shared.SetInitialState();
         }
     }
 
@@ -35,6 +27,16 @@ namespace Drakken.Client.World
         public PhysicalButton OptionsButton;
         public PhysicalButton ExitButton;
         public GameObject Clutter;
+
+        public void SetInitialState()
+        {
+            Title.SetActive(false);
+            JoinButton.gameObject.SetActive(false);
+            ReadyButton.gameObject.SetActive(false);
+            OptionsButton.gameObject.SetActive(false);
+            ExitButton.gameObject.SetActive(false);
+            Clutter.SetActive(false);
+        }
     }
 
     [Serializable]
@@ -43,17 +45,34 @@ namespace Drakken.Client.World
         public Transform CameraPosition;
         public Transform DraftTokenRow;
         public PhysicalButton DraftConfirmButton;
+
+        public void SetInitialState()
+        {
+            DraftConfirmButton.gameObject.SetActive(false);
+        }
     }
 
     [Serializable]
     public class SharedLayout
     {
         public Transform MyDiceRow;
-        public Transform OpponentDiceRow;
-        public Transform MyHandRow;
+        public Transform OpDiceRow;
+        public Transform MyTokenRow;
+        public Transform OpTokenRow;
         public GameObject Mat1;
         public GameObject Mat2;
         public float TokenSpacing = 0.4f;
         public float DiceSpacing = 0.35f;
+
+        public void SetInitialState()
+        {
+            Mat1.SetActive(false);
+            Mat2.SetActive(false);
+        }
+
+        public void OnDisconnect()
+        {
+            SetInitialState();
+        }
     }
 }

@@ -12,5 +12,13 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref EffectId);
             serializer.SerializeValue(ref SourceClientIndex);
         }
+        public DiceEffect Clone()
+        {
+            return new DiceEffect
+            {
+                EffectId = EffectId,
+                SourceClientIndex = SourceClientIndex
+            };
+        }
     }
 }

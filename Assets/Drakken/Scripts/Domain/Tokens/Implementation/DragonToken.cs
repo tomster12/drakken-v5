@@ -46,7 +46,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             foreach (var dice in diceToReplace)
             {
-                removedDiceIds.Add(dice.Id);
+                removedDiceIds.Add(dice.InstanceId);
                 client.Dice.Remove(dice);
             }
 
@@ -74,7 +74,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
-        protected override async Task Animate(DragonTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
+        protected override async Task Animate(GameState gameState, DragonTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
         {
             Log.Info("DragonAnimator", "Spawning dragon VFX");
 
@@ -100,7 +100,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             foreach (var newDice in resolution.AddedDice)
             {
-                Log.Info("DragonAnimator", $"Slamming in D8 id={newDice.Id} value={newDice.Value}");
+                Log.Info("DragonAnimator", $"Slamming in D8 id={newDice.InstanceId} value={newDice.Value}");
 
                 // context.SpawnDiceView(resolution.SourceClientIndex, newDice);
 

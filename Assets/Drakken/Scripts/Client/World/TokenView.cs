@@ -2,6 +2,7 @@ using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
 using System.Linq;
 using TMPro;
+using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -53,6 +54,18 @@ namespace Drakken.Client.World
             return tokenView;
         }
 
+        public static TokenView CreateEmpty(AssetDatabase assets, Transform parent = null)
+        {
+            var prefab = assets.TokenViewPrefab;
+            var tokenGo = Instantiate(prefab, parent);
+            tokenGo.gameObject.SetActive(true);
+            var tokenView = tokenGo.GetComponent<TokenView>();
+
+            tokenView.BindEmpty(assets.EmptyTokenMeshPrefab);
+
+            return tokenView;
+        }
+
         private void Awake()
         {
             TargetLocalPosition = transform.localPosition;
@@ -81,6 +94,24 @@ namespace Drakken.Client.World
             meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
             titleText.text = TokenDefinition.DisplayName;
+            titleText.gameObject.SetActive(true);
+
+            outline.Setup();
+        }
+
+        private void BindEmpty(GameObject prefab)
+        {
+            TokenInstance = null;
+            TokenDefinition = null;
+
+            var meshGo = Instantiate(prefab, transform);
+            meshGo.SetActive(true);
+            meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+            titleText.text = null;
+            titleText.gameObject.SetActive(false);
+
+            outline.Setup();
         }
 
         [ContextMenu("Bind Random")]
@@ -120,9 +151,9 @@ namespace Drakken.Client.World
                 moveLerp * Time.deltaTime);
 
             // Update outline
-            outline.enabled = IsSelected || (IsHovered && IsInteractable);
+            outline.SetEnabled(IsSelected || (IsHovered && IsInteractable));
 
-            if (outline.enabled)
+            if (outline.IsEnabled)
             {
                 outline.OutlineColor = IsSelected
                     ? (IsHovered ? hoverSelectedOutlineColor : selectedOutlineColor)

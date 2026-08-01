@@ -1,6 +1,7 @@
 using Drakken.Client.World;
 using Drakken.Common.Utility;
 using System.Threading.Tasks;
+using static Drakken.Client.ClientUI;
 
 namespace Drakken.Client.States
 {
@@ -36,7 +37,12 @@ namespace Drakken.Client.States
 
         public override async Task Exit(ClientStateType toStateType)
         {
-            if (client.Match != null) client.Match.DraftingPhaseStarted -= OnDraftingPhaseStarted;
+            if (Match != null)
+            {
+                Match.OnDraftingPhaseStarted -= OnDraftingPhaseStarted;
+                Match.OnOtherPlayerJoined -= OnOtherPlayerJoined;
+                Match.OnOtherPlayerReady -= OnOtherPlayerReady;
+            }
 
             // Disable this scenes specific objects
             Layout.Title.Title.SetActive(false);
@@ -59,44 +65,70 @@ namespace Drakken.Client.States
         {
             if (client.IsConnected) return;
 
-            Log.Info("ConnectingClientState", "Connecting...");
             Layout.Title.JoinButton.Interactable = false;
 
             // Connect to the server
             var connected = await client.Connect();
             if (!connected)
             {
-                Log.Info("ConnectingClientState", "Connection failed.");
                 Layout.Title.JoinButton.Interactable = true;
                 return;
             }
-
-            Log.Info("ConnectingClientState", "Connected. Joining match...");
 
             // Now straight away try join a match
             var joined = await client.JoinMatch();
             if (!joined)
             {
-                Log.Info("ConnectingClientState", "Failed to join match.");
                 Layout.Title.JoinButton.Interactable = true;
                 return;
             }
 
-            Log.Info("ConnectingClientState", "Joined. Ready up!");
+            // Setup UI
+            client.UI.SetMyAvatar(AvatarState.Visible);
+
+            if (Match.IsOpJoined)
+            {
+                client.UI.SetOpAvatar(AvatarState.Visible);
+                client.UI.SetStatus("Lobby", "Waiting for both ready...");
+            }
+            else
+            {
+                client.UI.SetStatus("Lobby", "Waiting for an opponent...");
+            }
 
             // Everything was successful so we are in a match
             // Prepare for the client to ready up and wait to move to draft
             Layout.Title.ReadyButton.Interactable = true;
-            client.Match.DraftingPhaseStarted += OnDraftingPhaseStarted;
+            Match.OnDraftingPhaseStarted += OnDraftingPhaseStarted;
+            Match.OnOtherPlayerJoined += OnOtherPlayerJoined;
+            Match.OnOtherPlayerReady += OnOtherPlayerReady;
+        }
+
+        private async void OnOtherPlayerJoined()
+        {
+            client.UI.SetOpAvatar(AvatarState.Visible);
+            client.UI.SetStatus("Lobby", "Waiting for both ready...");
         }
 
         private void OnReadyClicked()
         {
-            Assert.False(client.Match.IsReadiedUp);
+            Assert.False(Match.IsReady);
 
             Layout.Title.ReadyButton.Interactable = false;
 
-            client.Match.SetReady();
+            client.UI.SetMyAvatar(AvatarState.Ready);
+
+            Match.SetReady();
+        }
+
+        private async void OnOtherPlayerReady()
+        {
+            client.UI.SetOpAvatar(AvatarState.Ready);
+
+            if (Match.IsReady)
+            {
+                client.UI.SetStatus("Lobby", "Game starting...");
+            }
         }
 
         private void OnExitClicked()
@@ -106,6 +138,9 @@ namespace Drakken.Client.States
 
         private async void OnDraftingPhaseStarted()
         {
+            client.UI.SetMyAvatar(AvatarState.Visible);
+            client.UI.SetOpAvatar(AvatarState.Visible);
+
             await client.GotoState(ClientStateType.Drafting);
         }
     }

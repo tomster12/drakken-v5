@@ -35,7 +35,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var opponent = gameState.Clients[opponentIndex];
 
             // Validate the users choice
-            var targetDice = opponent.Dice.Find(d => d.Id == intent.TargetDiceId);
+            var targetDice = opponent.Dice.Find(d => d.InstanceId == intent.TargetDiceId);
             Assert.NotNull(targetDice, $"ParasiteExecutor: no dice with id={intent.TargetDiceId} on opponent");
 
             // Apply the effect to server-side state
@@ -54,7 +54,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class ParasiteTokenAnimator : TokenAnimator<ParasiteTokenResolution>
     {
-        protected override async Task Animate(ParasiteTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
+        protected override async Task Animate(GameState gameState, ParasiteTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
         {
             int opponentIndex = 1 - sourceClientIndex;
             var targetView = context.GetDiceView(opponentIndex, resolution.TargetDiceId);

@@ -46,6 +46,9 @@ namespace Drakken.Client.World
         public void Bind(DiceInstance dice)
         {
             this.DiceInstance = dice;
+            
+            outline.Setup();
+
             Refresh();
         }
 
@@ -67,7 +70,7 @@ namespace Drakken.Client.World
 
             // Enable / disable hover
             bool shouldShow = IsHovered && IsInteractable;
-            outline.enabled = shouldShow;
+            outline.SetEnabled(shouldShow);
 
             if (shouldShow)
             {

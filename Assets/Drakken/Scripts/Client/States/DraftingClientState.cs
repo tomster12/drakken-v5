@@ -15,6 +15,7 @@ namespace Drakken.Client.States
         private SceneLayout Layout => GameEntrypoint.Singleton.Scene;
         private SceneShared Shared => GameEntrypoint.Singleton.Client.Shared;
         private readonly List<TokenView> selectedTokenViews = new();
+        private bool hasDiscarded;
         private int CountToDiscard => GameConstants.DraftingTokenCount - GameConstants.StandardTokenCount;
         private bool SelectedEnoughTokens => selectedTokenViews.Count >= CountToDiscard;
 
@@ -22,12 +23,16 @@ namespace Drakken.Client.States
 
         public override Task Enter(ClientStateType fromStateType)
         {
+            Match.OnPlayingPhaseStarted += OnPlayingPhaseStarted;
+
             // Initialise this scenes objects
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
             Layout.Drafting.DraftConfirmButton.Interactable = false;
-            Layout.Drafting.DraftConfirmButton.Clicked += OnConfirmClicked;
+            Layout.Drafting.DraftConfirmButton.Clicked += OnConfirmDiscardClicked;
 
             GameEntrypoint.Singleton.Client.Camera.SetTarget(Layout.Drafting.CameraPosition);
+
+            UpdateStatusUI();
 
             // When coming from the title create the dice
             if (fromStateType == ClientStateType.Title)
@@ -52,19 +57,18 @@ namespace Drakken.Client.States
 
         public override Task Exit(ClientStateType toStateType)
         {
-            Match.PlayingPhaseStarted -= OnPlayingPhaseStarted;
+            Match.OnPlayingPhaseStarted -= OnPlayingPhaseStarted;
 
             // If we are going back to title then clean up the token / dice views
             if (toStateType == ClientStateType.Title)
             {
-                Layout.Shared.Mat1.SetActive(false);
-                Layout.Shared.Mat2.SetActive(false);
-
-                Shared.Clear();
+                Layout.Shared.OnDisconnect();
+                Shared.OnDisconnect();
+                client.UI.OnDisconnect();
             }
 
             // Cleanup this scenes specific objects
-            Layout.Drafting.DraftConfirmButton.Clicked -= OnConfirmClicked;
+            Layout.Drafting.DraftConfirmButton.Clicked -= OnConfirmDiscardClicked;
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
 
             return Task.CompletedTask;
@@ -73,14 +77,14 @@ namespace Drakken.Client.States
         private void CreateAndRollDice()
         {
             Assert.True(Shared.MyDiceViews.Count == 0);
-            Assert.True(Shared.OpponentDiceViews.Count == 0);
+            Assert.True(Shared.OpDiceViews.Count == 0);
 
             // For each player create a row of dice views
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 // Check if placing yours or opponents
                 var areMyDice = Match.ClientIndex == clientIndex;
-                var diceRowParent = areMyDice ? Layout.Shared.MyDiceRow : Layout.Shared.OpponentDiceRow;
+                var diceRowParent = areMyDice ? Layout.Shared.MyDiceRow : Layout.Shared.OpDiceRow;
                 var clientDice = GameState.Clients[clientIndex].Dice;
 
                 for (int i = 0; i < clientDice.Count; i++)
@@ -101,48 +105,64 @@ namespace Drakken.Client.States
 
                     if (areMyDice)
                         Shared.MyDiceViews.Add(diceView);
-                    else Shared.OpponentDiceViews.Add(diceView);
+                    else Shared.OpDiceViews.Add(diceView);
                 }
             }
+
+            // Update UI to match dice totals
+            client.UI.UpdateMyDiceTotal();
+            client.UI.UpdateOpDiceTotal();
         }
 
         private void RollExistingDice()
         {
             Assert.True(Shared.MyDiceViews.Count != 0);
-            Assert.True(Shared.OpponentDiceViews.Count != 0);
+            Assert.True(Shared.OpDiceViews.Count != 0);
+
+            // TODO: Update dice to match the gamestate
+
+            // Update UI to match dice totals
+            client.UI.UpdateMyDiceTotal();
+            client.UI.UpdateOpDiceTotal();
         }
 
         private void SpawnTokens()
         {
-            Assert.True(Shared.TokenViews.Count == 0);
+            Assert.True(Shared.MyTokenViews.Count == 0);
 
             // Create each token object in a row
-            var tokenRowParent = Layout.Drafting.DraftTokenRow;
-            var tokenHand = GameState.Clients[Match.ClientIndex].Hand;
-            for (int i = 0; i < tokenHand.Count; i++)
+            for (int i = 0; i < GameState.Clients[Match.ClientIndex].Tokens.Count; i++)
             {
                 // Create new instance
-                var tokenInstance = tokenHand[i];
-                var tokenView = TokenView.Create(client.Assets, client.TokenRegistry, tokenInstance, tokenRowParent);
+                var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[i];
+                var tokenView = TokenView.Create(client.Assets, client.TokenRegistry, tokenInstance, Layout.Drafting.DraftTokenRow);
                 if (tokenView == null) continue;
 
                 // Place into the row
-                float offset = (i - (tokenHand.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
+                float offset = (i - (GameState.Clients[Match.ClientIndex].Tokens.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
                 Vector3 localPos = new(offset, 0f, 0f);
                 tokenView.TargetLocalPosition = localPos;
                 tokenView.transform.localPosition = localPos;
                 tokenView.transform.localRotation = Quaternion.identity;
 
-                // Can always interact with all the tokens
                 tokenView.SetInteractable(true);
-
                 tokenView.OnClicked.AddListener(OnTokenClicked);
-
-                Shared.TokenViews.Add(tokenView);
+                Shared.MyTokenViews.Add(tokenView);
             }
         }
 
         // ------------------------------ Logic
+
+        private void UpdateStatusUI()
+        {
+            var statusText = hasDiscarded
+                ? "Waiting for opponent..."
+                : SelectedEnoughTokens
+                    ? "Ready to confirm"
+                    : $"Select {CountToDiscard} tokens to discard";
+
+            client.UI.SetStatus("Drafting", statusText);
+        }
 
         private void OnTokenClicked(TokenView tokenView)
         {
@@ -154,7 +174,7 @@ namespace Drakken.Client.States
                     selectedTokenViews.Remove(tokenView);
 
                     // We can ensure all tokens are interactable again
-                    foreach (var otherTokenView in Shared.TokenViews)
+                    foreach (var otherTokenView in Shared.MyTokenViews)
                     {
                         otherTokenView.SetInteractable(true);
                     }
@@ -171,7 +191,7 @@ namespace Drakken.Client.States
                     // If we have selected the limit disable others
                     if (SelectedEnoughTokens)
                     {
-                        foreach (var otherTokenView in Shared.TokenViews)
+                        foreach (var otherTokenView in Shared.MyTokenViews)
                         {
                             if (!otherTokenView.IsSelected)
                             {
@@ -182,22 +202,21 @@ namespace Drakken.Client.States
                 }
             }
 
+            // Cannot interact once we've selected enough
             Layout.Drafting.DraftConfirmButton.Interactable = SelectedEnoughTokens;
+
+            UpdateStatusUI();
         }
 
-        private async void OnConfirmClicked()
+        private async void OnConfirmDiscardClicked()
         {
             Assert.True(SelectedEnoughTokens);
+            Assert.False(hasDiscarded);
 
-            // Disable confirm button and tokens now
+            // Update local state to stop further interaction
+            hasDiscarded = true;
             Layout.Drafting.DraftConfirmButton.Interactable = false;
-            foreach (var tokenView in Shared.TokenViews)
-            {
-                tokenView.SetInteractable(false);
-            }
-
-            // Wait for playing to start now
-            Match.PlayingPhaseStarted += OnPlayingPhaseStarted;
+            Layout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
 
             // Tell the server which instances we discarded
             var message = new DraftDiscardMessage
@@ -206,7 +225,34 @@ namespace Drakken.Client.States
                     .Select(tv => tv.TokenInstance.InstanceId)
                     .ToList()
             };
-            Match.SendDraftDiscard(message);
+            var response = await Match.RequestDraftDiscard(message);
+
+            // For now assert this went through correctly
+            Assert.True(response);
+
+            // Delete discarded token views
+            foreach (var tokenView in selectedTokenViews)
+            {
+                GameObject.Destroy(tokenView.gameObject);
+                Shared.MyTokenViews.Remove(tokenView);
+            }
+
+            // Place each token back into the row
+            for (int i = 0; i < Shared.MyTokenViews.Count; i++)
+            {
+                var tokenView = Shared.MyTokenViews[i];
+
+                tokenView.transform.SetParent(Layout.Drafting.DraftTokenRow, worldPositionStays: true);
+                float offset = (i - (Shared.MyTokenViews.Count - 1) / 2f) * Layout.Shared.TokenSpacing;
+                Vector3 localPos = new(offset, 0f, 0f);
+                tokenView.TargetLocalPosition = localPos;
+                tokenView.transform.localPosition = localPos;
+                tokenView.transform.localRotation = Quaternion.identity;
+
+                tokenView.SetInteractable(false);
+            }
+
+            UpdateStatusUI();
         }
 
         private async void OnPlayingPhaseStarted()

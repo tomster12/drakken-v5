@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 410151dc9bddb63468806ca2cab75858
+guid: e589f34f461d9934ca85b41cfd2173fa
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -7,12 +7,12 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Dark Wood
+      name: Token Wood 1
     second: {fileID: 2100000, guid: 756f505a9b2d1cd45bf70fc5796f5662, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Light Wood
+      name: Token Wood 2
     second: {fileID: 2100000, guid: f7961897fc451ca47826d97cb2430986, type: 2}
   materials:
     materialImportMode: 2

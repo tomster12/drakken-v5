@@ -4,7 +4,7 @@ namespace Drakken.Domain.Tokens
 {
     public class TokenInstance : INetworkSerializable
     {
-        private static int nextId = 1;
+        private static int nextInstanceId = 1;
         public int InstanceId;
         public string TokenId;
 
@@ -12,7 +12,7 @@ namespace Drakken.Domain.Tokens
         {
             return new()
             {
-                InstanceId = nextId++,
+                InstanceId = nextInstanceId++,
                 TokenId = tokenId
             };
         }
@@ -21,6 +21,15 @@ namespace Drakken.Domain.Tokens
         {
             serializer.SerializeValue(ref InstanceId);
             serializer.SerializeValue(ref TokenId);
+        }
+
+        public TokenInstance Clone()
+        {
+            return new TokenInstance
+            {
+                InstanceId = InstanceId,
+                TokenId = TokenId,
+            };
         }
     }
 }

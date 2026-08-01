@@ -1,12 +1,11 @@
 using System.Linq;
 using UnityEngine;
-
 using Drakken.Common.Utility;
 using Drakken.Client;
 using Drakken.Server;
 using System;
 using Drakken.Client.World;
-using Drakken.Networking;
+using Drakken.DebugServer;
 
 namespace Drakken
 {
@@ -39,12 +38,21 @@ namespace Drakken
         private void Awake()
         {
             Singleton = this;
-            resolvedConnection = debugPreventConnection ? new DebugGameConnection() : connection;
         }
 
         private async void Start()
         {
             if (debugPreventApplication) return;
+
+            resolvedConnection = debugPreventConnection
+                ? new DebugGameConnection()
+                : connection;
+
+            if (debugPreventConnection)
+            {
+                Log.Info("Application", "Starting game server due to debugPreventConnection");
+                server.StartApplication();
+            }
 
             var isServer =
                 UnityEngine.Application.isBatchMode ||
@@ -52,12 +60,12 @@ namespace Drakken
 
             if (isServer)
             {
-                Log.Info("Application", "Running as server");
+                Log.Info("Application", "Starting game server application");
                 server.StartApplication();
             }
             else
             {
-                Log.Info("Application", "Running as client");
+                Log.Info("Application", "Starting game client application");
                 await client.StartApplication();
             }
         }

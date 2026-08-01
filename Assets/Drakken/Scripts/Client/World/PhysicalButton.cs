@@ -44,6 +44,8 @@ namespace Drakken.Client.World
             isHovered = false;
             isHeld = false;
             mouse = Mouse.current;
+            
+            outline.Setup();
         }
 
         private void Update()
@@ -54,7 +56,7 @@ namespace Drakken.Client.World
 
             var isActive = (Interactable && isHovered) || isHeld;
 
-            outline.enabled = isActive;
+            outline.SetEnabled(isActive);
 
             meshRenderer.material.color =
                 Interactable

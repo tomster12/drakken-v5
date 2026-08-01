@@ -3,46 +3,68 @@ using Drakken.Domain;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Unity.Mathematics;
 
 namespace Drakken.Server
 {
     public class ServerMatch
     {
         private static ulong nextMatchId = 1;
+        private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(1);
 
-        private readonly GameServer server;
-        private readonly ulong matchId;
-        private readonly GameState gameState;
+        private readonly TokenRegistry tokenRegistry;
         private readonly ulong[] clientIds = new ulong[2];
-        private readonly Dictionary<ulong, int> clientIndexAssignment = new();
+        private readonly Dictionary<ulong, int> clientIdIndexAssignment = new();
+        private readonly ulong matchId;
+        public GameState GameState { get; private set; }
+
         private int connectedCount;
         private int startReadyCount = 0;
         private int discardReadyCount = 0;
 
-        public ServerMatch(GameServer server)
+        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
+
+        public bool IsMatch(ulong matchId)
+            => this.matchId == matchId;
+
+        private ulong GetOtherClientId(ulong clientId)
+            => clientIds[0] == clientId ? clientIds[1] : clientIds[0];
+
+        // -------------------------------- Setup
+
+        public ServerMatch(TokenRegistry tokenRegistry)
         {
-            this.server = server;
+            this.tokenRegistry = tokenRegistry;
             matchId = nextMatchId++;
-            gameState = new GameState();
+            GameState = new();
 
             Log.Info($"ServerMatch-{matchId}", $"Created new match");
         }
 
-        public JoinMatchResponse OnRequestJoin(ulong clientId)
+        public JoinMatchResponse OnClientRequestJoin(ulong clientId)
         {
             // Block if the match is started / or full
-            if (gameState.Phase != GamePhase.NotStarted || connectedCount >= 2)
+            if (GameState.Phase != GamePhase.NotStarted || connectedCount >= 2)
             {
+                Log.Info($"ServerMatch-{matchId}", $"Rejected ClientId={clientId}");
                 return new() { Success = false };
             }
 
             // Assign the client the next client ID
             int index = connectedCount++;
             clientIds[index] = clientId;
-            clientIndexAssignment[clientId] = index;
+            clientIdIndexAssignment[clientId] = index;
 
-            Log.Info($"ServerMatch-{matchId}", $"ClientId={clientId} joined as clientIndex={index}");
+            Log.Info($"ServerMatch-{matchId}", $"Accepted ClientId={clientId} as clientIndex={index}");
+
+            if (connectedCount == 2)
+            {
+                Connection.Server_MessageMatchOtherPlayerJoined(clientIds[0]);
+            }
 
             return new()
             {
@@ -52,12 +74,18 @@ namespace Drakken.Server
             };
         }
 
-        public void OnReady(ulong clientId)
+        public void OnClientReady(ulong clientId)
         {
-            Assert.True(gameState.Phase == GamePhase.NotStarted);
+            Assert.True(GameState.Phase == GamePhase.NotStarted);
+            Log.Info($"ServerMatch-{matchId}", $"Client {clientId} ready ({startReadyCount + 1}/2)");
 
             startReadyCount++;
-            Log.Info($"ServerMatch-{matchId}", $"Client {clientId} ready ({startReadyCount}/2)");
+
+            // Let 1st player know they have readied up
+            if (startReadyCount == 2)
+            {
+                Connection.Server_MessageMatchOtherPlayerReady(GetOtherClientId(clientId));
+            }
 
             // When both readied up start drafting phase
             if (startReadyCount == 2)
@@ -66,13 +94,19 @@ namespace Drakken.Server
             }
         }
 
-        private void StartDraftingPhase()
-        {
-            Assert.True(gameState.Phase == GamePhase.NotStarted);
+        // -------------------------------- Drafting
 
-            // Start game into drafting phase
-            Log.Info($"ServerMatch-{matchId}", $"Starting game");
-            gameState.Phase = GamePhase.Drafting;
+        private async void StartDraftingPhase()
+        {
+            // TODO: Allow coming to drafting after round end
+            Assert.True(GameState.Phase == GamePhase.NotStarted);
+            Assert.True(startReadyCount == 2);
+            Log.Info($"ServerMatch-{matchId}", $"Match starting drafting phase");
+
+            // Arbitrary delay before starting
+            await Task.Delay(draftingStartDelay);
+
+            GameState.Phase = GamePhase.Drafting;
 
             // Give each client a set of new dice
             for (int p = 0; p < 2; p++)
@@ -81,17 +115,17 @@ namespace Drakken.Server
                 {
                     var dice = DiceInstance.Create(sides: GameConstants.StandardDiceSideCount);
                     dice.Roll();
-                    gameState.Clients[p].Dice.Add(dice);
+                    GameState.Clients[p].Dice.Add(dice);
                 }
             }
 
             // Build a pool from all available token definitions and shuffle it
             var allTokenIds = new List<string>();
-            foreach (var def in server.TokenRegistry.AllDefinitions)
+            foreach (var tokenDef in tokenRegistry.AllDefinitions)
             {
                 for (int i = 0; i < GameConstants.MaxCountOfEachToken; i++)
                 {
-                    allTokenIds.Add(def.TokenId);
+                    allTokenIds.Add(tokenDef.TokenId);
                 }
             }
 
@@ -105,46 +139,52 @@ namespace Drakken.Server
                     var draftedIdIndex = (p * GameConstants.DraftingTokenCount + i) % allTokenIds.Count;
                     var tokenId = allTokenIds[draftedIdIndex];
                     var tokenInstance = TokenInstance.Create(tokenId);
-                    gameState.Clients[p].Hand.Add(tokenInstance);
+                    GameState.Clients[p].Tokens.Add(tokenInstance);
                 }
             }
 
-            GameEntrypoint.Singleton.Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, gameState);
+            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState);
         }
 
-        public void OnDraftDiscard(ulong clientId, DraftDiscardMessage message)
+        public void OnClientRequestDraftDiscard(ulong clientId, DraftDiscardMessage message, Action<bool> respond)
         {
-            Assert.True(gameState.Phase == GamePhase.Drafting);
+            Assert.True(GameState.Phase == GamePhase.Drafting);
+            Assert.True(clientIdIndexAssignment.TryGetValue(clientId, out int playerIndex));
+            Log.Info($"ServerMatch-{matchId}", $"Player {clientId} discarded tokens");
 
-            if (!clientIndexAssignment.TryGetValue(clientId, out int playerIndex)) return;
-
-            var hand = gameState.Clients[playerIndex].Hand;
-
+            // Remove the discarded tokens
+            var tokens = GameState.Clients[playerIndex].Tokens;
             foreach (var discardedId in message.DiscardedInstanceIds)
             {
-                var tokenInstance = hand.Find(t => t.InstanceId == discardedId);
+                var tokenInstance = tokens.Find(t => t.InstanceId == discardedId);
                 Assert.NotNull(tokenInstance);
-                hand.Remove(tokenInstance);
+                tokens.Remove(tokenInstance);
             }
 
-            Log.Info($"ServerMatch-{matchId}", $"Player {playerIndex} discarded 2, hand={hand.Count}");
+            // Tell the client all is good before we move on
+            respond(true);
 
+            // Start playing phase once everyone has readied up
             discardReadyCount++;
-            if (discardReadyCount == 2) BeginPlayingPhase();
+            if (discardReadyCount == 2)
+            {
+                BeginPlayingPhase();
+            }
         }
 
-        private void BeginPlayingPhase()
-        {
-            Assert.True(gameState.Phase == GamePhase.Drafting);
-            gameState.Phase = GamePhase.Playing;
+        // -------------------------------- Playing
 
-            Log.Info($"ServerMatch-{matchId}", "Both players finished drafting, starting Playing phase");
-            GameEntrypoint.Singleton.Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, gameState);
-        }
-
-        public bool IsMatch(ulong matchId)
+        private async void BeginPlayingPhase()
         {
-            return this.matchId == matchId;
+            Assert.True(GameState.Phase == GamePhase.Drafting);
+            Log.Info($"ServerMatch-{matchId}", $"Match starting playing phase");
+
+            // Arbitrary delay before starting
+            await Task.Delay(playingStartDelay);
+
+            GameState.Phase = GamePhase.Playing;
+
+            Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
         }
     }
 }

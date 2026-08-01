@@ -4,15 +4,15 @@ namespace Drakken.Domain.Tokens
 {
     public interface ITokenAnimator
     {
-        Task Animate(TokenResolution resolution, TokenVisualContext context, int sourceClientIndex);
+        Task Animate(GameState gameState, TokenResolution resolution, TokenVisualContext context, int sourceClientIndex);
     }
 
     public abstract class TokenAnimator<TResolution> : ITokenAnimator
         where TResolution : TokenResolution
     {
-        public Task Animate(TokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
-            => Animate((TResolution)resolution, context, sourceClientIndex);
+        public Task Animate(GameState gameState, TokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
+            => Animate(gameState, (TResolution)resolution, context, sourceClientIndex);
 
-        protected abstract Task Animate(TResolution resolution, TokenVisualContext context, int sourceClientIndex);
+        protected abstract Task Animate(GameState gameState, TResolution resolution, TokenVisualContext context, int sourceClientIndex);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
 using Unity.Netcode;
@@ -8,8 +9,8 @@ namespace Drakken.Domain
 {
     public class DiceInstance : INetworkSerializable
     {
-        private static int nextId = 1;
-        public int Id;
+        private static int nextInstanceId = 1;
+        public int InstanceId;
         public int Sides;
         public int Value;
         public List<DiceEffect> Effects = new();
@@ -18,7 +19,7 @@ namespace Drakken.Domain
         {
             return new()
             {
-                Id = nextId++,
+                InstanceId = nextInstanceId++,
                 Sides = sides
             };
         }
@@ -31,11 +32,21 @@ namespace Drakken.Domain
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeValue(ref Id);
+            serializer.SerializeValue(ref InstanceId);
             serializer.SerializeValue(ref Sides);
             serializer.SerializeValue(ref Value);
             serializer.SerializeList(Effects);
         }
+        
+        public DiceInstance Clone()
+        {
+            return new DiceInstance
+            {
+                InstanceId = InstanceId,
+                Sides = Sides,
+                Value = Value,
+                Effects = Effects.Select(effect => effect.Clone()).ToList(),
+            };
+        }
     }
-
 }

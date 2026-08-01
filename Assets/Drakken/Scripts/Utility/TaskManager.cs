@@ -4,26 +4,45 @@ using Drakken.Common.Utility;
 
 namespace Drakken.Common
 {
+    internal interface IPendingTaskCompletion
+    {
+        void Complete(object result);
+    }
+
+    internal class PendingTaskCompletion<T> : IPendingTaskCompletion
+    {
+        private readonly TaskCompletionSource<T> tcs = new();
+        public Task<T> Task => tcs.Task;
+
+        public void Complete(object result) => tcs.SetResult((T)result);
+    }
+
+
     internal class TaskManager
     {
-        private readonly Dictionary<string, TaskCompletionSource<object>> current = new();
+        private ulong nextRequestId = 1;
+        private readonly Dictionary<ulong, IPendingTaskCompletion> pendingTasksByRequestId = new();
 
-        public Task<T> Create<T>(string key)
+        public (ulong requestId, Task<T> task) Create<T>()
         {
-            Assert.False(current.ContainsKey(key), $"Task '{key}' is already in progress");
-            var tcs = new TaskCompletionSource<object>();
-            current[key] = tcs;
-            return tcs.Task.ContinueWith(t => (T)t.Result);
+            var requestId = nextRequestId++;
+
+            var pendingTaskCompletion = new PendingTaskCompletion<T>();
+
+            pendingTasksByRequestId[requestId] = pendingTaskCompletion;
+
+            return (requestId, pendingTaskCompletion.Task);
         }
 
-        public bool Complete<T>(string key, T result)
+        public bool Complete<T>(ulong requestId, T result)
         {
-            if (current.TryGetValue(key, out var tcs))
+            if (pendingTasksByRequestId.TryGetValue(requestId, out var pendingTaskCompletion))
             {
-                current.Remove(key);
-                tcs.SetResult(result!);
+                pendingTasksByRequestId.Remove(requestId);
+                pendingTaskCompletion.Complete(result);
                 return true;
             }
+
             return false;
         }
     }

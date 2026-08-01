@@ -9,8 +9,6 @@ namespace Drakken.Domain
         public GamePhase Phase = GamePhase.NotStarted;
         public int Turn = 1;
         public int Round = 1;
-        public GameStateClient CurrentClient => Clients[TurnClientIndex];
-        public GameStateClient OpponentClient => Clients[1 - TurnClientIndex];
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -20,6 +18,18 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref Phase);
             serializer.SerializeValue(ref Turn);
             serializer.SerializeValue(ref Round);
+        }
+        
+        public GameState Clone()
+        {
+            return new GameState
+            {
+                Clients = new[] { Clients[0].Clone(), Clients[1].Clone() },
+                TurnClientIndex = TurnClientIndex,
+                Phase = Phase,
+                Turn = Turn,
+                Round = Round,
+            };
         }
     }
 

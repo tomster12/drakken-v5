@@ -8,27 +8,36 @@ using UnityEngine;
 
 namespace Drakken.Client
 {
-    public class GameClient : MonoBehaviour
+    public interface IGameClient
+    {
+        Task<bool> Connect();
+        Task<bool> JoinMatch();
+        public ClientMatch Match { get; }
+    }
+
+    public class GameClient : MonoBehaviour, IGameClient
     {
         [Header("References")]
         [SerializeField] private AssetDatabase assets;
         [SerializeField] private new CameraController camera;
-
+        [SerializeField] private ClientUI ui;
 
         public ClientMatch Match { get; private set; }
         public TokenRegistry TokenRegistry { get; private set; }
+        public SceneShared Shared { get; private set; } = new();
         public AssetDatabase Assets => assets;
         public CameraController Camera => camera;
+        public ClientUI UI => ui;
 
         private readonly TitleClientState titleState = new();
         private readonly DraftingClientState draftingState = new();
         private readonly PlayingClientState playingState = new();
         private ClientState currentState = null;
         private ClientStateType currentStateType = ClientStateType.None;
+
         public bool IsConnecting { get; private set; }
         public bool IsConnected { get; private set; }
         public bool IsInMatch => Match != null;
-        public SceneShared Shared { get; private set; } = new();
 
         private void Awake()
         {
@@ -115,6 +124,7 @@ namespace Drakken.Client
                 return true;
             }
 
+            Log.Info("Client", "Failed to join match");
             return false;
         }
     }
