@@ -20,6 +20,8 @@ namespace Drakken.Client.World
         [Header("References")]
         [SerializeField] private Outline outline;
         [SerializeField] private TextMeshPro titleText;
+        [SerializeField] private Canvas descriptionCanvas;
+        [SerializeField] private TextMeshProUGUI descriptionText;
 
         [Header("Config")]
         [SerializeField] private float hoverLiftY = 0.15f;
@@ -96,6 +98,10 @@ namespace Drakken.Client.World
             titleText.text = TokenDefinition.DisplayName;
             titleText.gameObject.SetActive(true);
 
+            descriptionCanvas.gameObject.SetActive(false);
+
+            descriptionText.text = TokenDefinition.Description;
+
             outline.Setup();
         }
 
@@ -110,6 +116,8 @@ namespace Drakken.Client.World
 
             titleText.text = null;
             titleText.gameObject.SetActive(false);
+
+            descriptionCanvas.gameObject.SetActive(false);
 
             outline.Setup();
         }
@@ -158,6 +166,17 @@ namespace Drakken.Client.World
                 outline.OutlineColor = IsSelected
                     ? (IsHovered ? hoverSelectedOutlineColor : selectedOutlineColor)
                     : hoverOutlineColor;
+            }
+
+            // Update description
+            descriptionCanvas.gameObject.SetActive(IsHovered);
+
+            if (IsHovered)
+            {
+                // Set its position to relative to the title
+                descriptionCanvas.transform.SetPositionAndRotation(
+                    titleText.transform.position + new Vector3(0, -0.1f, 0.22f),
+                    Quaternion.Euler(90.0f, 0, 0));
             }
         }
 

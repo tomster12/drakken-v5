@@ -105,7 +105,7 @@ namespace Drakken.Client
 
             // Start networking client
             GameEntrypoint.Singleton.Connection.AddClientListeners(OnConnected, OnDisconnected);
-            GameEntrypoint.Singleton.Connection.StartClient(this, config.address, config.port);
+            GameEntrypoint.Singleton.Connection.StartClient(config.address, config.port);
 
             return tcs.Task;
         }

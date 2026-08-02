@@ -11,7 +11,7 @@ namespace Drakken.Domain.Networking
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeList(DealtTokens);
+            serializer.SerializeList(ref DealtTokens);
             serializer.SerializeValue(ref OpTokenCount);
         }
     }

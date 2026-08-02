@@ -9,7 +9,7 @@ namespace Drakken.Domain.Networking
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeList(DiscardedInstanceIds);
+            serializer.SerializeList(ref DiscardedInstanceIds);
         }
     }
 }

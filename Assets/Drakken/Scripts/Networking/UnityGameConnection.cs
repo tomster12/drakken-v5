@@ -8,44 +8,30 @@ using Drakken.Server;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 
-namespace Drakken
+namespace Drakken.Networking
 {
-    public interface IGameConnection
+    public class UnityGameConnection : NetworkBehaviour, IGameConnection
     {
-        void StartServer(IGameServer server, string address, ushort port);
-        void StartClient(IGameClient client, string address, ushort port);
-        void AddClientListeners(Action<ulong> OnConnected, Action<ulong> OnDisconnected);
-        void RemoveClientListeners(Action<ulong> OnConnected, Action<ulong> OnDisconnected);
-
-        Task<JoinMatchResponse> Client_RequestJoinMatch();
-        void Server_MessageMatchOtherPlayerJoined(ulong clientId);
-        void Client_MessageMatchClientReady(ulong matchId);
-        void Server_MessageMatchOtherPlayerReady(ulong clientId);
-        void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState);
-        Task<bool> Client_RequestMatchDraftDiscard(ulong matchId, DraftDiscardMessage message);
-        void Server_BroadcastMatchStartPlayingPhase(ulong[] clientIds, GameState gameState);
-    }
-
-    public class GameConnection : NetworkBehaviour, IGameConnection
-    {
-        private IGameServer server;
-        private IGameClient client;
+        public static UnityGameConnection Singleton { get; private set; }
+        private IGameServer Server => GameEntrypoint.Singleton.Server;
+        private IGameClient Client => GameEntrypoint.Singleton.Client;
         private readonly TaskManager tasks = new();
 
-        public void StartServer(IGameServer server, string address, ushort port)
+        private void Awake()
         {
-            this.server = server;
+            Singleton = this;
+        }
 
+        public void StartServer(string address, ushort port)
+        {
             var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
             transport.ConnectionData.Address = address;
             transport.ConnectionData.Port = port;
             NetworkManager.Singleton.StartServer();
         }
 
-        public void StartClient(IGameClient client, string address, ushort port)
+        public void StartClient(string address, ushort port)
         {
-            this.client = client;
-
             var transport = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
             transport.ConnectionData.Address = address;
             transport.ConnectionData.Port = port;
@@ -77,7 +63,7 @@ namespace Drakken
         private void C2S_RequestJoinMatch_Rpc(ulong requestId, RpcParams rpc = default)
         {
             var clientId = rpc.Receive.SenderClientId;
-            var response = server.OnRequestJoinMatch(clientId);
+            var response = Server.OnRequestJoinMatch(clientId);
             S2C_RespondJoinMatch_Rpc(requestId, response, RpcTarget.Single(clientId, RpcTargetUse.Temp));
         }
 
@@ -95,7 +81,7 @@ namespace Drakken
         [Rpc(SendTo.SpecifiedInParams)]
         private void S2C_MessageMatchOtherPlayerJoined_Rpc(RpcParams rpc = default)
         {
-            client.Match.OnServerOtherPlayerJoined();
+            Client.Match.OnServerOtherPlayerJoined();
         }
 
         public void Client_MessageMatchClientReady(ulong matchId)
@@ -107,7 +93,7 @@ namespace Drakken
         private void C2S_MessageMatchClientReady_Rpc(ulong matchId, RpcParams rpc = default)
         {
             var clientId = rpc.Receive.SenderClientId;
-            server.GetMatch(matchId).OnClientReady(clientId);
+            Server.GetMatch(matchId).OnClientReady(clientId);
         }
 
         public void Server_MessageMatchOtherPlayerReady(ulong clientId)
@@ -118,7 +104,7 @@ namespace Drakken
         [Rpc(SendTo.SpecifiedInParams)]
         private void S2C_MessageMatchOtherPlayerReady_Rpc(RpcParams rpc = default)
         {
-            client.Match.OnServerOtherPlayerReady();
+            Client.Match.OnServerOtherPlayerReady();
         }
 
         // -------------------------------- Drafting
@@ -131,7 +117,7 @@ namespace Drakken
         [Rpc(SendTo.SpecifiedInParams)]
         private void S2C_BroadcastMatchStartDraftingPhase_Rpc(GameState gameState, RpcParams rpc = default)
         {
-            client.Match.OnServerStartDraftingPhase(gameState);
+            Client.Match.OnServerStartDraftingPhase(gameState);
         }
 
         public Task<bool> Client_RequestMatchDraftDiscard(ulong matchId, DraftDiscardMessage message)
@@ -145,7 +131,7 @@ namespace Drakken
         private void C2S_RequestMatchDraftDiscard_Rpc(ulong matchId, ulong requestId, DraftDiscardMessage message, RpcParams rpc = default)
         {
             var clientId = rpc.Receive.SenderClientId;
-            server.GetMatch(matchId).OnClientRequestDraftDiscard(clientId, message, (response) =>
+            Server.GetMatch(matchId).OnClientRequestDraftDiscard(clientId, message, (response) =>
                 S2C_RespondMatchDraftDiscard_Rpc(requestId, response, RpcTarget.Single(clientId, RpcTargetUse.Temp)));
         }
 
@@ -153,6 +139,17 @@ namespace Drakken
         private void S2C_RespondMatchDraftDiscard_Rpc(ulong requestId, bool response, RpcParams rpc = default)
         {
             tasks.Complete(requestId, response);
+        }
+
+        public void Server_MessageMatchOtherPlayerDiscarded(ulong clientId)
+        {
+            S2C_MessageMatchOtherPlayerDiscarded_Rpc(RpcTarget.Single(clientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void S2C_MessageMatchOtherPlayerDiscarded_Rpc(RpcParams rpc = default)
+        {
+            Client.Match.OnServerOtherPlayerDiscarded();
         }
 
         // -------------------------------- Playing
@@ -165,7 +162,7 @@ namespace Drakken
         [Rpc(SendTo.SpecifiedInParams)]
         private void S2C_BroadcastMatchStartPlayingPhase_Rpc(GameState gameState, RpcParams rpc = default)
         {
-            client.Match.OnServerStartPlayingPhase(gameState);
+            Client.Match.OnServerStartPlayingPhase(gameState);
         }
     }
 }

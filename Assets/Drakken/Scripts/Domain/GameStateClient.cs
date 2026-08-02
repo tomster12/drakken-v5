@@ -27,11 +27,11 @@ namespace Drakken.Domain
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeList(Dice);
-            serializer.SerializeList(Tokens);
+            serializer.SerializeList(ref Dice);
+            serializer.SerializeList(ref Tokens);
             serializer.SerializeValue(ref Score);
         }
-        
+
         public GameStateClient Clone()
         {
             return new GameStateClient

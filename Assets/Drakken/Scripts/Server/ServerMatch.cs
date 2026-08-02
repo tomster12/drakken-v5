@@ -3,6 +3,7 @@ using Drakken.Domain;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
+using Drakken.Networking;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -16,17 +17,16 @@ namespace Drakken.Server
         private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(1);
 
+        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
+        public GameState GameState { get; private set; }
         private readonly TokenRegistry tokenRegistry;
         private readonly ulong[] clientIds = new ulong[2];
         private readonly Dictionary<ulong, int> clientIdIndexAssignment = new();
         private readonly ulong matchId;
-        public GameState GameState { get; private set; }
 
         private int connectedCount;
         private int startReadyCount = 0;
         private int discardReadyCount = 0;
-
-        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
 
         public bool IsMatch(ulong matchId)
             => this.matchId == matchId;
@@ -81,11 +81,8 @@ namespace Drakken.Server
 
             startReadyCount++;
 
-            // Let 1st player know they have readied up
-            if (startReadyCount == 2)
-            {
-                Connection.Server_MessageMatchOtherPlayerReady(GetOtherClientId(clientId));
-            }
+            // Let other player know they have readied up
+            Connection.Server_MessageMatchOtherPlayerReady(GetOtherClientId(clientId));
 
             // When both readied up start drafting phase
             if (startReadyCount == 2)
@@ -164,6 +161,9 @@ namespace Drakken.Server
             // Tell the client all is good before we move on
             respond(true);
 
+            // Let other player know they have discard
+            Connection.Server_MessageMatchOtherPlayerDiscarded(GetOtherClientId(clientId));
+
             // Start playing phase once everyone has readied up
             discardReadyCount++;
             if (discardReadyCount == 2)
@@ -183,6 +183,9 @@ namespace Drakken.Server
             await Task.Delay(playingStartDelay);
 
             GameState.Phase = GamePhase.Playing;
+
+            // TODO: Remove
+            GameState.TurnClientIndex = 1;
 
             Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
         }

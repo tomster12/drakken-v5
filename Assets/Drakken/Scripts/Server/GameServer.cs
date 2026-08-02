@@ -33,7 +33,7 @@ namespace Drakken.Server
 
             Log.Info("Server", $"Starting game server at {config.address}:{config.port}");
 
-            GameEntrypoint.Singleton.Connection.StartServer(this, config.address, config.port);
+            GameEntrypoint.Singleton.Connection.StartServer(config.address, config.port);
         }
 
         public JoinMatchResponse OnRequestJoinMatch(ulong clientId)

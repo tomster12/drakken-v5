@@ -35,7 +35,7 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref InstanceId);
             serializer.SerializeValue(ref Sides);
             serializer.SerializeValue(ref Value);
-            serializer.SerializeList(Effects);
+            serializer.SerializeList(ref Effects);
         }
         
         public DiceInstance Clone()

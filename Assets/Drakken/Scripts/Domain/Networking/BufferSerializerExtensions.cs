@@ -6,16 +6,16 @@ namespace Drakken.Domain.Networking
 {
     public static class BufferSerializerExtensions
     {
-        public static void SerializeList<TItem, TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<TItem> list)
+        public static void SerializeList<TItem, TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, ref List<TItem> list)
             where TReaderWriter : IReaderWriter
             where TItem : INetworkSerializable, new()
         {
-            int count = list.Count;
-            serializer.SerializeValue(ref count);
-
             if (serializer.IsReader)
             {
-                list.Clear();
+                int count = 0;
+                serializer.SerializeValue(ref count);
+                list = new(count);
+
                 for (int i = 0; i < count; i++)
                 {
                     TItem item = new();
@@ -25,6 +25,9 @@ namespace Drakken.Domain.Networking
             }
             else
             {
+                int count = list.Count;
+                serializer.SerializeValue(ref count);
+
                 for (int i = 0; i < count; i++)
                 {
                     var item = list[i];
@@ -33,15 +36,15 @@ namespace Drakken.Domain.Networking
             }
         }
 
-        public static void SerializeList<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, List<int> list)
+        public static void SerializeList<TReaderWriter>(this BufferSerializer<TReaderWriter> serializer, ref List<int> list)
             where TReaderWriter : IReaderWriter
         {
-            int count = list.Count;
-            serializer.SerializeValue(ref count);
-
             if (serializer.IsReader)
             {
-                list.Clear();
+                int count = 0;
+                serializer.SerializeValue(ref count);
+                list = new(count);
+
                 for (int i = 0; i < count; i++)
                 {
                     int item = new();
@@ -51,6 +54,9 @@ namespace Drakken.Domain.Networking
             }
             else
             {
+                int count = list.Count;
+                serializer.SerializeValue(ref count);
+
                 for (int i = 0; i < count; i++)
                 {
                     var item = list[i];

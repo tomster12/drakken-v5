@@ -9,13 +9,13 @@ namespace Drakken.Client.States
         private SceneLayout Layout => GameEntrypoint.Singleton.Scene;
         private SceneShared Shared => GameEntrypoint.Singleton.Client.Shared;
 
-        public override Task Enter(ClientStateType fromType)
+        public override async Task Enter(ClientStateType fromType)
         {
-            UpdateStatusUI();
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(Layout.Playing.CameraPosition);
 
             SetupTokens();
 
-            return Task.CompletedTask;
+            UpdateStatusUI();
         }
 
         private void SetupTokens()
@@ -57,7 +57,7 @@ namespace Drakken.Client.States
             else StartOpTurn();
         }
 
-        public override Task Exit(ClientStateType toStateType)
+        public override async Task Exit(ClientStateType toStateType)
         {
             // If we are going back to title then clean up the token / dice views
             if (toStateType == ClientStateType.Title)
@@ -66,8 +66,6 @@ namespace Drakken.Client.States
                 Shared.OnDisconnect();
                 client.UI.OnDisconnect();
             }
-
-            return Task.CompletedTask;
         }
 
         private void StartMyTurn()

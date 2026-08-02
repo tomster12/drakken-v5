@@ -8,6 +8,7 @@ namespace Drakken.Client.World
         public TitleLayout Title;
         public DraftingLayout Drafting;
         public SharedLayout Shared;
+        public PlayingLayout Playing;
 
         private void Awake()
         {
@@ -50,6 +51,12 @@ namespace Drakken.Client.World
         {
             DraftConfirmButton.gameObject.SetActive(false);
         }
+    }
+
+    [Serializable]
+    public class PlayingLayout
+    {
+        public Transform CameraPosition;
     }
 
     [Serializable]

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
+using static Drakken.Client.ClientUI;
 
 namespace Drakken.Client.States
 {
@@ -21,9 +22,10 @@ namespace Drakken.Client.States
 
         // ------------------------------ Setup
 
-        public override Task Enter(ClientStateType fromStateType)
+        public override async Task Enter(ClientStateType fromStateType)
         {
             Match.OnPlayingPhaseStarted += OnPlayingPhaseStarted;
+            Match.OnOtherPlayerDiscarded += OnOtherPlayerDiscarded;
 
             // Initialise this scenes objects
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
@@ -51,13 +53,15 @@ namespace Drakken.Client.States
 
             // And now spawn tokens ready to discard
             SpawnTokens();
-
-            return Task.CompletedTask;
         }
 
-        public override Task Exit(ClientStateType toStateType)
+        public override async Task Exit(ClientStateType toStateType)
         {
             Match.OnPlayingPhaseStarted -= OnPlayingPhaseStarted;
+            Match.OnOtherPlayerDiscarded -= OnOtherPlayerDiscarded;
+
+            client.UI.SetMyAvatar(AvatarState.Visible);
+            client.UI.SetOpAvatar(AvatarState.Visible);
 
             // If we are going back to title then clean up the token / dice views
             if (toStateType == ClientStateType.Title)
@@ -70,8 +74,6 @@ namespace Drakken.Client.States
             // Cleanup this scenes specific objects
             Layout.Drafting.DraftConfirmButton.Clicked -= OnConfirmDiscardClicked;
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
-
-            return Task.CompletedTask;
         }
 
         private void CreateAndRollDice()
@@ -218,6 +220,8 @@ namespace Drakken.Client.States
             Layout.Drafting.DraftConfirmButton.Interactable = false;
             Layout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
 
+            client.UI.SetMyAvatar(AvatarState.Ready);
+
             // Tell the server which instances we discarded
             var message = new DraftDiscardMessage
             {
@@ -249,10 +253,16 @@ namespace Drakken.Client.States
                 tokenView.transform.localPosition = localPos;
                 tokenView.transform.localRotation = Quaternion.identity;
 
+                tokenView.OnClicked.RemoveListener(OnTokenClicked);
                 tokenView.SetInteractable(false);
             }
 
             UpdateStatusUI();
+        }
+
+        private async void OnOtherPlayerDiscarded()
+        {
+            client.UI.SetOpAvatar(AvatarState.Ready);
         }
 
         private async void OnPlayingPhaseStarted()

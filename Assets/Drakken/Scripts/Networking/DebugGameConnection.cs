@@ -7,7 +7,7 @@ using Drakken.Domain;
 using Drakken.Domain.Networking;
 using Drakken.Server;
 
-namespace Drakken.DebugServer
+namespace Drakken.Networking
 {
     public class DebugGameConnection : IGameConnection
     {
@@ -15,24 +15,24 @@ namespace Drakken.DebugServer
         private static readonly ulong opClientId = 30;
         private static readonly TimeSpan opponentReactionDelay = TimeSpan.FromSeconds(1);
 
-        private IGameServer server;
-        private DebugGameClient opDebugGameClient;
+        private IGameServer Server => GameEntrypoint.Singleton.Server;
         private readonly Dictionary<ulong, IGameClient> clientsById = new();
         private Action<ulong> onClientConnectedCallback;
+        private DebugGameClient opClient;
         private readonly TaskManager tasks = new();
 
-        public void StartServer(IGameServer server, string address, ushort port)
+        public void StartServer(string address, ushort port)
         {
-            this.server = server;
         }
 
-        public void StartClient(IGameClient client, string address, ushort port)
+        public void StartClient(string address, ushort port)
         {
-            opDebugGameClient = new DebugGameClient();
+            // Setup opponent debug client
+            opClient = new DebugGameClient();
+            clientsById[myClientId] = GameEntrypoint.Singleton.Client;
+            clientsById[opClientId] = opClient;
 
-            clientsById[myClientId] = client;
-            clientsById[opClientId] = opDebugGameClient;
-
+            // Imediately tell the client to execute
             onClientConnectedCallback.Invoke(myClientId);
         }
 
@@ -51,12 +51,12 @@ namespace Drakken.DebugServer
         public Task<JoinMatchResponse> Client_RequestJoinMatch()
         {
             // make debug opponent join match first
-            var opJoinResponse = server.OnRequestJoinMatch(opClientId);
-            opDebugGameClient.SetMatch(new ClientMatch(
+            var opJoinResponse = Server.OnRequestJoinMatch(opClientId);
+            opClient.SetMatch(new ClientMatch(
                 opJoinResponse.MatchId,
                 (int)opJoinResponse.ClientIndex));
 
-            var response = server.OnRequestJoinMatch(myClientId);
+            var response = Server.OnRequestJoinMatch(myClientId);
             return Task.FromResult(response);
         }
 
@@ -68,7 +68,7 @@ namespace Drakken.DebugServer
 
         public void Client_MessageMatchClientReady(ulong matchId)
         {
-            var match = server.GetMatch(matchId);
+            var match = Server.GetMatch(matchId);
             match.OnClientReady(myClientId);
 
             ScheduleOpClientReady(match);
@@ -97,7 +97,7 @@ namespace Drakken.DebugServer
         public Task<bool> Client_RequestMatchDraftDiscard(ulong matchId, DraftDiscardMessage message)
         {
             var (requestId, task) = tasks.Create<bool>();
-            var match = server.GetMatch(matchId);
+            var match = Server.GetMatch(matchId);
             match.OnClientRequestDraftDiscard(myClientId, message, (response) =>
                 tasks.Complete(requestId, response));
 
@@ -110,7 +110,7 @@ namespace Drakken.DebugServer
         {
             await Task.Delay(opponentReactionDelay);
 
-            var clientIndex = opDebugGameClient.Match.ClientIndex;
+            var clientIndex = opClient.Match.ClientIndex;
             var message = new DraftDiscardMessage
             {
                 DiscardedInstanceIds = new()
@@ -123,12 +123,39 @@ namespace Drakken.DebugServer
             match.OnClientRequestDraftDiscard(opClientId, message, (response) => { });
         }
 
+        public void Server_MessageMatchOtherPlayerDiscarded(ulong clientId)
+        {
+            var targetClient = clientsById[clientId];
+            targetClient.Match.OnServerOtherPlayerDiscarded();
+        }
+
+
         public void Server_BroadcastMatchStartPlayingPhase(ulong[] clientIds, GameState gameState)
         {
             foreach (var clientId in clientIds)
             {
                 clientsById[clientId].Match.OnServerStartPlayingPhase(gameState.Clone());
             }
+        }
+    }
+
+    public class DebugGameClient : IGameClient
+    {
+        public ClientMatch Match { get; private set; }
+
+        public void SetMatch(ClientMatch clientMatch)
+        {
+            Match = clientMatch;
+        }
+
+        public Task<bool> Connect()
+        {
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> JoinMatch()
+        {
+            return Task.FromResult(true);
         }
     }
 }

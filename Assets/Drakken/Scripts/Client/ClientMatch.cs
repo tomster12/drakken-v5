@@ -12,15 +12,17 @@ namespace Drakken.Client
         public Action OnOtherPlayerJoined = delegate { };
         public Action OnOtherPlayerReady = delegate { };
         public Action OnDraftingPhaseStarted = delegate { };
+        public Action OnOtherPlayerDiscarded = delegate { };
         public Action OnPlayingPhaseStarted = delegate { };
 
+        public GameState GameState { get; private set; }
         public ulong MatchId { get; private set; }
         public int ClientIndex { get; private set; }
-        public GameState GameState { get; private set; }
 
         public bool IsOpJoined { get; private set; }
         public bool IsOpReady { get; private set; }
         public bool IsReady { get; private set; }
+        public bool IsOpDiscarded { get; private set; }
         public bool IsMyTurn => GameState?.TurnClientIndex == ClientIndex;
         public int OpClientIndex => 1 - ClientIndex;
 
@@ -92,6 +94,16 @@ namespace Drakken.Client
                 .ToList();
 
             return response;
+        }
+
+        public void OnServerOtherPlayerDiscarded()
+        {
+            Assert.False(IsOpDiscarded);
+            Assert.True(GameState.Phase == GamePhase.Drafting);
+            Log.Info($"ClientMatch-{MatchId}", "OnServerOtherPlayerDiscarded");
+
+            IsOpDiscarded = true;
+            OnOtherPlayerDiscarded.Invoke();
         }
 
         // -------------------------------- Playing

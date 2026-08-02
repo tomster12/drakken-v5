@@ -5,7 +5,8 @@ using Drakken.Client;
 using Drakken.Server;
 using System;
 using Drakken.Client.World;
-using Drakken.DebugServer;
+using Drakken.Networking;
+using Unity.Netcode;
 
 namespace Drakken
 {
@@ -16,22 +17,24 @@ namespace Drakken
         public GameClient Client => client;
         public GameServer Server => server;
         public SceneLayout Scene => scene;
-        public IGameConnection Connection => resolvedConnection;
+        public IGameConnection Connection =>
+            (IGameConnection)debugConnection
+            ?? UnityGameConnection.Singleton;
 
         [Header("References")]
         [SerializeField] private GameClient client;
         [SerializeField] private GameServer server;
         [SerializeField] private SceneLayout scene;
-        [SerializeField] private GameConnection connection;
 
         [Header("Debug")]
         [SerializeField] private bool debugPreventApplication = false;
-        [SerializeField] private bool debugPreventConnection = false;
+        [SerializeField] private bool debugUseFakeConnection = false;
 
-        private IGameConnection resolvedConnection;
+        private DebugGameConnection debugConnection;
 
         private void OnValidate()
         {
+            // Used for DebugBindRandom() in TokenView
             Singleton = this;
         }
 
@@ -44,11 +47,13 @@ namespace Drakken
         {
             if (debugPreventApplication) return;
 
-            resolvedConnection = debugPreventConnection
-                ? new DebugGameConnection()
-                : connection;
+            if (debugUseFakeConnection)
+            {
+                debugConnection = new();
+                Destroy(UnityGameConnection.Singleton.gameObject);
+            }
 
-            if (debugPreventConnection)
+            if (debugUseFakeConnection)
             {
                 Log.Info("Application", "Starting game server due to debugPreventConnection");
                 server.StartApplication();

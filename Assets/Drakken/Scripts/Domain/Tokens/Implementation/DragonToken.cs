@@ -21,8 +21,8 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             base.NetworkSerialize(serializer);
             serializer.SerializeValue(ref D3Roll);
-            serializer.SerializeList(RemovedDiceIds);
-            serializer.SerializeList(AddedDice);
+            serializer.SerializeList(ref RemovedDiceIds);
+            serializer.SerializeList(ref AddedDice);
         }
     }
 
