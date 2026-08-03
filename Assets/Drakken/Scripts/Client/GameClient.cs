@@ -21,10 +21,11 @@ namespace Drakken.Client
         [SerializeField] private AssetDatabase assets;
         [SerializeField] private new CameraController camera;
         [SerializeField] private ClientUI ui;
+        [SerializeField] private SceneLayout scene;
 
         public ClientMatch Match { get; private set; }
-        public TokenRegistry TokenRegistry { get; private set; }
-        public SceneShared Shared { get; private set; } = new();
+        public SceneObjects SceneObjects { get; private set; } = new();
+        public SceneLayout SceneLayout => scene;
         public AssetDatabase Assets => assets;
         public CameraController Camera => camera;
         public ClientUI UI => ui;
@@ -34,14 +35,13 @@ namespace Drakken.Client
         private readonly PlayingClientState playingState = new();
         private ClientState currentState = null;
         private ClientStateType currentStateType = ClientStateType.None;
-
         public bool IsConnecting { get; private set; }
         public bool IsConnected { get; private set; }
         public bool IsInMatch => Match != null;
 
         private void Awake()
         {
-            TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefabById);
+            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefabById);
 
             titleState.Init(this);
             draftingState.Init(this);
@@ -120,7 +120,10 @@ namespace Drakken.Client
 
             if (response.Success)
             {
-                Match = new ClientMatch(response.MatchId, (int)response.ClientIndex);
+                Match = new ClientMatch(
+                    GameEntrypoint.Singleton.TokenRegistry,
+                    response.MatchId,
+                    (int)response.ClientIndex);
                 return true;
             }
 

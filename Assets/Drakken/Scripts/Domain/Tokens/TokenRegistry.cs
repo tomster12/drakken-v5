@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Drakken.Common.Utility;
+using Drakken.Domain.Tokens.Implementation;
+using Drakken.Domain.Tokens.Logic;
 using UnityEngine;
 
 namespace Drakken.Domain.Tokens
@@ -32,62 +34,16 @@ namespace Drakken.Domain.Tokens
             entries[definition.TokenId] = new TokenRegistryEntry(definition, executor, intentType, resolutionType, visuals);
         }
 
-        public TokenDefinition GetDefinition(string tokenId)
-            => GetEntryOrThrow(tokenId).Definition;
-
-        public bool TryGetDefinition(string tokenId, out TokenDefinition definition)
+        public TokenRegistryEntry GetEntryOrThrow(string tokenId)
         {
-            if (entries.TryGetValue(tokenId, out var entry))
-            {
-                definition = entry.Definition;
-                return true;
-            }
-            definition = default;
-            return false;
-        }
+            if (!entries.TryGetValue(tokenId, out var entry))
+                throw new InvalidOperationException($"No registry entry for TokenId={tokenId}");
 
-        public ITokenExecutor GetExecutor(string tokenId)
-            => GetEntryOrThrow(tokenId).Executor;
-
-        public TokenIntent DeserialiseIntent(string tokenId, string json)
-            => (TokenIntent)JsonUtility.FromJson(json, GetEntryOrThrow(tokenId).IntentType);
-
-        public TokenResolution DeserialiseResolution(string tokenId, string json)
-            => (TokenResolution)JsonUtility.FromJson(json, GetEntryOrThrow(tokenId).ResolutionType);
-
-        public ITokenAnimator GetAnimator(string tokenId)
-        {
-            var visuals = GetEntryOrThrow(tokenId).Visuals;
-            if (visuals != null) return visuals.Animator;
-            throw new KeyNotFoundException($"No animator registered for tokenId='{tokenId}'. Was the registry built with visuals?");
-        }
-
-        public GameObject GetMeshPrefab(string tokenId)
-        {
-            var visuals = GetEntryOrThrow(tokenId).Visuals;
-            if (visuals != null) return visuals.MeshPrefab;
-            throw new KeyNotFoundException($"No mesh prefab registered for tokenId='{tokenId}'. Was the registry built with visuals?");
-        }
-
-        public bool TryGetMeshPrefab(string tokenId, out GameObject meshPrefab)
-        {
-            if (entries.TryGetValue(tokenId, out var entry) && entry.Visuals != null)
-            {
-                meshPrefab = entry.Visuals.MeshPrefab;
-                return true;
-            }
-            meshPrefab = null;
-            return false;
-        }
-
-        private TokenRegistryEntry GetEntryOrThrow(string tokenId)
-        {
-            if (entries.TryGetValue(tokenId, out var entry)) return entry;
-            throw new KeyNotFoundException($"No token registered for tokenId='{tokenId}'");
+            return entry;
         }
     }
 
-    internal sealed class TokenRegistryEntry
+    public class TokenRegistryEntry
     {
         public readonly TokenDefinition Definition;
         public readonly ITokenExecutor Executor;
@@ -113,11 +69,16 @@ namespace Drakken.Domain.Tokens
     public class TokenVisuals
     {
         public readonly ITokenAnimator Animator;
+        public readonly ITokenIntentPicker IntentPicker;
         public readonly GameObject MeshPrefab;
 
-        public TokenVisuals(ITokenAnimator animator, GameObject meshPrefab)
+        public TokenVisuals(
+            ITokenAnimator animator,
+            ITokenIntentPicker intentPicker,
+            GameObject meshPrefab)
         {
             Animator = animator;
+            IntentPicker = intentPicker;
             MeshPrefab = meshPrefab;
         }
     }

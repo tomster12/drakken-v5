@@ -1,5 +1,6 @@
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
+using System;
 using System.Linq;
 using TMPro;
 using UnityEditor.VersionControl;
@@ -26,9 +27,12 @@ namespace Drakken.Client.World
         [Header("Config")]
         [SerializeField] private float hoverLiftY = 0.15f;
         [SerializeField] private float selectedLiftY = 0.30f;
-        [SerializeField] private Color hoverOutlineColor = Color.white;
-        [SerializeField] private Color selectedOutlineColor = Color.yellow;
-        [SerializeField] private Color hoverSelectedOutlineColor = Color.yellow;
+        [SerializeField] private Color discardHoverOutlineColor = new(232, 171, 168); // #e8aba8
+        [SerializeField] private Color discardSelectedOutlineColor = new(158, 48, 43); // #9e302b
+        [SerializeField] private Color discardHoverSelectedOutlineColor = new(228, 69, 61); // #e4453d
+        [SerializeField] private Color playingHoverOutlineColor = new(212, 205, 203); // #d4cdcb
+        [SerializeField] private Color playingSelectedOutlineColor = new(236, 233, 232); // #ece9e8
+        [SerializeField] private Color playingHoverSelectedOutlineColor = new(252, 249, 248); // #fcf9f8
 
         [Header("Movement")]
         [SerializeField] private float moveLerp = 10f;
@@ -40,7 +44,28 @@ namespace Drakken.Client.World
         public bool IsBinded => TokenInstance != null;
         public bool IsSelected { get; private set; } = false;
         public bool IsHovered { get; private set; } = false;
-        public bool IsInteractable { get; set; } = false;
+        public InteractionModeType InteractionMode { get; set; } = InteractionModeType.None;
+
+        private Color HoverOutlineColor => InteractionMode switch
+        {
+            InteractionModeType.Discard => discardHoverOutlineColor,
+            InteractionModeType.Play => playingHoverOutlineColor,
+            _ => Color.black
+        };
+
+        private Color SelectedOutlineColor => InteractionMode switch
+        {
+            InteractionModeType.Discard => discardSelectedOutlineColor,
+            InteractionModeType.Play => playingSelectedOutlineColor,
+            _ => Color.black
+        };
+
+        private Color HoverSelectedOutlineColor => InteractionMode switch
+        {
+            InteractionModeType.Discard => discardHoverSelectedOutlineColor,
+            InteractionModeType.Play => playingHoverSelectedOutlineColor,
+            _ => Color.black
+        };
 
         // ------------------------------ Setup
 
@@ -77,21 +102,11 @@ namespace Drakken.Client.World
         {
             TokenInstance = instance;
 
-            if (!registry.TryGetMeshPrefab(instance.TokenId, out var meshPrefab))
-            {
-                Log.Error("TokenView", $"No mesh prefab registered for tokenId='{instance.TokenId}'");
-                return;
-            }
+            var entry = registry.GetEntryOrThrow(instance.TokenId);
 
-            if (!registry.TryGetDefinition(instance.TokenId, out var tokenDefinition))
-            {
-                Log.Error("TokenView", $"No token definition found for tokenId='{instance.TokenId}'");
-                return;
-            }
+            TokenDefinition = entry.Definition;
 
-            TokenDefinition = tokenDefinition;
-
-            var meshGo = Instantiate(meshPrefab, transform);
+            var meshGo = Instantiate(entry.Visuals.MeshPrefab, transform);
             meshGo.SetActive(true);
             meshGo.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
 
@@ -159,13 +174,13 @@ namespace Drakken.Client.World
                 moveLerp * Time.deltaTime);
 
             // Update outline
-            outline.SetEnabled(IsSelected || (IsHovered && IsInteractable));
+            outline.SetEnabled(IsSelected || (IsHovered && InteractionMode != InteractionModeType.None));
 
             if (outline.IsEnabled)
             {
                 outline.OutlineColor = IsSelected
-                    ? (IsHovered ? hoverSelectedOutlineColor : selectedOutlineColor)
-                    : hoverOutlineColor;
+                    ? (IsHovered ? HoverSelectedOutlineColor : SelectedOutlineColor)
+                    : HoverOutlineColor;
             }
 
             // Update description
@@ -180,21 +195,9 @@ namespace Drakken.Client.World
             }
         }
 
-        public void SetInteractable(bool interactable)
-        {
-            if (IsInteractable == interactable) return;
-
-            IsInteractable = interactable;
-
-            if (!interactable && IsHovered)
-            {
-                IsHovered = false;
-            }
-        }
-
         public bool SetSelected(bool selected)
         {
-            if (IsInteractable && IsSelected != selected)
+            if (InteractionMode != InteractionModeType.None && IsSelected != selected)
             {
                 IsSelected = selected;
                 return true;
@@ -205,7 +208,7 @@ namespace Drakken.Client.World
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (IsInteractable && !IsHovered)
+            if (InteractionMode != InteractionModeType.None && !IsHovered)
             {
                 IsHovered = true;
             }
@@ -221,7 +224,7 @@ namespace Drakken.Client.World
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (IsInteractable)
+            if (InteractionMode != InteractionModeType.None)
             {
                 if (eventData.button == PointerEventData.InputButton.Left)
                 {
@@ -231,5 +234,7 @@ namespace Drakken.Client.World
         }
 
         public void OnPointerUp(PointerEventData eventData) { }
+
+        public enum InteractionModeType { None, Discard, Play };
     }
 }

@@ -4,9 +4,8 @@ using Drakken.Common.Utility;
 using Drakken.Client;
 using Drakken.Server;
 using System;
-using Drakken.Client.World;
 using Drakken.Networking;
-using Unity.Netcode;
+using Drakken.Domain.Tokens;
 
 namespace Drakken
 {
@@ -16,15 +15,14 @@ namespace Drakken
 
         public GameClient Client => client;
         public GameServer Server => server;
-        public SceneLayout Scene => scene;
         public IGameConnection Connection =>
             (IGameConnection)debugConnection
             ?? UnityGameConnection.Singleton;
+        public TokenRegistry TokenRegistry { get; set; }
 
         [Header("References")]
         [SerializeField] private GameClient client;
         [SerializeField] private GameServer server;
-        [SerializeField] private SceneLayout scene;
 
         [Header("Debug")]
         [SerializeField] private bool debugPreventApplication = false;

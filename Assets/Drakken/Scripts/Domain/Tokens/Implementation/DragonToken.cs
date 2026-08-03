@@ -1,16 +1,15 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
+using Drakken.Domain.Tokens.Implementation.Common;
+using Drakken.Domain.Tokens.Logic;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace Drakken.Domain.Tokens.Implementation
 {
-    public class DragonTokenIntent : TokenIntent { }
-
     public class DragonTokenResolution : TokenResolution
     {
         public int D3Roll;
@@ -26,9 +25,9 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class DragonTokenExecutor : TokenExecutor<DragonTokenIntent, DragonTokenResolution>
+    public class DragonTokenExecutor : TokenExecutor<EmptyTokenIntent, DragonTokenResolution>
     {
-        protected override DragonTokenResolution Execute(GameState gameState, DragonTokenIntent intent, int sourceClientIndex)
+        protected override DragonTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex)
         {
             var client = gameState.Clients[sourceClientIndex];
 
@@ -36,30 +35,16 @@ namespace Drakken.Domain.Tokens.Implementation
             int replaceCount = Random.Range(1, 4);
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
-            var diceToReplace = client.Dice
-                .OrderBy(_ => Random.value)
-                .Take(replaceCount)
-                .ToList();
-
-            // Remove old dice
-            var removedDiceIds = new List<int>();
-
-            foreach (var dice in diceToReplace)
-            {
-                removedDiceIds.Add(dice.InstanceId);
-                client.Dice.Remove(dice);
-            }
+            // Select the dice to remove
+            var diceToReplace = client.Dice.OrderBy(_ => Random.value).Take(replaceCount).ToList();
+            var removedDiceIds = diceToReplace.Select(d => d.InstanceId).ToList();
 
             // Add replacement D8s
             var addedDice = new List<DiceInstance>();
-
             for (int i = 0; i < replaceCount; i++)
             {
                 var newDice = DiceInstance.Create(sides: 8);
-
                 newDice.Roll();
-
-                client.Dice.Add(newDice);
                 addedDice.Add(newDice);
             }
 
@@ -69,6 +54,14 @@ namespace Drakken.Domain.Tokens.Implementation
                 RemovedDiceIds = removedDiceIds,
                 AddedDice = addedDice,
             };
+        }
+
+        protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
+        {
+            var client = gameState.Clients[sourceClientIndex];
+
+            client.Dice.RemoveAll(d => resolution.RemovedDiceIds.Contains(d.InstanceId));
+            client.Dice.AddRange(resolution.AddedDice);
         }
     }
 
@@ -84,16 +77,15 @@ namespace Drakken.Domain.Tokens.Implementation
 
             foreach (int removedDiceId in resolution.RemovedDiceIds)
             {
-                var diceView = context.GetDiceView(sourceClientIndex, removedDiceId);
+                // var diceView = context.GetDiceView(sourceClientIndex, removedDiceId);
+                // Assert.NotNull(diceView);
 
-                if (diceView != null)
-                {
-                    Log.Info("DragonAnimator", $"Shattering dice id={removedDiceId}");
+                Log.Info("DragonAnimator", $"Shattering dice id={removedDiceId}");
+                // diceView.PlayShatterAnimation();
 
-                    // diceView.PlayShatterAnimation();
+                // TODO: Delete dice view
 
-                    await Task.Delay(300);
-                }
+                await Task.Delay(300);
             }
 
             await Task.Delay(200);
@@ -103,7 +95,6 @@ namespace Drakken.Domain.Tokens.Implementation
                 Log.Info("DragonAnimator", $"Slamming in D8 id={newDice.InstanceId} value={newDice.Value}");
 
                 // context.SpawnDiceView(resolution.SourceClientIndex, newDice);
-
                 // diceView.PlayLandAnimation(newDice.Value);
 
                 await Task.Delay(200);

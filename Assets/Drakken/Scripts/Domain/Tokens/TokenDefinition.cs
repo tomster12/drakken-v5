@@ -1,7 +1,7 @@
 namespace Drakken.Domain.Tokens
 {
     public enum TokenRarity { Common, Rare, Epic, Legendary }
-    
+
     public enum TokenCategory { DiceGrowth, Attack, Effect, Chaos }
 
     public enum TargetOwner { None, Self, Opponent, Any }
@@ -13,7 +13,5 @@ namespace Drakken.Domain.Tokens
         public string Description;
         public TokenRarity Rarity;
         public TokenCategory[] Categories;
-        public TargetOwner TargetOwner;
-        public bool RequiresTarget;
     }
 }

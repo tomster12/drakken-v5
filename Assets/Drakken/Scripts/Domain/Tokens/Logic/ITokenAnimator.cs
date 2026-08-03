@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Drakken.Domain.Tokens
+namespace Drakken.Domain.Tokens.Logic
 {
     public interface ITokenAnimator
     {

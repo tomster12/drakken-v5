@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Drakken.Common.Utility;
+using Drakken.Domain.Tokens.Logic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -38,17 +39,24 @@ namespace Drakken.Domain.Tokens.Implementation
             var targetDice = opponent.Dice.Find(d => d.InstanceId == intent.TargetDiceId);
             Assert.NotNull(targetDice, $"ParasiteExecutor: no dice with id={intent.TargetDiceId} on opponent");
 
-            // Apply the effect to server-side state
+            return new ParasiteTokenResolution
+            {
+                TargetDiceId = intent.TargetDiceId
+            };
+        }
+
+        protected override void Apply(GameState gameState, ParasiteTokenResolution resolution, int sourceClientIndex)
+        {
+            int opponentIndex = 1 - sourceClientIndex;
+            var opponent = gameState.Clients[opponentIndex];
+
+            var targetDice = opponent.Dice.Find(d => d.InstanceId == resolution.TargetDiceId);
+
             targetDice.Effects.Add(new DiceEffect
             {
                 EffectId = "parasite",
                 SourceClientIndex = sourceClientIndex,
             });
-
-            return new ParasiteTokenResolution
-            {
-                TargetDiceId = intent.TargetDiceId
-            };
         }
     }
 
@@ -57,7 +65,7 @@ namespace Drakken.Domain.Tokens.Implementation
         protected override async Task Animate(GameState gameState, ParasiteTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
         {
             int opponentIndex = 1 - sourceClientIndex;
-            var targetView = context.GetDiceView(opponentIndex, resolution.TargetDiceId);
+            // var targetView = context.GetDiceView(opponentIndex, resolution.TargetDiceId);
 
             Log.Info("ParasiteAnimator", "Launching parasite projectile");
 
@@ -65,12 +73,12 @@ namespace Drakken.Domain.Tokens.Implementation
 
             await Task.Delay(500);
 
-            if (targetView != null)
-            {
-                Log.Info("ParasiteAnimator", $"Attaching parasite to dice id={resolution.TargetDiceId}");
+            // if (targetView != null)
+            // {
+            //     Log.Info("ParasiteAnimator", $"Attaching parasite to dice id={resolution.TargetDiceId}");
 
-                // targetView.AttachEffect("ParasiteEffect");
-            }
+            //     // targetView.AttachEffect("ParasiteEffect");
+            // }
 
             await Task.Delay(200);
         }

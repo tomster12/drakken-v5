@@ -68,6 +68,8 @@ namespace Drakken.Client.World
         public Transform OpTokenRow;
         public GameObject Mat1;
         public GameObject Mat2;
+        public GameObject Bag1;
+        public GameObject Bag2;
         public float TokenSpacing = 0.4f;
         public float DiceSpacing = 0.35f;
 

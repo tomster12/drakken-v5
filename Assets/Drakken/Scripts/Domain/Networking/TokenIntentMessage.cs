@@ -1,3 +1,6 @@
+using System;
+using Drakken.Domain.Tokens;
+using Drakken.Domain.Tokens.Logic;
 using Unity.Netcode;
 
 namespace Drakken.Domain.Networking
@@ -6,13 +9,21 @@ namespace Drakken.Domain.Networking
     {
         public string TokenId;
         public int InstanceId;
-        public string IntentJson;
+        public TokenIntent Intent;
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeString(ref TokenId);
             serializer.SerializeValue(ref InstanceId);
-            serializer.SerializeString(ref IntentJson);
+
+            if (serializer.IsReader)
+            {
+                var tokenRegistry = GameEntrypoint.Singleton.TokenRegistry;
+                var entry = tokenRegistry.GetEntryOrThrow(TokenId);
+                Intent = (TokenIntent)Activator.CreateInstance(entry.IntentType);
+            }
+
+            Intent.NetworkSerialize(serializer);
         }
     }
 }

@@ -1,39 +1,38 @@
 using Drakken.Client.World;
 using Drakken.Common.Utility;
 using System.Threading.Tasks;
-using UnityEngine;
 using static Drakken.Client.ClientUI;
 
 namespace Drakken.Client.States
 {
     public class TitleClientState : ClientState
     {
-        private SceneLayout Layout => GameEntrypoint.Singleton.Scene;
+        private SceneLayout SceneLayout => GameEntrypoint.Singleton.Client.SceneLayout;
 
         public override async Task Enter(ClientStateType fromStateType)
         {
             // Initialise this scenes objects
-            Layout.Title.Title.SetActive(true);
+            SceneLayout.Title.Title.SetActive(true);
 
-            Layout.Title.JoinButton.Clicked += OnJoinClicked;
-            Layout.Title.JoinButton.Interactable = true;
-            Layout.Title.JoinButton.gameObject.SetActive(true);
+            SceneLayout.Title.JoinButton.Clicked += OnJoinClicked;
+            SceneLayout.Title.JoinButton.Interactable = true;
+            SceneLayout.Title.JoinButton.gameObject.SetActive(true);
 
-            Layout.Title.ReadyButton.Clicked += OnReadyClicked;
-            Layout.Title.ReadyButton.Interactable = false;
-            Layout.Title.ReadyButton.gameObject.SetActive(true);
+            SceneLayout.Title.ReadyButton.Clicked += OnReadyClicked;
+            SceneLayout.Title.ReadyButton.Interactable = false;
+            SceneLayout.Title.ReadyButton.gameObject.SetActive(true);
 
-            Layout.Title.OptionsButton.Interactable = true;
-            Layout.Title.OptionsButton.gameObject.SetActive(true);
+            SceneLayout.Title.OptionsButton.Interactable = true;
+            SceneLayout.Title.OptionsButton.gameObject.SetActive(true);
 
-            Layout.Title.ExitButton.Clicked += OnExitClicked;
-            Layout.Title.ExitButton.Interactable = true;
-            Layout.Title.ExitButton.gameObject.SetActive(true);
+            SceneLayout.Title.ExitButton.Clicked += OnExitClicked;
+            SceneLayout.Title.ExitButton.Interactable = true;
+            SceneLayout.Title.ExitButton.gameObject.SetActive(true);
 
-            Layout.Title.Clutter.SetActive(true);
+            SceneLayout.Title.Clutter.SetActive(true);
 
             // Move camera into position
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(Layout.Title.CameraPosition);
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(SceneLayout.Title.CameraPosition);
         }
 
         public override async Task Exit(ClientStateType toStateType)
@@ -46,33 +45,33 @@ namespace Drakken.Client.States
             }
 
             // Disable this scenes specific objects
-            Layout.Title.Title.SetActive(false);
+            SceneLayout.Title.Title.SetActive(false);
 
-            Layout.Title.JoinButton.Clicked -= OnJoinClicked;
-            Layout.Title.JoinButton.gameObject.SetActive(false);
+            SceneLayout.Title.JoinButton.Clicked -= OnJoinClicked;
+            SceneLayout.Title.JoinButton.gameObject.SetActive(false);
 
-            Layout.Title.ReadyButton.Clicked -= OnReadyClicked;
-            Layout.Title.ReadyButton.gameObject.SetActive(false);
+            SceneLayout.Title.ReadyButton.Clicked -= OnReadyClicked;
+            SceneLayout.Title.ReadyButton.gameObject.SetActive(false);
 
-            Layout.Title.OptionsButton.gameObject.SetActive(false);
+            SceneLayout.Title.OptionsButton.gameObject.SetActive(false);
 
-            Layout.Title.ExitButton.Clicked -= OnExitClicked;
-            Layout.Title.ExitButton.gameObject.SetActive(false);
+            SceneLayout.Title.ExitButton.Clicked -= OnExitClicked;
+            SceneLayout.Title.ExitButton.gameObject.SetActive(false);
 
-            Layout.Title.Clutter.SetActive(false);
+            SceneLayout.Title.Clutter.SetActive(false);
         }
 
         private async void OnJoinClicked()
         {
             if (client.IsConnected) return;
 
-            Layout.Title.JoinButton.Interactable = false;
+            SceneLayout.Title.JoinButton.Interactable = false;
 
             // Connect to the server
             var connected = await client.Connect();
             if (!connected)
             {
-                Layout.Title.JoinButton.Interactable = true;
+                SceneLayout.Title.JoinButton.Interactable = true;
                 return;
             }
 
@@ -80,7 +79,7 @@ namespace Drakken.Client.States
             var joined = await client.JoinMatch();
             if (!joined)
             {
-                Layout.Title.JoinButton.Interactable = true;
+                SceneLayout.Title.JoinButton.Interactable = true;
                 return;
             }
 
@@ -99,7 +98,7 @@ namespace Drakken.Client.States
 
             // Everything was successful so we are in a match
             // Prepare for the client to ready up and wait to move to draft
-            Layout.Title.ReadyButton.Interactable = true;
+            SceneLayout.Title.ReadyButton.Interactable = true;
             Match.OnDraftingPhaseStarted += OnDraftingPhaseStarted;
             Match.OnOtherPlayerJoined += OnOtherPlayerJoined;
             Match.OnOtherPlayerReady += OnOtherPlayerReady;
@@ -115,7 +114,7 @@ namespace Drakken.Client.States
         {
             Assert.False(Match.IsReady);
 
-            Layout.Title.ReadyButton.Interactable = false;
+            SceneLayout.Title.ReadyButton.Interactable = false;
 
             client.UI.SetMyAvatar(AvatarState.Ready);
 

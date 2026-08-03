@@ -1,6 +1,6 @@
 using Unity.Netcode;
 
-namespace Drakken.Domain.Tokens
+namespace Drakken.Domain.Tokens.Logic
 {
     public abstract class TokenResolution : INetworkSerializable
     {

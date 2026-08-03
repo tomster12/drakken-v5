@@ -11,7 +11,6 @@ namespace Drakken.Server
     {
         JoinMatchResponse OnRequestJoinMatch(ulong clientId);
         ServerMatch GetMatch(ulong matchId);
-        public TokenRegistry TokenRegistry { get; }
     }
 
     public class GameServer : MonoBehaviour, IGameServer
@@ -19,12 +18,11 @@ namespace Drakken.Server
         [Header("References")]
         [SerializeField] private UnityTransport transport;
 
-        public TokenRegistry TokenRegistry { get; private set; }
         private ServerMatch currentMatch;
 
         private void Awake()
         {
-            TokenRegistry = TokenRegistryBuilder.BuildRegistry();
+            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildServerRegistry();
         }
 
         public void StartApplication()
@@ -38,7 +36,7 @@ namespace Drakken.Server
 
         public JoinMatchResponse OnRequestJoinMatch(ulong clientId)
         {
-            currentMatch ??= new ServerMatch(TokenRegistry);
+            currentMatch ??= new ServerMatch(GameEntrypoint.Singleton.TokenRegistry);
 
             return currentMatch.OnClientRequestJoin(clientId);
         }

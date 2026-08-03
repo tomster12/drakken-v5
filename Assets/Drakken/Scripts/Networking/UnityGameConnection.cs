@@ -164,5 +164,38 @@ namespace Drakken.Networking
         {
             Client.Match.OnServerStartPlayingPhase(gameState);
         }
+
+        public Task<bool> Client_RequestMatchPlayToken(ulong matchId, TokenIntentMessage message)
+        {
+            var (requestId, task) = tasks.Create<bool>();
+            C2S_RequestMatchPlayToken_Rpc(matchId, requestId, message);
+            return task;
+        }
+
+        [Rpc(SendTo.Server)]
+        private void C2S_RequestMatchPlayToken_Rpc(ulong matchId, ulong requestId, TokenIntentMessage message, RpcParams rpc = default)
+        {
+            var clientId = rpc.Receive.SenderClientId;
+            Server.GetMatch(matchId).OnClientRequestPlayToken(clientId, message, (response) =>
+                S2C_RespondMatchPlayToken_Rpc(requestId, response, RpcTarget.Single(clientId, RpcTargetUse.Temp)));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void S2C_RespondMatchPlayToken_Rpc(ulong requestId, bool response, RpcParams rpc = default)
+        {
+            tasks.Complete(requestId, response);
+        }
+
+
+        public void Server_BroadcastMatchTokenResolved(ulong[] clientIds, TokenResolutionMessage message)
+        {
+            S2C_BroadcastMatchTokenResolved_Rpc(message, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void S2C_BroadcastMatchTokenResolved_Rpc(TokenResolutionMessage message, RpcParams rpc = default)
+        {
+            Client.Match.OnServerTokenResolved(message);
+        }
     }
 }

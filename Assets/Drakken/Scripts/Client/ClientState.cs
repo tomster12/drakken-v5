@@ -5,9 +5,9 @@ namespace Drakken.Client
 {
     public class ClientState
     {
-        protected GameClient client;
         protected ClientMatch Match => client.Match;
         protected GameState GameState => Match.GameState;
+        protected GameClient client;
 
         public void Init(GameClient client)
         {

@@ -53,6 +53,7 @@ namespace Drakken.Networking
             // make debug opponent join match first
             var opJoinResponse = Server.OnRequestJoinMatch(opClientId);
             opClient.SetMatch(new ClientMatch(
+                GameEntrypoint.Singleton.TokenRegistry,
                 opJoinResponse.MatchId,
                 (int)opJoinResponse.ClientIndex));
 
@@ -129,12 +130,29 @@ namespace Drakken.Networking
             targetClient.Match.OnServerOtherPlayerDiscarded();
         }
 
-
         public void Server_BroadcastMatchStartPlayingPhase(ulong[] clientIds, GameState gameState)
         {
             foreach (var clientId in clientIds)
             {
                 clientsById[clientId].Match.OnServerStartPlayingPhase(gameState.Clone());
+            }
+        }
+
+        public Task<bool> Client_RequestMatchPlayToken(ulong matchId, TokenIntentMessage message)
+        {
+            var (requestId, task) = tasks.Create<bool>();
+            var match = Server.GetMatch(matchId);
+            match.OnClientRequestPlayToken(myClientId, message, (response) =>
+                tasks.Complete(requestId, response));
+
+            return task;
+        }
+
+        public void Server_BroadcastMatchTokenResolved(ulong[] clientIds, TokenResolutionMessage message)
+        {
+            foreach (var clientId in clientIds)
+            {
+                clientsById[clientId].Match.OnServerTokenResolved(message);
             }
         }
     }

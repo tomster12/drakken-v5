@@ -4,6 +4,7 @@ using System;
 using Drakken.Domain.Networking;
 using System.Threading.Tasks;
 using System.Linq;
+using Drakken.Domain.Tokens;
 
 namespace Drakken.Client
 {
@@ -14,11 +15,13 @@ namespace Drakken.Client
         public Action OnDraftingPhaseStarted = delegate { };
         public Action OnOtherPlayerDiscarded = delegate { };
         public Action OnPlayingPhaseStarted = delegate { };
+        public Action<TokenResolutionMessage> OnTokenResolved = delegate { };
+
+        private readonly TokenRegistry tokenRegistry;
 
         public GameState GameState { get; private set; }
         public ulong MatchId { get; private set; }
         public int ClientIndex { get; private set; }
-
         public bool IsOpJoined { get; private set; }
         public bool IsOpReady { get; private set; }
         public bool IsReady { get; private set; }
@@ -28,8 +31,9 @@ namespace Drakken.Client
 
         // -------------------------------- Setup
 
-        public ClientMatch(ulong matchId, int clientIndex)
+        public ClientMatch(TokenRegistry tokenRegistry, ulong matchId, int clientIndex)
         {
+            this.tokenRegistry = tokenRegistry;
             MatchId = matchId;
             ClientIndex = clientIndex;
             GameState = new();
@@ -77,7 +81,9 @@ namespace Drakken.Client
             Assert.True(GameState.Phase == GamePhase.NotStarted);
             Log.Info($"ClientMatch-{MatchId}", $"Match started drafting phase");
 
+            // Authoritively update entire game state
             GameState = gameState;
+
             OnDraftingPhaseStarted.Invoke();
         }
 
@@ -103,6 +109,7 @@ namespace Drakken.Client
             Log.Info($"ClientMatch-{MatchId}", "OnServerOtherPlayerDiscarded");
 
             IsOpDiscarded = true;
+
             OnOtherPlayerDiscarded.Invoke();
         }
 
@@ -113,8 +120,33 @@ namespace Drakken.Client
             Assert.True(GameState.Phase == GamePhase.Drafting);
             Log.Info($"ClientMatch-{MatchId}", $"Match started prafting phase");
 
+            // Authoritively update entire game state
             GameState = gameState;
+
             OnPlayingPhaseStarted.Invoke();
+        }
+
+        public async Task<bool> RequestPlayToken(TokenIntentMessage message)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Log.Info($"ClientMatch-{MatchId}", $"Sending token intent");
+
+            var response = await GameEntrypoint.Singleton.Connection.Client_RequestMatchPlayToken(MatchId, message);
+
+            return response;
+        }
+
+        public void OnServerTokenResolved(TokenResolutionMessage message)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Log.Info($"ClientMatch-{MatchId}", $"Token resolution received for TokenId={message.TokenId}");
+
+            // Directly apply resolution to game state
+            var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
+            entry.Executor.Apply(GameState, message.Resolution, message.SourceClientIndex);
+            GameState.Clients[message.SourceClientIndex].Tokens.RemoveAll(t => t.InstanceId == message.TokenInstanceId);
+
+            OnTokenResolved.Invoke(message);
         }
     }
 }

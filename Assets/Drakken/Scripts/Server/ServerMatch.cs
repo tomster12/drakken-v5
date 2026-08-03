@@ -17,13 +17,13 @@ namespace Drakken.Server
         private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(1);
 
-        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
-        public GameState GameState { get; private set; }
         private readonly TokenRegistry tokenRegistry;
+        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
+
+        public GameState GameState { get; private set; }
         private readonly ulong[] clientIds = new ulong[2];
         private readonly Dictionary<ulong, int> clientIdIndexAssignment = new();
         private readonly ulong matchId;
-
         private int connectedCount;
         private int startReadyCount = 0;
         private int discardReadyCount = 0;
@@ -184,10 +184,37 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Playing;
 
-            // TODO: Remove
+            // TODO: Remove, just for debug connection
             GameState.TurnClientIndex = 1;
 
             Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
+        }
+
+        public void OnClientRequestPlayToken(ulong clientId, TokenIntentMessage message, Action<bool> respond)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Assert.True(clientIdIndexAssignment.TryGetValue(clientId, out int sourceClientIndex));
+            Assert.True(GameState.TurnClientIndex == sourceClientIndex);
+
+            var tokenInstance = GameState.Clients[sourceClientIndex].Tokens.Find(t => t.InstanceId == message.InstanceId);
+            if (tokenInstance == null || tokenInstance.TokenId != message.TokenId)
+                throw new InvalidOperationException("Client attempted to play a token they do not own");
+
+            // Calculate and apply resolution to game state
+            var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
+            var resolution = entry.Executor.Execute(GameState, message.Intent, sourceClientIndex);
+            entry.Executor.Apply(GameState, resolution, sourceClientIndex);
+            GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);
+
+            respond(true);
+
+            Connection.Server_BroadcastMatchTokenResolved(clientIds, new TokenResolutionMessage
+            {
+                TokenId = message.TokenId,
+                TokenInstanceId = message.InstanceId,
+                SourceClientIndex = sourceClientIndex,
+                Resolution = resolution
+            });
         }
     }
 }

@@ -1,12 +1,13 @@
 using System;
 using Drakken.Domain.Tokens.Implementation;
+using Drakken.Domain.Tokens.Implementation.Common;
 using UnityEngine;
 
 namespace Drakken.Domain.Tokens
 {
     public static class TokenRegistryBuilder
     {
-        public static TokenRegistry BuildRegistry()
+        public static TokenRegistry BuildServerRegistry()
         {
             var registry = new TokenRegistry();
             RegisterAll(registry);
@@ -31,15 +32,14 @@ namespace Drakken.Domain.Tokens
                     DisplayName = "Dragon",
                     Description = "Roll a D3. Replace that many of your dice with freshly rolled D8s.",
                     Rarity = TokenRarity.Rare,
-                    Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos },
-                    TargetOwner = TargetOwner.None,
-                    RequiresTarget = false
+                    Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos }
                 },
                 new DragonTokenExecutor(),
-                typeof(DragonTokenIntent),
+                typeof(EmptyTokenIntent),
                 typeof(DragonTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
                     new DragonTokenAnimator(),
+                    new EmptyTokenIntentPicker(),
                     prefabFactory?.Invoke("dragon")
                 )
             );
@@ -51,15 +51,14 @@ namespace Drakken.Domain.Tokens
                     DisplayName = "Parasite",
                     Description = "Attach to an opponent dice. At end of round, halve its value.",
                     Rarity = TokenRarity.Common,
-                    Categories = new[] { TokenCategory.Attack, TokenCategory.Effect },
-                    TargetOwner = TargetOwner.Opponent,
-                    RequiresTarget = true
+                    Categories = new[] { TokenCategory.Attack, TokenCategory.Effect }
                 },
                 new ParasiteTokenExecutor(),
-                typeof(ParasiteTokenIntent),
+                typeof(PickDiceTokenIntent),
                 typeof(ParasiteTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
                     new ParasiteTokenAnimator(),
+                    new PickDiceTokenIntentPicker(TargetOwner.Any),
                     prefabFactory?.Invoke("parasite")
                 )
             );

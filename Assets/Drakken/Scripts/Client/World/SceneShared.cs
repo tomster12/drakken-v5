@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Drakken.Client.World
 {
-    public class SceneShared
+    public class SceneObjects
     {
         public List<TokenView> MyTokenViews { get; private set; } = new();
         public List<TokenView> OpTokenViews { get; private set; } = new();

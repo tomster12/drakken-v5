@@ -61,7 +61,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73997bff34517954d82bf285fb94dded, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Drakken.Client.GameObjects.TokenView
+  m_EditorClassIdentifier: Assembly-CSharp::Drakken.Client.World.TokenView
   OnClicked:
     m_PersistentCalls:
       m_Calls: []
@@ -71,9 +71,12 @@ MonoBehaviour:
   descriptionText: {fileID: 2043557081191301749}
   hoverLiftY: 0.15
   selectedLiftY: 0.3
-  hoverOutlineColor: {r: 0.83137256, g: 0.8039216, b: 0.79607844, a: 1}
-  selectedOutlineColor: {r: 0.61960787, g: 0.1882353, b: 0.16862746, a: 1}
-  hoverSelectedOutlineColor: {r: 0.89411765, g: 0.27058825, b: 0.23921569, a: 1}
+  discardHoverOutlineColor: {r: 0.9098039, g: 0.67058825, b: 0.65882355, a: 1}
+  discardSelectedOutlineColor: {r: 0.61960787, g: 0.1882353, b: 0.16862746, a: 1}
+  discardHoverSelectedOutlineColor: {r: 0.89411765, g: 0.27058825, b: 0.23921569, a: 1}
+  playingHoverOutlineColor: {r: 0.83137256, g: 0.8039216, b: 0.79607844, a: 1}
+  playingSelectedOutlineColor: {r: 0.9254902, g: 0.9137255, b: 0.9098039, a: 1}
+  playingHoverSelectedOutlineColor: {r: 0.9882353, g: 0.9764706, b: 0.972549, a: 1}
   moveLerp: 10
   liftLerp: 20
 --- !u!1 &4960395737622834167
@@ -163,7 +166,7 @@ GameObject:
   - component: {fileID: 2000980179745118590}
   - component: {fileID: 312605795378855331}
   m_Layer: 0
-  m_Name: Name Label
+  m_Name: Title Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
