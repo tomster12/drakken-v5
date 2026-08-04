@@ -1,9 +1,12 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client.World;
+using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Logic;
+using Drakken.Utility;
 using UnityEngine;
 
 namespace Drakken.Client.States
@@ -13,9 +16,12 @@ namespace Drakken.Client.States
         private SceneLayout SceneLayout => GameEntrypoint.Singleton.Client.SceneLayout;
         private SceneObjects SceneObjects => GameEntrypoint.Singleton.Client.SceneObjects;
         private TokenView selectedTokenView = null;
+        private CancellationTokenSource cts = new();
 
         public override async Task Enter(ClientStateType fromType)
         {
+            cts = new();
+
             Match.OnTokenResolved += OnTokenResolved;
 
             GameEntrypoint.Singleton.Client.Camera.SetTarget(SceneLayout.Playing.CameraPosition);
@@ -28,35 +34,43 @@ namespace Drakken.Client.States
         private void SetupTokens()
         {
             // Place each token into the row
-            for (int i = 0; i < SceneObjects.MyTokenViews.Count; i++)
+            for (int i = 0; i < SceneObjects.MyTokenViews.Length; i++)
             {
                 var tokenView = SceneObjects.MyTokenViews[i];
 
-                tokenView.transform.SetParent(SceneLayout.Shared.MyTokenRow, worldPositionStays: true);
-                float offset = (i - (SceneObjects.MyTokenViews.Count - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
-                Vector3 localPos = new(offset, 0f, 0f);
-                tokenView.TargetLocalPosition = localPos;
-                tokenView.transform.localPosition = localPos;
-                tokenView.transform.localRotation = Quaternion.identity;
-
                 tokenView.InteractionMode = TokenView.InteractionModeType.None;
+
+                float offset = (i - (SceneObjects.MyTokenViews.Length - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
+                Vector3 targetPos = SceneLayout.Shared.MyTokenRow.position + new Vector3(offset, 0f, 0f);
+
+                // Animate directly into the row
+                var animation = new AnimationSequenceBuilder()
+                    .Next(
+                        tokenView.CreateCurrentPositionAnimationTrack(
+                            0.6f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic),
+                        AnimationTracks.Rotation(
+                            0.4f, tokenView.transform, tokenView.transform.rotation, SceneLayout.Shared.MyTokenRow.rotation, Easing.EaseOutCubic))
+                    .Build();
+
+                _ = tokenView.Animator.Play(animation, cts.Token);
             }
 
             // Create each opponent token object in a row
-            for (int i = 0; i < GameState.Clients[Match.OpClientIndex].Tokens.Count; i++)
-            {
-                var tokenView = TokenView.CreateEmpty(client.Assets, SceneLayout.Shared.OpTokenRow);
-                if (tokenView == null) continue;
+            var opTokenCount = GameState.Clients[Match.OpClientIndex].Tokens.Count;
+            SceneObjects.OpTokenViews = new TokenView[opTokenCount];
 
-                // Place into the row
-                float offset = (i - (GameState.Clients[Match.OpClientIndex].Tokens.Count - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
-                Vector3 localPos = new(offset, 0f, 0f);
-                tokenView.TargetLocalPosition = localPos;
-                tokenView.transform.localPosition = localPos;
-                tokenView.transform.localRotation = Quaternion.identity;
+            for (int i = 0; i < opTokenCount; i++)
+            {
+                var tokenView = TokenView.CreateEmpty(client.Assets);
+                Assert.NotNull(tokenView);
+                SceneObjects.OpTokenViews[i] = tokenView;
 
                 tokenView.InteractionMode = TokenView.InteractionModeType.None;
-                SceneObjects.OpTokenViews.Add(tokenView);
+
+                float offset = (i - (opTokenCount - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
+                Vector3 targetPos = SceneLayout.Shared.OpTokenRow.position + new Vector3(offset, 0f, 0f);
+
+                tokenView.SetPositionAndRotation(targetPos, SceneLayout.Shared.OpTokenRow.rotation);
             }
 
             // Start turn
@@ -66,6 +80,9 @@ namespace Drakken.Client.States
 
         public override async Task Exit(ClientStateType toStateType)
         {
+            cts.Cancel();
+            cts.Dispose();
+
             Match.OnTokenResolved -= OnTokenResolved;
 
             // If we are going back to title then clean up the token / dice views

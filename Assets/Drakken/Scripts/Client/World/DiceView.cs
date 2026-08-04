@@ -27,10 +27,10 @@ namespace Drakken.Client.World
 
         // ------------------------------ Setup
 
-        public static DiceView Create(AssetDatabase assets, DiceInstance instance, Transform parent = null)
+        public static DiceView Create(AssetDatabase assets, DiceInstance instance)
         {
             var prefab = assets.DiceViewPrefab;
-            var diceGo = Instantiate(prefab, parent);
+            var diceGo = Instantiate(prefab);
             var diceView = diceGo.GetComponent<DiceView>();
 
             diceView.Bind(instance);

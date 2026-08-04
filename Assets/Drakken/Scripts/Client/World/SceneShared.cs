@@ -1,33 +1,33 @@
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 namespace Drakken.Client.World
 {
     public class SceneObjects
     {
-        public List<TokenView> MyTokenViews { get; private set; } = new();
-        public List<TokenView> OpTokenViews { get; private set; } = new();
-        public List<DiceView> MyDiceViews { get; private set; } = new();
-        public List<DiceView> OpDiceViews { get; private set; } = new();
+        public TokenView[] MyTokenViews { get; set; } = new TokenView[0];
+        public TokenView[] OpTokenViews { get; set; } = new TokenView[0];
+        public DiceView[] MyDiceViews { get; set; } = new DiceView[0];
+        public DiceView[] OpDiceViews { get; set; } = new DiceView[0];
 
         public void OnDisconnect()
         {
             foreach (var view in MyTokenViews)
-                Object.Destroy(view.gameObject);
+                GameObject.Destroy(view.gameObject);
 
             foreach (var view in OpTokenViews)
-                Object.Destroy(view.gameObject);
+                GameObject.Destroy(view.gameObject);
 
             foreach (var view in MyDiceViews)
-                Object.Destroy(view.gameObject);
+                GameObject.Destroy(view.gameObject);
 
             foreach (var view in OpDiceViews)
-                Object.Destroy(view.gameObject);
+                GameObject.Destroy(view.gameObject);
 
-            MyTokenViews.Clear();
-            OpTokenViews.Clear();
-            MyDiceViews.Clear();
-            OpDiceViews.Clear();
+            MyTokenViews = new TokenView[0];
+            OpTokenViews = new TokenView[0];
+            MyDiceViews = new DiceView[0];
+            OpDiceViews = new DiceView[0];
         }
     }
 }

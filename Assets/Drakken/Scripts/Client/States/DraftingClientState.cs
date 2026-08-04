@@ -1,12 +1,17 @@
 using Drakken.Client.World;
+using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
+using Drakken.Utility;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using UnityEditor;
 using UnityEngine;
+
 using static Drakken.Client.ClientUI;
 
 namespace Drakken.Client.States
@@ -19,11 +24,14 @@ namespace Drakken.Client.States
         private bool SelectedEnoughTokens => selectedTokenViews.Count >= CountToDiscard;
         private readonly List<TokenView> selectedTokenViews = new();
         private bool hasDiscarded;
+        private CancellationTokenSource cts = new();
 
         // ------------------------------ Setup
 
         public override async Task Enter(ClientStateType fromStateType)
         {
+            cts = new();
+
             Match.OnPlayingPhaseStarted += OnPlayingPhaseStarted;
             Match.OnOtherPlayerDiscarded += OnOtherPlayerDiscarded;
 
@@ -36,18 +44,18 @@ namespace Drakken.Client.States
 
             UpdateStatusUI();
 
-            // When coming from the title create the dice
             if (fromStateType == ClientStateType.Title)
             {
                 SceneLayout.Shared.Mat1.SetActive(true);
                 SceneLayout.Shared.Mat2.SetActive(true);
 
+                // When coming from the title create the dice
                 CreateAndRollDice();
             }
 
-            // Otherwise roll the existing dice
             else
             {
+                // Otherwise roll the existing dice
                 RollExistingDice();
             }
 
@@ -57,6 +65,9 @@ namespace Drakken.Client.States
 
         public override async Task Exit(ClientStateType toStateType)
         {
+            cts.Cancel();
+            cts.Dispose();
+
             Match.OnPlayingPhaseStarted -= OnPlayingPhaseStarted;
             Match.OnOtherPlayerDiscarded -= OnOtherPlayerDiscarded;
 
@@ -78,36 +89,34 @@ namespace Drakken.Client.States
 
         private void CreateAndRollDice()
         {
-            Assert.True(SceneObjects.MyDiceViews.Count == 0);
-            Assert.True(SceneObjects.OpDiceViews.Count == 0);
+            Assert.True(SceneObjects.MyDiceViews.Length == 0);
+            Assert.True(SceneObjects.OpDiceViews.Length == 0);
 
-            // For each player create a row of dice views
+            // For both you and opponent
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
-                // Check if placing yours or opponents
                 var areMyDice = Match.ClientIndex == clientIndex;
-                var diceRowParent = areMyDice ? SceneLayout.Shared.MyDiceRow : SceneLayout.Shared.OpDiceRow;
+                var diceRow = areMyDice ? SceneLayout.Shared.MyDiceRow : SceneLayout.Shared.OpDiceRow;
                 var clientDice = GameState.Clients[clientIndex].Dice;
+
+                // Create a row of dice views
+                if (areMyDice) SceneObjects.MyDiceViews = new DiceView[clientDice.Count];
+                else SceneObjects.OpDiceViews = new DiceView[clientDice.Count];
 
                 for (int i = 0; i < clientDice.Count; i++)
                 {
-                    // Create new instance
                     var diceInstance = clientDice[i];
-                    var diceView = DiceView.Create(client.Assets, diceInstance, diceRowParent);
+                    var diceView = DiceView.Create(client.Assets, diceInstance);
                     if (diceView == null) continue;
 
-                    // Place into the row
+                    if (areMyDice) SceneObjects.MyDiceViews[i] = diceView;
+                    else SceneObjects.OpDiceViews[i] = diceView;
+
                     float offset = (i - (clientDice.Count - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
-                    Vector3 localPos = new(offset, 0f, 0f);
-                    diceView.transform.localPosition = localPos;
-                    diceView.transform.localRotation = Quaternion.identity;
+                    Vector3 targetPos = diceRow.position + new Vector3(offset, 0f, 0f);
+                    diceView.transform.SetPositionAndRotation(targetPos, Quaternion.identity);
 
-                    // Allow hovering both players dice
                     diceView.SetInteractable(true);
-
-                    if (areMyDice)
-                        SceneObjects.MyDiceViews.Add(diceView);
-                    else SceneObjects.OpDiceViews.Add(diceView);
                 }
             }
 
@@ -118,8 +127,8 @@ namespace Drakken.Client.States
 
         private void RollExistingDice()
         {
-            Assert.True(SceneObjects.MyDiceViews.Count != 0);
-            Assert.True(SceneObjects.OpDiceViews.Count != 0);
+            Assert.True(SceneObjects.MyDiceViews.Length != 0);
+            Assert.True(SceneObjects.OpDiceViews.Length != 0);
 
             // TODO: Update dice to match the gamestate
 
@@ -130,29 +139,50 @@ namespace Drakken.Client.States
 
         private async void SpawnTokens()
         {
-            Assert.True(SceneObjects.MyTokenViews.Count == 0);
+            Assert.True(SceneObjects.MyTokenViews.Length == 0);
+
+            Vector3 bagStartPos = SceneLayout.Shared.Bag1.transform.position;
 
             // Create each token object in a row
-            for (int i = 0; i < GameState.Clients[Match.ClientIndex].Tokens.Count; i++)
+            var tokenCount = GameState.Clients[Match.ClientIndex].Tokens.Count;
+            SceneObjects.MyTokenViews = new TokenView[tokenCount];
+
+            for (int i = 0; i < tokenCount; i++)
             {
-                var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[i];
-                var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, tokenInstance, SceneLayout.Drafting.DraftTokenRow);
-                if (tokenView == null) continue;
+                // Start a new task for this token
+                int tokenIndex = i;
+                int taskDelay = (tokenCount - 1 - tokenIndex) * 400;
+                AsyncUtility.DelayTask(taskDelay, async () =>
+                {
+                    var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[tokenIndex];
+                    var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, tokenInstance);
+                    Assert.NotNull(tokenView);
 
-                // Start at the bag
-                // tokenView.transform.position = SceneLayout.Shared.Bag1.transform.position;
+                    SceneObjects.MyTokenViews[tokenIndex] = tokenView;
 
-                // Calculate target position
-                float targetOffsetX = (i - (GameState.Clients[Match.ClientIndex].Tokens.Count - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
-                Vector3 targeLocalPos = new(targetOffsetX, 0f, 0f);
-                tokenView.TargetLocalPosition = targeLocalPos;
-                tokenView.transform.localPosition = targeLocalPos;
-                tokenView.transform.localRotation = Quaternion.identity;
+                    // Start small inside the bag
+                    tokenView.SetPositionAndRotation(bagStartPos, Quaternion.identity);
+                    tokenView.transform.localScale = Vector3.zero;
 
-                SceneObjects.MyTokenViews.Add(tokenView);
+                    // Animate up and then across
+                    Vector3 bagAbovePos = bagStartPos + Vector3.up * 1.5f;
+                    float targetOffsetX = (tokenIndex - (tokenCount - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
+                    Vector3 targetPos = SceneLayout.Drafting.DraftTokenRow.position + new Vector3(targetOffsetX, 0f, 0f);
 
-                // tokenView.InteractionMode = TokenView.InteractionModeType.Discard;
-                // tokenView.OnClicked.AddListener(OnTokenClicked);
+                    var animation = new AnimationSequenceBuilder()
+                        .At(0.0f, AnimationTracks.LocalScale(0.6f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
+                        .At(0.0f, AnimationTracks.Rotation(1.2f, tokenView.transform, Quaternion.identity, SceneLayout.Drafting.DraftTokenRow.rotation, Easing.Linear))
+                        .Next(tokenView.CreateCurrentPositionAnimationTrack(
+                            0.4f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
+                        .Next(tokenView.CreateCurrentPositionAnimationTrack(
+                            0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 0.7f, targetPos), Easing.EaseOutCubic))
+                        .Build();
+
+                    await tokenView.Animator.Play(animation, cts.Token);
+
+                    tokenView.OnClicked.AddListener(OnTokenClicked);
+                    tokenView.InteractionMode = TokenView.InteractionModeType.Discard;
+                }, cts.Token);
             }
         }
 
@@ -160,11 +190,10 @@ namespace Drakken.Client.States
 
         private void UpdateStatusUI()
         {
-            var statusText = hasDiscarded
-                ? "Waiting for opponent..."
-                : SelectedEnoughTokens
-                    ? "Ready to confirm"
-                    : $"Select {CountToDiscard} tokens to discard";
+            var statusText =
+                hasDiscarded ? "Waiting for opponent..."
+                : SelectedEnoughTokens ? "Ready to confirm"
+                : $"Select {CountToDiscard} tokens to discard";
 
             client.UI.SetStatus("Drafting", statusText);
         }
@@ -241,23 +270,30 @@ namespace Drakken.Client.States
             foreach (var tokenView in selectedTokenViews)
             {
                 GameObject.Destroy(tokenView.gameObject);
-                SceneObjects.MyTokenViews.Remove(tokenView);
             }
 
-            // Place each token back into the row
-            for (int i = 0; i < SceneObjects.MyTokenViews.Count; i++)
+            SceneObjects.MyTokenViews = SceneObjects.MyTokenViews
+                .Where(tv => !selectedTokenViews.Contains(tv))
+                .ToArray();
+
+            // Animate each token back into the row
+            for (int i = 0; i < SceneObjects.MyTokenViews.Length; i++)
             {
                 var tokenView = SceneObjects.MyTokenViews[i];
 
-                tokenView.transform.SetParent(SceneLayout.Drafting.DraftTokenRow, worldPositionStays: true);
-                float offset = (i - (SceneObjects.MyTokenViews.Count - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
-                Vector3 localPos = new(offset, 0f, 0f);
-                tokenView.TargetLocalPosition = localPos;
-                tokenView.transform.localPosition = localPos;
-                tokenView.transform.localRotation = Quaternion.identity;
-
                 tokenView.OnClicked.RemoveListener(OnTokenClicked);
                 tokenView.InteractionMode = TokenView.InteractionModeType.None;
+
+                float targetOffsetX = (i - (SceneObjects.MyTokenViews.Length - 1) / 2f) * SceneLayout.Shared.TokenSpacing;
+                Vector3 targetPos = SceneLayout.Drafting.DraftTokenRow.position + new Vector3(targetOffsetX, 0f, 0f);
+
+                // Animate directly into the row
+                var animation = new AnimationSequenceBuilder()
+                    .Next(tokenView.CreateCurrentPositionAnimationTrack(
+                        0.6f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
+                    .Build();
+
+                _ = tokenView.Animator.Play(animation, cts.Token);
             }
 
             UpdateStatusUI();

@@ -1,9 +1,10 @@
+using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
+using Drakken.Utility;
 using System;
 using System.Linq;
 using TMPro;
-using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -40,11 +41,14 @@ namespace Drakken.Client.World
 
         public TokenDefinition TokenDefinition { get; private set; }
         public TokenInstance TokenInstance { get; private set; }
-        public Vector3 TargetLocalPosition { get; set; }
+        public InteractionModeType InteractionMode { get; set; } = InteractionModeType.None;
+        public AnimationPlayer Animator { get; private set; } = new();
+        public bool IsInteractable => InteractionMode != InteractionModeType.None && !Animator.IsAnimating;
         public bool IsBinded => TokenInstance != null;
         public bool IsSelected { get; private set; } = false;
         public bool IsHovered { get; private set; } = false;
-        public InteractionModeType InteractionMode { get; set; } = InteractionModeType.None;
+        private Vector3 currentPosition;
+        private float currentLiftOffsetY;
 
         private Color HoverOutlineColor => InteractionMode switch
         {
@@ -67,12 +71,12 @@ namespace Drakken.Client.World
             _ => Color.black
         };
 
-        // ------------------------------ Setup
+        // ------------------------------ Binding
 
-        public static TokenView Create(AssetDatabase assets, TokenRegistry registry, TokenInstance instance, Transform parent = null)
+        public static TokenView Create(AssetDatabase assets, TokenRegistry registry, TokenInstance instance)
         {
             var prefab = assets.TokenViewPrefab;
-            var tokenGo = Instantiate(prefab, parent);
+            var tokenGo = Instantiate(prefab);
             tokenGo.gameObject.SetActive(true);
             var tokenView = tokenGo.GetComponent<TokenView>();
 
@@ -81,21 +85,16 @@ namespace Drakken.Client.World
             return tokenView;
         }
 
-        public static TokenView CreateEmpty(AssetDatabase assets, Transform parent = null)
+        public static TokenView CreateEmpty(AssetDatabase assets)
         {
             var prefab = assets.TokenViewPrefab;
-            var tokenGo = Instantiate(prefab, parent);
+            var tokenGo = Instantiate(prefab);
             tokenGo.gameObject.SetActive(true);
             var tokenView = tokenGo.GetComponent<TokenView>();
 
             tokenView.BindEmpty(assets.EmptyTokenMeshPrefab);
 
             return tokenView;
-        }
-
-        private void Awake()
-        {
-            TargetLocalPosition = transform.localPosition;
         }
 
         private void Bind(TokenRegistry registry, TokenInstance instance)
@@ -140,9 +139,10 @@ namespace Drakken.Client.World
         [ContextMenu("Bind Random")]
         private void DebugBindRandom()
         {
-            var registry = TokenRegistryBuilder.BuildClientRegistry(GameEntrypoint.Singleton.Client.Assets.GetTokenPrefabById);
+            GameEntrypoint.Singleton.TokenRegistry ??=
+                TokenRegistryBuilder.BuildClientRegistry(GameEntrypoint.Singleton.Client.Assets.GetTokenPrefabById);
 
-            var tokenId = registry.AllDefinitions
+            var tokenId = GameEntrypoint.Singleton.TokenRegistry.AllDefinitions
                 .ToList()
                 .ShuffleInplace()
                 .First()
@@ -150,31 +150,47 @@ namespace Drakken.Client.World
 
             var tokenInstance = TokenInstance.Create(tokenId);
 
-            Bind(registry, tokenInstance);
+            Bind(GameEntrypoint.Singleton.TokenRegistry, tokenInstance);
+        }
+
+        // ------------------------------ Lifetime
+
+        private void Awake()
+        {
+            currentPosition = transform.localPosition;
+        }
+
+        private void Update()
+        {
+            UpdateInteraction();
+        }
+
+        // ------------------------------ Animation
+
+        public void SetPositionAndRotation(Vector3 position, Quaternion rotation)
+        {
+            currentPosition = position;
+            transform.rotation = rotation;
+        }
+
+        public IAnimationTrack CreateCurrentPositionAnimationTrack(
+            float durationSeconds, Func<float, Vector3> getPositionFunc, Func<float, float> easingFunc = null)
+        {
+            easingFunc ??= Easing.Linear;
+            return new AnimationTrack<Vector3>(
+                durationSeconds,
+                normalizedTime => getPositionFunc(easingFunc(normalizedTime)),
+                position => currentPosition = position);
         }
 
         // ------------------------------ Interaction
 
-        private void Update()
+        private void UpdateInteraction()
         {
-            // Calculate height offset
-            float targetOffsetY = IsSelected ? selectedLiftY
-                                : IsHovered ? hoverLiftY
-                                : 0f;
-
-            // Lerp towards target position
-            var targetLocalPosition = new Vector3(
-                TargetLocalPosition.x,
-                TargetLocalPosition.y + targetOffsetY,
-                TargetLocalPosition.z);
-
-            transform.localPosition = Vector3.Lerp(
-                transform.localPosition,
-                targetLocalPosition,
-                moveLerp * Time.deltaTime);
+            var hoveredAndInteractable = IsHovered && IsInteractable;
 
             // Update outline
-            outline.SetEnabled(IsSelected || (IsHovered && InteractionMode != InteractionModeType.None));
+            outline.SetEnabled(IsSelected || hoveredAndInteractable);
 
             if (outline.IsEnabled)
             {
@@ -184,20 +200,35 @@ namespace Drakken.Client.World
             }
 
             // Update description
-            descriptionCanvas.gameObject.SetActive(IsHovered);
+            descriptionCanvas.gameObject.SetActive(hoveredAndInteractable);
 
-            if (IsHovered)
+            if (hoveredAndInteractable)
             {
                 // Set its position to relative to the title
                 descriptionCanvas.transform.SetPositionAndRotation(
-                    titleText.transform.position + new Vector3(0, -0.1f, 0.22f),
+                    titleText.transform.position + new Vector3(0, -0.1f, 0.24f),
                     Quaternion.Euler(90.0f, 0, 0));
             }
+
+            // Update lift from current position
+            float targetLiftOffsetY = IsSelected ? selectedLiftY
+                                     : hoveredAndInteractable ? hoverLiftY
+                                     : 0f;
+
+            currentLiftOffsetY = Mathf.Lerp(
+                currentLiftOffsetY,
+                targetLiftOffsetY,
+                liftLerp * Time.deltaTime);
+
+            transform.position = new Vector3(
+                currentPosition.x,
+                currentPosition.y + currentLiftOffsetY,
+                currentPosition.z);
         }
 
         public bool SetSelected(bool selected)
         {
-            if (InteractionMode != InteractionModeType.None && IsSelected != selected)
+            if (IsInteractable && IsSelected != selected)
             {
                 IsSelected = selected;
                 return true;
@@ -208,23 +239,17 @@ namespace Drakken.Client.World
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (InteractionMode != InteractionModeType.None && !IsHovered)
-            {
-                IsHovered = true;
-            }
+            IsHovered = true;
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (IsHovered)
-            {
-                IsHovered = false;
-            }
+            IsHovered = false;
         }
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (InteractionMode != InteractionModeType.None)
+            if (IsInteractable)
             {
                 if (eventData.button == PointerEventData.InputButton.Left)
                 {
