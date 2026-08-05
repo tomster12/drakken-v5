@@ -1,9 +1,17 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Drakken.Client
 {
+    [Serializable]
+    public class ClientPlayerUI
+    {
+
+        [SerializeField] public TextMeshPro OpDiceTotal;
+    }
+
     public class ClientUI : MonoBehaviour
     {
         [Header("References")]
@@ -12,8 +20,9 @@ namespace Drakken.Client
         [SerializeField] private TextMeshProUGUI StatusSubTitleText;
         [SerializeField] private Image MyAvatar;
         [SerializeField] private Image OpAvatar;
-        [SerializeField] private TextMeshPro MyDiceTotal;
-        [SerializeField] private TextMeshPro OpDiceTotal;
+        [SerializeField] public Transform DiceTotalParent;
+        [SerializeField] public TextMeshPro MyDiceTotal;
+        [SerializeField] public TextMeshPro OpDiceTotal;
 
         [Header("Config")]
         [SerializeField] private Color AvatarVisibleColor;
@@ -29,8 +38,8 @@ namespace Drakken.Client
             HideStatus();
             SetMyAvatar(AvatarState.Hidden);
             SetOpAvatar(AvatarState.Hidden);
-            UpdateMyDiceTotal(hide: true);
-            UpdateOpDiceTotal(hide: true);
+            UpdateDiceTotal(0, 0, hide: true);
+            UpdateDiceTotal(0, 1, hide: true);
         }
 
         public void OnDisconnect()
@@ -86,34 +95,30 @@ namespace Drakken.Client
             }
         }
 
-        public void UpdateMyDiceTotal(bool hide = false)
+        public void UpdateDiceTotal(int playerClientImdex, int clientIndex, bool unknown = false, bool hide = false)
         {
+            DiceTotalParent.transform.rotation = Quaternion.Euler(0, playerClientImdex * 180f, 0);
+            var diceTotal = clientIndex == 0 ? MyDiceTotal : OpDiceTotal;
+
             if (hide)
             {
-                MyDiceTotal.gameObject.SetActive(false);
+                diceTotal.gameObject.SetActive(false);
                 return;
             }
 
-            var match = GameEntrypoint.Singleton.Client.Match;
-            var total = match.GameState.Clients[match.ClientIndex].GetDiceTotal();
-            MyDiceTotal.text = total.ToString();
-            MyDiceTotal.gameObject.SetActive(true);
-        }
+            diceTotal.gameObject.SetActive(true);
 
-        public void UpdateOpDiceTotal(bool hide = false)
-        {
-            if (hide)
+            if (unknown)
             {
-                OpDiceTotal.gameObject.SetActive(false);
-                return;
+                diceTotal.text = "?";
             }
-
-            var match = GameEntrypoint.Singleton.Client.Match;
-            var total = match.GameState.Clients[match.OpClientIndex].GetDiceTotal();
-            OpDiceTotal.text = total.ToString();
-            OpDiceTotal.gameObject.SetActive(true);
+            else
+            {
+                var match = GameEntrypoint.Singleton.Client.Match;
+                var total = match.GameState.Clients[match.ClientIndex].GetDiceTotal();
+                diceTotal.text = total.ToString();
+            }
         }
-
         public enum AvatarState { Hidden, Visible, Ready }
     }
 }

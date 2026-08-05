@@ -37,6 +37,8 @@ namespace Drakken.Client.World.Animation
         private readonly List<(float StartTimeSeconds, Action Callback)> timedCallbacks = new();
         private float cursorSeconds = 0f;
 
+        public static AnimationSequenceBuilder Start() => new();
+
         public AnimationSequenceBuilder Next(params IAnimationTrack[] tracks)
         {
             foreach (var track in tracks)

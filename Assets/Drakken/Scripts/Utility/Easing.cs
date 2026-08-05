@@ -14,5 +14,11 @@ namespace Drakken.Utility
         public static float EaseInOutCubic(float t) =>
             t < 0.5f ? 4f * t * t * t
                      : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
+
+        public static float EaseInOutQuad(float t) =>
+            t < 0.5f ? 2f * t * t
+                     : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
+
+        public static float EaseInSin(float t) => 1f - Mathf.Cos((t * Mathf.PI) / 2f);
     }
 }

@@ -1,4 +1,9 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Drakken.Client.World.Animation;
 using Drakken.Domain;
+using Drakken.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,11 +26,11 @@ namespace Drakken.Client.World
         [SerializeField] private Color hoverOutlineColor = Color.white;
 
         public DiceInstance DiceInstance { get; private set; }
+        public AnimationPlayer Animator { get; private set; } = new();
         public bool IsHovered { get; private set; } = false;
-        public bool IsInteractable { get; set; } = false;
-        private bool toUpdateHovered = false;
+        private bool IsInteractable => !Animator.IsAnimating;
 
-        // ------------------------------ Setup
+        // ------------------------------ Binding
 
         public static DiceView Create(AssetDatabase assets, DiceInstance instance)
         {
@@ -46,79 +51,70 @@ namespace Drakken.Client.World
         public void Bind(DiceInstance dice)
         {
             this.DiceInstance = dice;
-            
+
             outline.Setup();
 
-            Refresh();
+            // Update labels to match dice instance values
+            if (valueLabel != null) valueLabel.text = DiceInstance.Value.ToString();
+            if (sidesLabel != null) sidesLabel.text = $"D{DiceInstance.Sides}";
+        }
+
+        // ------------------------------ Animation
+
+        public async Task AnimateRoll(CancellationToken ct)
+        {
+            // Generate 5 random values evenly spaced across duration
+            float duration = 2.0f;
+            float values = 15;
+            List<(float Time, int Value)> timedValues = new();
+
+            for (int i = 0; i < values; i++)
+            {
+                float time = Easing.EaseInSin((float)i / (values - 1)) * duration;
+                int value = Random.Range(1, DiceInstance.Sides + 1);
+                timedValues.Add((time, value));
+            }
+            timedValues.Add((duration, DiceInstance.Value));
+
+            // Build and play animation
+            var animationBuilder = AnimationSequenceBuilder
+                .Start()
+                .Next(AnimationTracks.EulerRotation(duration, transform, transform.rotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
+
+            foreach (var pair in timedValues)
+            {
+                animationBuilder.At(pair.Time, () => valueLabel.text = pair.Value.ToString());
+            }
+
+            var animation = animationBuilder.Build();
+            await Animator.Play(animation, ct);
         }
 
         // ------------------------------ Interaction
 
         private void Update()
         {
-            if (toUpdateHovered)
-            {
-                toUpdateHovered = false;
-                UpdateHovered();
-            }
-        }
-
-        private void UpdateHovered()
-        {
             // Show sides label when hovered
-            sidesLabel.gameObject.SetActive(IsHovered);
+            sidesLabel.gameObject.SetActive(IsHovered && IsInteractable);
 
             // Enable / disable hover
-            bool shouldShow = IsHovered && IsInteractable;
-            outline.SetEnabled(shouldShow);
-
-            if (shouldShow)
-            {
-                outline.OutlineColor = hoverOutlineColor;
-            }
-        }
-
-        public void Refresh()
-        {
-            // Update labels to match dice instance values
-            if (valueLabel != null) valueLabel.text = DiceInstance.Value.ToString();
-            if (sidesLabel != null) sidesLabel.text = $"D{DiceInstance.Sides}";
+            outline.SetEnabled(IsHovered && IsInteractable);
+            if (IsHovered && IsInteractable) outline.OutlineColor = hoverOutlineColor;
 
             // Update material based on if has effects
             bool hasEffects = DiceInstance.Effects != null && DiceInstance.Effects.Count > 0;
-            if (renderer != null)
-                renderer.material.color = hasEffects ? colorAffected : normalColor;
-        }
-
-        public void SetInteractable(bool interactable)
-        {
-            if (IsInteractable == interactable) return;
-
-            IsInteractable = interactable;
-
-            if (!interactable && IsHovered)
-            {
-                IsHovered = false;
-                toUpdateHovered = true;
-            }
+            if (renderer != null) renderer.material.color = hasEffects ? colorAffected : normalColor;
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (IsInteractable && !IsHovered)
-            {
-                IsHovered = true;
-                toUpdateHovered = true;
-            }
+            IsHovered = true;
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (IsHovered)
-            {
-                IsHovered = false;
-                toUpdateHovered = true;
-            }
+            IsHovered = false;
         }
     }
 }
+

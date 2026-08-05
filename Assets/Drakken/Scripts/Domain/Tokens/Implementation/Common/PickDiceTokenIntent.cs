@@ -24,11 +24,11 @@ namespace Drakken.Domain.Tokens.Implementation.Common
             this.targetOwner = targetOwner;
         }
 
-        protected override async Task<PickDiceTokenIntent> PickIntent(TokenVisualContext context)
+        protected override async Task<PickDiceTokenIntent> PickIntent(TokenVisualContext context, int clientIndex)
         {
             var pickableDiceViews = targetOwner == TargetOwner.Opponent
-                ? context.SceneObjects.OpDiceViews
-                : context.SceneObjects.MyDiceViews;
+                ? context.SceneObjects.Player(1 - clientIndex).DiceViews
+                : context.SceneObjects.Player(clientIndex).DiceViews;
 
             return new PickDiceTokenIntent { TargetDiceInstanceId = pickableDiceViews[0].DiceInstance.InstanceId };
         }

@@ -7,7 +7,7 @@ namespace Drakken.Domain.Tokens.Implementation.Common
 
     public class EmptyTokenIntentPicker : TokenIntentPicker<EmptyTokenIntent>
     {
-        protected override Task<EmptyTokenIntent> PickIntent(TokenVisualContext context)
+        protected override Task<EmptyTokenIntent> PickIntent(TokenVisualContext context, int clientIndex)
             => Task.FromResult(new EmptyTokenIntent());
     }
 }

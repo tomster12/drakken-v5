@@ -7,14 +7,15 @@ namespace Drakken.Client.World
     {
         public TitleLayout Title;
         public DraftingLayout Drafting;
-        public SharedLayout Shared;
-        public PlayingLayout Playing;
+        public GameLayout Game;
+        public float TokenSpacing = 0.4f;
+        public float DiceSpacing = 0.35f;
 
         private void Awake()
         {
             Title.SetInitialState();
             Drafting.SetInitialState();
-            Shared.SetInitialState();
+            Game.SetInitialState();
         }
     }
 
@@ -43,9 +44,11 @@ namespace Drakken.Client.World
     [Serializable]
     public class DraftingLayout
     {
-        public Transform CameraPosition;
-        public Transform DraftTokenRow;
         public PhysicalButton DraftConfirmButton;
+        public DraftingPlayerLayout P1;
+        public DraftingPlayerLayout P2;
+
+        public DraftingPlayerLayout Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
 
         public void SetInitialState()
         {
@@ -54,29 +57,26 @@ namespace Drakken.Client.World
     }
 
     [Serializable]
-    public class PlayingLayout
+    public class DraftingPlayerLayout
     {
         public Transform CameraPosition;
+        public Transform DraftConfirmButtonPosition;
+        public Transform DraftTokenRow;
     }
 
     [Serializable]
-    public class SharedLayout
+    public class GameLayout
     {
-        public Transform MyDiceRow;
-        public Transform OpDiceRow;
-        public Transform MyTokenRow;
-        public Transform OpTokenRow;
-        public GameObject Mat1;
-        public GameObject Mat2;
-        public GameObject Bag1;
-        public GameObject Bag2;
-        public float TokenSpacing = 0.4f;
-        public float DiceSpacing = 0.35f;
+        public GamePlayerLayout P1;
+        public GamePlayerLayout P2;
+        public Transform CentrePos;
+
+        public GamePlayerLayout Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
 
         public void SetInitialState()
         {
-            Mat1.SetActive(false);
-            Mat2.SetActive(false);
+            P1.Mat.SetActive(false);
+            P2.Mat.SetActive(false);
         }
 
         public void OnDisconnect()
@@ -84,4 +84,15 @@ namespace Drakken.Client.World
             SetInitialState();
         }
     }
+
+    [Serializable]
+    public class GamePlayerLayout
+    {
+        public Transform PlayingCameraPosition;
+        public Transform DiceRow;
+        public Transform TokenRow;
+        public GameObject Mat;
+        public GameObject Bag;
+    }
 }
+

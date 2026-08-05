@@ -41,7 +41,7 @@ namespace Drakken.Client.World
 
             transform.rotation = Quaternion.Lerp(
                 transform.rotation,
-                currentPanRotation * targetRotation,
+                targetRotation * currentPanRotation,
                 rotationLerpSpeed * Time.deltaTime);
         }
 
@@ -53,13 +53,20 @@ namespace Drakken.Client.World
             float xPanned = -mousePanAmount * xPct;
             float yPanned = mousePanAmount * yPct;
 
+            // TODO: Flip y panned correctly
+
             return Quaternion.Euler(xPanned, yPanned, 0);
         }
 
-        public void SetTarget(Transform transform)
+        public void SetTarget(Transform transform, bool snap = false)
         {
             targetPosition = transform.position;
             targetRotation = transform.rotation;
+
+            if (snap)
+            {
+                this.transform.SetPositionAndRotation(targetPosition, targetRotation);
+            }
         }
     }
 }

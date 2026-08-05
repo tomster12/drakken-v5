@@ -206,8 +206,8 @@ namespace Drakken.Client.World
             {
                 // Set its position to relative to the title
                 descriptionCanvas.transform.SetPositionAndRotation(
-                    titleText.transform.position + new Vector3(0, -0.1f, 0.24f),
-                    Quaternion.Euler(90.0f, 0, 0));
+                    titleText.transform.position - Vector3.up * 0.1f,
+                    Quaternion.Euler(90.0f, titleText.transform.rotation.eulerAngles.y, 0));
             }
 
             // Update lift from current position

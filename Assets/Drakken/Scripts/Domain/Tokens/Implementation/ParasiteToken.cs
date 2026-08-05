@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens.Logic;
@@ -62,12 +63,16 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class ParasiteTokenAnimator : TokenAnimator<ParasiteTokenResolution>
     {
-        protected override async Task Animate(GameState gameState, ParasiteTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
+        protected override async Task Animate(
+            GameState gameState,
+            TokenVisualContext visualContext,
+            int sourceClientIndex,
+            int tokenInstanceId,
+            ParasiteTokenResolution resolution,
+            CancellationToken ct)
         {
             int opponentIndex = 1 - sourceClientIndex;
             // var targetView = context.GetDiceView(opponentIndex, resolution.TargetDiceId);
-
-            Log.Info("ParasiteAnimator", "Launching parasite projectile");
 
             // var projectile = context.SpawnProjectile("Parasite", sourcePos, targetPos);
 

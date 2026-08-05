@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
+using Drakken.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -13,15 +16,15 @@ namespace Drakken.Domain.Tokens.Implementation
     public class DragonTokenResolution : TokenResolution
     {
         public int D3Roll;
-        public List<int> RemovedDiceIds = new();
-        public List<DiceInstance> AddedDice = new();
+        public List<int> ReplacedIndices = new();
+        public List<DiceInstance> AddedDiceInstances = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
             serializer.SerializeValue(ref D3Roll);
-            serializer.SerializeList(ref RemovedDiceIds);
-            serializer.SerializeList(ref AddedDice);
+            serializer.SerializeList(ref ReplacedIndices);
+            serializer.SerializeList(ref AddedDiceInstances);
         }
     }
 
@@ -35,11 +38,13 @@ namespace Drakken.Domain.Tokens.Implementation
             int replaceCount = Random.Range(1, 4);
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
-            // Select the dice to remove
-            var diceToReplace = client.Dice.OrderBy(_ => Random.value).Take(replaceCount).ToList();
-            var removedDiceIds = diceToReplace.Select(d => d.InstanceId).ToList();
+            // Select random indices to replace
+            var replacedIndices = Enumerable.Range(0, client.Dice.Count)
+                .OrderBy(_ => Random.value)
+                .Take(replaceCount)
+                .ToList();
 
-            // Add replacement D8s
+            // Create replacement D8s
             var addedDice = new List<DiceInstance>();
             for (int i = 0; i < replaceCount; i++)
             {
@@ -51,46 +56,65 @@ namespace Drakken.Domain.Tokens.Implementation
             return new DragonTokenResolution
             {
                 D3Roll = replaceCount,
-                RemovedDiceIds = removedDiceIds,
-                AddedDice = addedDice,
+                ReplacedIndices = replacedIndices,
+                AddedDiceInstances = addedDice,
             };
         }
 
         protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
         {
+            Assert.True(resolution.ReplacedIndices.Count == resolution.AddedDiceInstances.Count);
+            Assert.True(resolution.D3Roll == resolution.AddedDiceInstances.Count);
+
             var client = gameState.Clients[sourceClientIndex];
 
-            client.Dice.RemoveAll(d => resolution.RemovedDiceIds.Contains(d.InstanceId));
-            client.Dice.AddRange(resolution.AddedDice);
+            for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
+            {
+                var index = resolution.ReplacedIndices[i];
+                Assert.True(index >= 0 && index < client.Dice.Count);
+
+                client.Dice[index] = resolution.AddedDiceInstances[i];
+            }
         }
     }
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
-        protected override async Task Animate(GameState gameState, DragonTokenResolution resolution, TokenVisualContext context, int sourceClientIndex)
+        protected override async Task Animate(
+            GameState gameState,
+            TokenVisualContext visualContext,
+            int sourceClientIndex,
+            int tokenInstanceId,
+            DragonTokenResolution resolution,
+            CancellationToken ct)
         {
-            Log.Info("DragonAnimator", "Spawning dragon VFX");
+            // Move token to the middle and rotated upwards
+            var centreTargetPos = visualContext.SceneLayout.Game.CentrePos.position;
 
-            // e.g. context.SpawnVFX("DragonRoar", context.BoardCenter);
+            await visualContext.TokenView.Animator.Play(AnimationSequenceBuilder
+                .Start()
+                .Next(
+                    visualContext.TokenView.CreateCurrentPositionAnimationTrack(
+                        0.6f, AnimationCurves.Lerp(visualContext.TokenView.transform.position, centreTargetPos), Easing.EaseInOutCubic),
+                    AnimationTracks.Rotation(
+                        0.6f, visualContext.TokenView.transform, visualContext.TokenView.transform.rotation, Quaternion.identity, Easing.EaseInOutCubic))
+                .Build(), ct);
 
-            await Task.Delay(600);
+            // Spawn a new DiceView and roll to match the amount to replace
 
-            foreach (int removedDiceId in resolution.RemovedDiceIds)
+            await Task.Delay(500);
+
+            // Delete each of the removed dice
+            foreach (int removedDiceId in resolution.ReplacedIndices)
             {
                 // var diceView = context.GetDiceView(sourceClientIndex, removedDiceId);
                 // Assert.NotNull(diceView);
-
-                Log.Info("DragonAnimator", $"Shattering dice id={removedDiceId}");
-                // diceView.PlayShatterAnimation();
-
-                // TODO: Delete dice view
-
-                await Task.Delay(300);
             }
 
-            await Task.Delay(200);
+            await Task.Delay(500);
 
-            foreach (var newDice in resolution.AddedDice)
+            //
+            foreach (var newDice in resolution.AddedDiceInstances)
             {
                 Log.Info("DragonAnimator", $"Slamming in D8 id={newDice.InstanceId} value={newDice.Value}");
 
