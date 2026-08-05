@@ -18,6 +18,8 @@ namespace Drakken.Client
 
         public virtual Task Exit(ClientStateType toType) => Task.CompletedTask;
 
+        public virtual void OnDestroy() {}
+
         public virtual Task Update() => Task.CompletedTask;
     }
 

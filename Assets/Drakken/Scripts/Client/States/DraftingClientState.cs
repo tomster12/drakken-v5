@@ -26,7 +26,7 @@ namespace Drakken.Client.States
         private bool SelectedEnoughTokens => selectedTokenViews.Count >= CountToDiscard;
         private readonly List<TokenView> selectedTokenViews = new();
         private bool hasDiscarded;
-        private CancellationTokenSource cts = new();
+        private CancellationTokenSource cts = null;
 
         // ------------------------------ Setup
 
@@ -73,6 +73,7 @@ namespace Drakken.Client.States
         {
             cts.Cancel();
             cts.Dispose();
+            cts = null;
 
             Match.OnPlayingPhaseStarted -= OnPlayingPhaseStarted;
             Match.OnOtherPlayerDiscarded -= OnOtherPlayerDiscarded;
@@ -91,6 +92,12 @@ namespace Drakken.Client.States
             // Cleanup this scenes specific objects
             SceneLayout.Drafting.DraftConfirmButton.Clicked -= OnConfirmDiscardClicked;
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
+        }
+
+        public override void OnDestroy()
+        {
+            cts?.Cancel();
+            cts?.Dispose();
         }
 
         private async Task CreateAndRollDice()
@@ -172,18 +179,22 @@ namespace Drakken.Client.States
             var tokenCount = GameState.Clients[Match.ClientIndex].Tokens.Count;
             MySceneObjects.TokenViews = new TokenView[tokenCount];
 
+            List<Task> tasks = new();
+
             for (int i = 0; i < tokenCount; i++)
             {
                 // Start a new task for this token
                 int tokenIndex = i;
                 int taskDelay = (tokenCount - 1 - tokenIndex) * 400;
-                AsyncUtility.DelayTask(taskDelay, async () =>
+
+                tasks.Add(AsyncUtility.DelayTask(taskDelay, async () =>
                 {
                     var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[tokenIndex];
                     var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, tokenInstance);
                     Assert.NotNull(tokenView);
 
                     MySceneObjects.TokenViews[tokenIndex] = tokenView;
+                    tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
                     // Start small inside the bag
                     Quaternion baseRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
@@ -206,10 +217,16 @@ namespace Drakken.Client.States
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
                             0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 0.7f, targetPos), Easing.EaseOutCubic))
                         .Build(), cts.Token);
+                }, cts.Token));
+            }
 
-                    tokenView.OnClicked.AddListener(OnTokenClicked);
-                    tokenView.InteractionMode = TokenView.InteractionModeType.Discard;
-                }, cts.Token);
+            await Task.WhenAll(tasks);
+
+            // Can interact with all once finished
+            for (int i = 0; i < tokenCount; i++)
+            {
+                MySceneObjects.TokenViews[i].OnClicked.AddListener(OnTokenClicked);
+                MySceneObjects.TokenViews[i].SetInteractionMode(TokenView.InteractionModeType.Discard);
             }
         }
 
@@ -237,7 +254,7 @@ namespace Drakken.Client.States
                     // We can ensure all tokens are interactable again
                     foreach (var otherTokenView in MySceneObjects.TokenViews)
                     {
-                        otherTokenView.InteractionMode = TokenView.InteractionModeType.Discard;
+                        otherTokenView.SetInteractionMode(TokenView.InteractionModeType.Discard);
                     }
                 }
             }
@@ -256,7 +273,7 @@ namespace Drakken.Client.States
                         {
                             if (!otherTokenView.IsSelected)
                             {
-                                otherTokenView.InteractionMode = TokenView.InteractionModeType.None;
+                                otherTokenView.SetInteractionMode(TokenView.InteractionModeType.None);
                             }
                         }
                     }
@@ -310,7 +327,7 @@ namespace Drakken.Client.States
                 var tokenView = MySceneObjects.TokenViews[i];
 
                 tokenView.OnClicked.RemoveListener(OnTokenClicked);
-                tokenView.InteractionMode = TokenView.InteractionModeType.None;
+                tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
                 float targetOffsetX = (i - (MySceneObjects.TokenViews.Length - 1) / 2f) * SceneLayout.TokenSpacing;
                 Vector3 targetPos = MyDraftingLayout.DraftTokenRow.position + MyDraftingLayout.DraftTokenRow.right * targetOffsetX;

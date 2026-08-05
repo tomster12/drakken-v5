@@ -88,18 +88,6 @@ namespace Drakken.Domain.Tokens.Implementation
             DragonTokenResolution resolution,
             CancellationToken ct)
         {
-            // Move token to the middle and rotated upwards
-            var centreTargetPos = visualContext.SceneLayout.Game.CentrePos.position;
-
-            await visualContext.TokenView.Animator.Play(AnimationSequenceBuilder
-                .Start()
-                .Next(
-                    visualContext.TokenView.CreateCurrentPositionAnimationTrack(
-                        0.6f, AnimationCurves.Lerp(visualContext.TokenView.transform.position, centreTargetPos), Easing.EaseInOutCubic),
-                    AnimationTracks.Rotation(
-                        0.6f, visualContext.TokenView.transform, visualContext.TokenView.transform.rotation, Quaternion.identity, Easing.EaseInOutCubic))
-                .Build(), ct);
-
             // Spawn a new DiceView and roll to match the amount to replace
 
             await Task.Delay(500);

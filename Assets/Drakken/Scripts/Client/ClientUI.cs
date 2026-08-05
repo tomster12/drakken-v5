@@ -97,8 +97,11 @@ namespace Drakken.Client
 
         public void UpdateDiceTotal(int playerClientImdex, int clientIndex, bool unknown = false, bool hide = false)
         {
+            // Manipulation so we can use same 2 text meshes irrelevant of which way looking at board
             DiceTotalParent.transform.rotation = Quaternion.Euler(0, playerClientImdex * 180f, 0);
-            var diceTotal = clientIndex == 0 ? MyDiceTotal : OpDiceTotal;
+            var diceTotal = playerClientImdex == 0
+                ? (clientIndex == 0 ? MyDiceTotal : OpDiceTotal)
+                : (clientIndex == 0 ? OpDiceTotal : MyDiceTotal);
 
             if (hide)
             {
@@ -115,10 +118,11 @@ namespace Drakken.Client
             else
             {
                 var match = GameEntrypoint.Singleton.Client.Match;
-                var total = match.GameState.Clients[match.ClientIndex].GetDiceTotal();
+                var total = match.GameState.Clients[clientIndex].GetDiceTotal();
                 diceTotal.text = total.ToString();
             }
         }
+
         public enum AvatarState { Hidden, Visible, Ready }
     }
 }

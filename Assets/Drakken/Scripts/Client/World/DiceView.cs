@@ -70,7 +70,7 @@ namespace Drakken.Client.World
 
             for (int i = 0; i < values; i++)
             {
-                float time = Easing.EaseInSin((float)i / (values - 1)) * duration;
+                float time = Easing.InverseEaseInOutQuad((float)i / (values - 1)) * duration;
                 int value = Random.Range(1, DiceInstance.Sides + 1);
                 timedValues.Add((time, value));
             }

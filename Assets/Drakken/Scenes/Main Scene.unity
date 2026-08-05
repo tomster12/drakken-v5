@@ -1669,6 +1669,7 @@ MonoBehaviour:
       Mat: {fileID: 1672422857}
       Bag: {fileID: 774944794}
     CentrePos: {fileID: 1927735674}
+    PlayDropRadius: 2
   TokenSpacing: 1.2
   DiceSpacing: 1
 --- !u!114 &865993108

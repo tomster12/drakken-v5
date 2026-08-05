@@ -70,6 +70,7 @@ namespace Drakken.Client.World
         public GamePlayerLayout P1;
         public GamePlayerLayout P2;
         public Transform CentrePos;
+        public float PlayDropRadius = 1.0f;
 
         public GamePlayerLayout Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
 

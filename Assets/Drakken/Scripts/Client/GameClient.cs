@@ -48,6 +48,13 @@ namespace Drakken.Client
             playingState.Init(this);
         }
 
+        void OnDestroy()
+        {
+            titleState.OnDestroy();
+            draftingState.OnDestroy();
+            playingState.OnDestroy();
+        }
+
         public async Task StartApplication()
         {
             await GotoState(ClientStateType.Title);
