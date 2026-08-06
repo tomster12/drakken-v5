@@ -47,6 +47,17 @@ namespace Drakken.Client.World.Animation
                 rotation => transform.rotation = rotation);
         }
 
+        public static IAnimationTrack EulerLocalRotation(
+            float durationSeconds, Transform transform, Quaternion startLocalRotation, Vector3 amount, Func<float, float> easingFunc = null)
+        {
+            easingFunc ??= Easing.Linear;
+            return new AnimationTrack<Quaternion>(
+                durationSeconds,
+                normalisedTime => Quaternion.Euler(
+                    Vector3.Lerp(startLocalRotation.eulerAngles, startLocalRotation.eulerAngles + amount, easingFunc(normalisedTime))),
+                rotation => transform.localRotation = rotation);
+        }
+
         public static IAnimationTrack LocalScale(
             float durationSeconds, Transform transform, Vector3 startLocalScale, Vector3 endLocalScale, Func<float, float> easingFunc = null)
         {

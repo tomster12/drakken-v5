@@ -80,7 +80,7 @@ namespace Drakken.Client.World
             // Build and play animation
             var animationBuilder = AnimationSequenceBuilder
                 .Start()
-                .Next(AnimationTracks.EulerRotation(duration, transform, transform.rotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
+                .Next(AnimationTracks.EulerLocalRotation(duration, transform, transform.localRotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
 
             foreach (var pair in timedValues)
             {
@@ -89,6 +89,17 @@ namespace Drakken.Client.World
 
             var animation = animationBuilder.Build();
             await Animator.Play(animation, ct);
+        }
+
+        public async Task AnimateShrinkAndDestroy(CancellationToken ct)
+        {
+            await Animator.Play(AnimationSequenceBuilder
+                .Start()
+                .Next(AnimationTracks.LocalScale(
+                    0.3f, transform, transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                .Build(), ct);
+
+            GameObject.Destroy(gameObject);
         }
 
         // ------------------------------ Interaction
@@ -106,7 +117,7 @@ namespace Drakken.Client.World
             bool hasEffects = DiceInstance.Effects != null && DiceInstance.Effects.Count > 0;
             if (renderer != null) renderer.material.color = hasEffects ? colorAffected : normalColor;
         }
-        
+
         public void SetInteractionLocked(bool interactionLocked)
         {
             isInteractionLocked = interactionLocked;

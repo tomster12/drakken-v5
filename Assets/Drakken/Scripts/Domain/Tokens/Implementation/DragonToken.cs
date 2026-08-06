@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
+using Drakken.Client.World;
 using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
@@ -80,6 +81,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
+        private const float D3OffsetDistance = 1.4f;
+
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,
@@ -92,16 +95,26 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
 
+
+            // Spawn a D3 next to the token showing how many dice it's about to replace
+            var d3Instance = DiceInstance.Create(sides: 3, value: resolution.D3Roll);
+            var d3View = DiceView.Create(visualContext.Assets, d3Instance);
+
+            var tokenTransform = visualContext.TokenView.transform;
+            Vector3 d3Pos = tokenTransform.position + tokenTransform.right * D3OffsetDistance;
+            d3View.transform.SetPositionAndRotation(d3Pos, tokenTransform.rotation);
+
+            await d3View.AnimateRoll(ct);
+            await Task.Delay(300);
+
+            await d3View.AnimateShrinkAndDestroy(ct);
+
             // Shrink each removed dice to localScale 0
             List<Task> removeDiceAnimationTasks = new();
             foreach (int removedDiceIndex in resolution.ReplacedIndices)
             {
                 var diceView = sourcePlayerObjects.DiceViews[removedDiceIndex];
-                removeDiceAnimationTasks.Add(diceView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
-                    .Next(AnimationTracks.LocalScale(
-                        0.3f, diceView.transform, diceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
-                    .Build(), ct));
+                removeDiceAnimationTasks.Add(diceView.AnimateShrinkAndDestroy(ct));
             }
             await Task.WhenAll(removeDiceAnimationTasks);
 
@@ -113,8 +126,6 @@ namespace Drakken.Domain.Tokens.Implementation
             for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
                 var diceIndex = resolution.ReplacedIndices[i];
-
-                sourcePlayerObjects.DestroyDiceAtIndex(diceIndex);
 
                 var newDiceView = sourcePlayerObjects.SpawnDiceAtIndex(resolution.AddedDiceInstances[i], diceIndex, targetRot);
                 await newDiceView.AnimateRoll(ct);
