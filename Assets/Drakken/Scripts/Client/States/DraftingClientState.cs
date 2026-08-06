@@ -112,10 +112,8 @@ namespace Drakken.Client.States
             List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
-                var diceRow = SceneLayout.Game.Player(clientIndex).DiceRow;
-                var clientDice = GameState.Clients[clientIndex].Dice;
-
                 // Create a row of dice views
+                var clientDice = GameState.Clients[clientIndex].Dice;
                 if (clientIndex == 0) SceneObjects.P1.DiceViews = new DiceView[clientDice.Count];
                 else SceneObjects.P2.DiceViews = new DiceView[clientDice.Count];
 
@@ -123,16 +121,12 @@ namespace Drakken.Client.States
                 {
                     var diceInstance = clientDice[i];
                     var diceView = DiceView.Create(client.Assets, diceInstance);
-                    if (diceView == null) continue;
-
                     SceneObjects.Player(clientIndex).DiceViews[i] = diceView;
 
-                    float offset = (i - (clientDice.Count - 1) / 2f) * SceneLayout.TokenSpacing;
-                    Vector3 targetPos = diceRow.position + new Vector3(offset, 0f, 0f);
+                    Vector3 targetPos = GetDiceRowIndexPosition(clientIndex, i);
                     Quaternion targetRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
                     diceView.transform.SetPositionAndRotation(targetPos, targetRot);
 
-                    // Roll dice to correct value
                     tasks.Add(diceView.AnimateRoll(cts.Token));
                 }
             }
@@ -191,9 +185,8 @@ namespace Drakken.Client.States
                 {
                     var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[tokenIndex];
                     var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, tokenInstance);
-                    Assert.NotNull(tokenView);
-
                     MySceneObjects.TokenViews[tokenIndex] = tokenView;
+
                     tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
                     // Start small inside the bag
@@ -209,11 +202,11 @@ namespace Drakken.Client.States
                     await tokenView.Animator.Play(AnimationSequenceBuilder
                         .Start()
                         .At(0.0f, AnimationTracks.LocalScale(
-                            0.6f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
+                            0.8f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
                         .At(0.0f, AnimationTracks.Rotation(
                             1.2f, tokenView.transform, baseRot, MyDraftingLayout.DraftTokenRow.rotation, Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
-                            0.7f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
+                            0.6f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
                             0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 0.7f, targetPos), Easing.EaseOutCubic))
                         .Build(), cts.Token);
@@ -230,7 +223,7 @@ namespace Drakken.Client.States
             }
         }
 
-        // ------------------------------ Logic
+        // ------------------------------ Main
 
         private void UpdateStatusUI()
         {
@@ -240,6 +233,14 @@ namespace Drakken.Client.States
                 : $"Select {CountToDiscard} tokens to discard";
 
             client.UI.SetStatus("Drafting", statusText);
+        }
+
+        private Vector3 GetDiceRowIndexPosition(int clientIndex, int diceIndex)
+        {
+            var diceViews = SceneObjects.Player(clientIndex).DiceViews;
+            var diceRow = SceneLayout.Game.Player(clientIndex).DiceRow;
+            float offset = (diceIndex - (diceViews.Length - 1) / 2f) * SceneLayout.DiceSpacing;
+            return diceRow.position + diceRow.right * offset;
         }
 
         private void OnTokenClicked(TokenView tokenView)

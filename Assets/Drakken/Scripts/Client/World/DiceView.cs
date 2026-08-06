@@ -28,7 +28,8 @@ namespace Drakken.Client.World
         public DiceInstance DiceInstance { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
         public bool IsHovered { get; private set; } = false;
-        private bool IsInteractable => !Animator.IsAnimating;
+        private bool isInteractionLocked = false;
+        private bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
 
         // ------------------------------ Binding
 
@@ -105,6 +106,11 @@ namespace Drakken.Client.World
             bool hasEffects = DiceInstance.Effects != null && DiceInstance.Effects.Count > 0;
             if (renderer != null) renderer.material.color = hasEffects ? colorAffected : normalColor;
         }
+        
+        public void SetInteractionLocked(bool interactionLocked)
+        {
+            isInteractionLocked = interactionLocked;
+        }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
@@ -117,4 +123,3 @@ namespace Drakken.Client.World
         }
     }
 }
-

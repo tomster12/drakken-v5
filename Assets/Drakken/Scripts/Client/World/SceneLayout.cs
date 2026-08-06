@@ -96,4 +96,3 @@ namespace Drakken.Client.World
         public GameObject Bag;
     }
 }
-

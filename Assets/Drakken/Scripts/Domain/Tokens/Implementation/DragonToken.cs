@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Drakken.Client;
+using Drakken.Client.World;
 using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
@@ -72,7 +74,6 @@ namespace Drakken.Domain.Tokens.Implementation
             {
                 var index = resolution.ReplacedIndices[i];
                 Assert.True(index >= 0 && index < client.Dice.Count);
-
                 client.Dice[index] = resolution.AddedDiceInstances[i];
             }
         }
@@ -81,36 +82,50 @@ namespace Drakken.Domain.Tokens.Implementation
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
         protected override async Task Animate(
-            GameState gameState,
+            ClientMatch match,
             TokenVisualContext visualContext,
             int sourceClientIndex,
             int tokenInstanceId,
             DragonTokenResolution resolution,
             CancellationToken ct)
         {
-            // Spawn a new DiceView and roll to match the amount to replace
-
             await Task.Delay(500);
 
-            // Delete each of the removed dice
-            foreach (int removedDiceId in resolution.ReplacedIndices)
+            List<Task> removeDiceAnimationTasks = new();
+            foreach (int removedDiceIndex in resolution.ReplacedIndices)
             {
-                // var diceView = context.GetDiceView(sourceClientIndex, removedDiceId);
-                // Assert.NotNull(diceView);
+                var removedDiceView = visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[removedDiceIndex];
+
+                removeDiceAnimationTasks.Add(removedDiceView.Animator.Play(AnimationSequenceBuilder
+                    .Start()
+                    .Next(AnimationTracks.LocalScale(0.3f, removedDiceView.transform, removedDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                    .Build(), ct));
             }
+            await Task.WhenAll(removeDiceAnimationTasks);
 
-            await Task.Delay(500);
+            await Task.Delay(200);
 
-            //
-            foreach (var newDice in resolution.AddedDiceInstances)
+            for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
-                Log.Info("DragonAnimator", $"Slamming in D8 id={newDice.InstanceId} value={newDice.Value}");
+                var diceIndex = resolution.ReplacedIndices[i];
 
-                // context.SpawnDiceView(resolution.SourceClientIndex, newDice);
-                // diceView.PlayLandAnimation(newDice.Value);
+                var oldDiceView = visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[diceIndex];
+                GameObject.Destroy(oldDiceView);
+
+                var newDiceInstance = resolution.AddedDiceInstances[i];
+                var newDiceView = DiceView.Create(visualContext.Assets, newDiceInstance);
+                visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[diceIndex] = newDiceView;
+
+                Vector3 targetPos = visualContext.GetDiceRowIndexPosition(sourceClientIndex, diceIndex);
+                Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
+                newDiceView.transform.SetPositionAndRotation(targetPos, targetRot);
+
+                await newDiceView.AnimateRoll(ct);
 
                 await Task.Delay(200);
             }
+
+            visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 
             await Task.Delay(100);
         }

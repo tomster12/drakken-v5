@@ -50,7 +50,8 @@ namespace Drakken.Client.World
         public TokenInstance TokenInstance { get; private set; }
         public InteractionModeType InteractionMode { get; private set; } = InteractionModeType.None;
         public AnimationPlayer Animator { get; private set; } = new();
-        public bool IsInteractable => InteractionMode != InteractionModeType.None && !Animator.IsAnimating;
+        private bool isInteractionLocked = false;
+        public bool IsInteractable => InteractionMode != InteractionModeType.None && !Animator.IsAnimating && !isInteractionLocked;
         public bool IsBinded => TokenInstance != null;
         public bool IsSelected { get; private set; } = false;
         public bool IsHovered { get; private set; } = false;
@@ -236,6 +237,11 @@ namespace Drakken.Client.World
                 currentPosition.x,
                 currentPosition.y + currentLiftOffsetY,
                 currentPosition.z);
+        }
+        
+        public void SetInteractionLocked(bool interactionLocked)
+        {
+            isInteractionLocked = interactionLocked;
         }
 
         public bool SetSelected(bool selected)

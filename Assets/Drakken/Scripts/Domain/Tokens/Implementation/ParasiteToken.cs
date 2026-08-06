@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Drakken.Client;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens.Logic;
 using Unity.Netcode;
@@ -64,7 +65,7 @@ namespace Drakken.Domain.Tokens.Implementation
     public class ParasiteTokenAnimator : TokenAnimator<ParasiteTokenResolution>
     {
         protected override async Task Animate(
-            GameState gameState,
+            ClientMatch match,
             TokenVisualContext visualContext,
             int sourceClientIndex,
             int tokenInstanceId,
