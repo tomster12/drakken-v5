@@ -1624,7 +1624,7 @@ MonoBehaviour:
   assets: {fileID: 11400000, guid: 1cfafc4164265a844a555f0622fd6ea4, type: 2}
   camera: {fileID: 330585549}
   ui: {fileID: 865993108}
-  scene: {fileID: 865993107}
+  layout: {fileID: 865993107}
 --- !u!114 &865993107
 MonoBehaviour:
   m_ObjectHideFlags: 0

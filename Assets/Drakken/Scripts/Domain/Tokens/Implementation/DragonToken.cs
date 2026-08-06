@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
-using Drakken.Client.World;
 using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
@@ -91,35 +90,33 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             await Task.Delay(500);
 
+            var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
+
+            // Shrink each removed dice to localScale 0
             List<Task> removeDiceAnimationTasks = new();
             foreach (int removedDiceIndex in resolution.ReplacedIndices)
             {
-                var removedDiceView = visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[removedDiceIndex];
-
-                removeDiceAnimationTasks.Add(removedDiceView.Animator.Play(AnimationSequenceBuilder
+                var diceView = sourcePlayerObjects.DiceViews[removedDiceIndex];
+                removeDiceAnimationTasks.Add(diceView.Animator.Play(AnimationSequenceBuilder
                     .Start()
-                    .Next(AnimationTracks.LocalScale(0.3f, removedDiceView.transform, removedDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                    .Next(AnimationTracks.LocalScale(
+                        0.3f, diceView.transform, diceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
                     .Build(), ct));
             }
             await Task.WhenAll(removeDiceAnimationTasks);
 
             await Task.Delay(200);
 
+            // Create new dice at each of the position and roll sequentially
+            Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
+
             for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
                 var diceIndex = resolution.ReplacedIndices[i];
 
-                var oldDiceView = visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[diceIndex];
-                GameObject.Destroy(oldDiceView);
+                sourcePlayerObjects.DestroyDiceAtIndex(diceIndex);
 
-                var newDiceInstance = resolution.AddedDiceInstances[i];
-                var newDiceView = DiceView.Create(visualContext.Assets, newDiceInstance);
-                visualContext.SceneObjects.Player(sourceClientIndex).DiceViews[diceIndex] = newDiceView;
-
-                Vector3 targetPos = visualContext.GetDiceRowIndexPosition(sourceClientIndex, diceIndex);
-                Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
-                newDiceView.transform.SetPositionAndRotation(targetPos, targetRot);
-
+                var newDiceView = sourcePlayerObjects.SpawnDiceAtIndex(resolution.AddedDiceInstances[i], diceIndex, targetRot);
                 await newDiceView.AnimateRoll(ct);
 
                 await Task.Delay(200);

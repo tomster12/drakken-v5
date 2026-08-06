@@ -1,7 +1,5 @@
-using System;
 using Drakken.Client;
 using Drakken.Client.World;
-using UnityEngine;
 
 namespace Drakken.Domain.Tokens.Logic
 {
@@ -12,6 +10,5 @@ namespace Drakken.Domain.Tokens.Logic
         public SceneLayout SceneLayout { get; set; }
         public SceneObjects SceneObjects { get; set; }
         public ClientUI ClientUI { get; set; }
-        public Func<int, int, Vector3> GetDiceRowIndexPosition { get; set; }
     }
 }

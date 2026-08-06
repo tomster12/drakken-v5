@@ -65,14 +65,13 @@ namespace Drakken.Client.States
             List<Task> tasks = new();
 
             // Place each of my token into my row
-            var myTokenViews = SceneObjects.Player(Match.ClientIndex).TokenViews;
-            for (int i = 0; i < myTokenViews.Length; i++)
+            for (int i = 0; i < MySceneObjects.TokenViews.Length; i++)
             {
-                var tokenView = myTokenViews[i];
+                var tokenView = MySceneObjects.TokenViews[i];
 
                 tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
-                var targetPos = GetTokenRowIndexPosition(Match.ClientIndex, i);
+                var targetPos = MySceneObjects.GetTokenRowIndexPosition(i);
                 tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
                     .Start()
                     .Next(
@@ -85,19 +84,18 @@ namespace Drakken.Client.States
 
             // Create each opponent token object in a row
             var opTokens = GameState.Clients[Match.OpClientIndex].Tokens;
-
-            SceneObjects.Player(Match.OpClientIndex).TokenViews = new TokenView[opTokens.Count];
-            var opTokenViews = SceneObjects.Player(Match.OpClientIndex).TokenViews;
+            var opPlayerObjects = SceneObjects.Player(Match.OpClientIndex);
             var opTokenRow = SceneLayout.Game.Player(Match.OpClientIndex).TokenRow;
+
+            opPlayerObjects.TokenViews = new TokenView[opTokens.Count];
 
             for (int i = 0; i < opTokens.Count; i++)
             {
-                var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, opTokens[i], hidden: true);
-                opTokenViews[i] = tokenView;
+                var tokenView = opPlayerObjects.SpawnTokenAtIndex(opTokens[i], i, hidden: true);
 
                 tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
-                var targetPos = GetTokenRowIndexPosition(Match.OpClientIndex, i);
+                var targetPos = opPlayerObjects.GetTokenRowIndexPosition(i);
                 var targetRot = opTokenRow.rotation;
                 tokenView.SetPositionAndRotation(targetPos, targetRot);
             }
@@ -129,45 +127,28 @@ namespace Drakken.Client.States
             client.UI.SetStatus($"Round {Match.GameState.Round}", whoseTurn);
         }
 
-        private Vector3 GetTokenRowPosition(int clientIndex, TokenView tokenView)
-        {
-            var tokenViews = SceneObjects.Player(clientIndex).TokenViews;
-            int tokenIndex = Array.IndexOf(tokenViews, tokenView);
-            return GetTokenRowIndexPosition(clientIndex, tokenIndex);
-        }
-
-        private Vector3 GetTokenRowIndexPosition(int clientIndex, int tokenIndex)
-        {
-            var tokenViews = SceneObjects.Player(clientIndex).TokenViews;
-            var tokenRow = SceneLayout.Game.Player(clientIndex).TokenRow;
-            float offset = (tokenIndex - (tokenViews.Length - 1) / 2f) * SceneLayout.TokenSpacing;
-            return tokenRow.position + tokenRow.right * offset;
-        }
-
-        private Vector3 GetDiceRowIndexPosition(int clientIndex, int diceIndex)
-        {
-            var diceViews = SceneObjects.Player(clientIndex).DiceViews;
-            var diceRow = SceneLayout.Game.Player(clientIndex).DiceRow;
-            float offset = (diceIndex - (diceViews.Length - 1) / 2f) * SceneLayout.DiceSpacing;
-            return diceRow.position + diceRow.right * offset;
-        }
-
         private void SetAllDiceInteractionLocked(bool interactionLocked)
         {
-            foreach (var diceView in SceneObjects.Player(Match.ClientIndex).DiceViews)
+            foreach (var diceView in SceneObjects.P1.DiceViews)
+            {
                 diceView.SetInteractionLocked(interactionLocked);
-
-            foreach (var diceView in SceneObjects.Player(Match.OpClientIndex).DiceViews)
+            }
+            foreach (var diceView in SceneObjects.P2.DiceViews)
+            {
                 diceView.SetInteractionLocked(interactionLocked);
+            }
         }
 
         private void SetAllTokensInteractionLocked(bool interactionLocked)
         {
-            foreach (var tokenView in SceneObjects.Player(Match.ClientIndex).TokenViews)
+            foreach (var tokenView in SceneObjects.P1.TokenViews)
+            {
                 tokenView.SetInteractionLocked(interactionLocked);
-
-            foreach (var tokenView in SceneObjects.Player(Match.OpClientIndex).TokenViews)
+            }
+            foreach (var tokenView in SceneObjects.P2.TokenViews)
+            {
                 tokenView.SetInteractionLocked(interactionLocked);
+            }
         }
 
         // ------------------------------ Playing Tokens
@@ -206,7 +187,8 @@ namespace Drakken.Client.States
 
         private async Task ReturnTokenToRow(TokenView tokenView)
         {
-            Vector3 targetPos = GetTokenRowPosition(Match.ClientIndex, tokenView);
+            int tokenIndex = Array.IndexOf(MySceneObjects.TokenViews, tokenView);
+            var targetPos = MySceneObjects.GetTokenRowIndexPosition(tokenIndex);
 
             await tokenView.Animator.Play(AnimationSequenceBuilder
                 .Start()
@@ -302,9 +284,7 @@ namespace Drakken.Client.States
             SceneLayout = SceneLayout,
             SceneObjects = SceneObjects,
             ClientUI = client.UI,
-            TokenView = tokenView,
-            GetDiceRowIndexPosition = GetDiceRowIndexPosition
+            TokenView = tokenView
         };
     }
 }
-

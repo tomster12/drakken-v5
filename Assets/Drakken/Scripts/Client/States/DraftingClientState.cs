@@ -109,24 +109,19 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
             // For both you and opponent
+            Quaternion targetRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
+
             List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 // Create a row of dice views
                 var clientDice = GameState.Clients[clientIndex].Dice;
-                if (clientIndex == 0) SceneObjects.P1.DiceViews = new DiceView[clientDice.Count];
-                else SceneObjects.P2.DiceViews = new DiceView[clientDice.Count];
+                var sceneObjects = SceneObjects.Player(clientIndex);
+                sceneObjects.DiceViews = new DiceView[clientDice.Count];
 
                 for (int i = 0; i < clientDice.Count; i++)
                 {
-                    var diceInstance = clientDice[i];
-                    var diceView = DiceView.Create(client.Assets, diceInstance);
-                    SceneObjects.Player(clientIndex).DiceViews[i] = diceView;
-
-                    Vector3 targetPos = GetDiceRowIndexPosition(clientIndex, i);
-                    Quaternion targetRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
-                    diceView.transform.SetPositionAndRotation(targetPos, targetRot);
-
+                    var diceView = sceneObjects.SpawnDiceAtIndex(clientDice[i], i, targetRot);
                     tasks.Add(diceView.AnimateRoll(cts.Token));
                 }
             }
@@ -167,7 +162,7 @@ namespace Drakken.Client.States
             Assert.True(SceneObjects.P1.TokenViews.Length == 0);
             Assert.True(SceneObjects.P2.TokenViews.Length == 0);
 
-            Vector3 bagStartPos = SceneLayout.Game.Player(Match.ClientIndex).Bag.transform.position;
+            Vector3 bagStartPos = MySceneObjects.BagPosition;
 
             // Create each token object in a row
             var tokenCount = GameState.Clients[Match.ClientIndex].Tokens.Count;
@@ -184,8 +179,7 @@ namespace Drakken.Client.States
                 tasks.Add(AsyncUtility.DelayTask(taskDelay, async () =>
                 {
                     var tokenInstance = GameState.Clients[Match.ClientIndex].Tokens[tokenIndex];
-                    var tokenView = TokenView.Create(client.Assets, GameEntrypoint.Singleton.TokenRegistry, tokenInstance);
-                    MySceneObjects.TokenViews[tokenIndex] = tokenView;
+                    var tokenView = MySceneObjects.SpawnTokenAtIndex(tokenInstance, tokenIndex);
 
                     tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
@@ -196,8 +190,7 @@ namespace Drakken.Client.States
 
                     // Animate up and then across
                     Vector3 bagAbovePos = bagStartPos + Vector3.up * 1.5f;
-                    float targetOffsetX = (tokenIndex - (tokenCount - 1) / 2f) * SceneLayout.TokenSpacing;
-                    Vector3 targetPos = MyDraftingLayout.DraftTokenRow.position + MyDraftingLayout.DraftTokenRow.right * targetOffsetX;
+                    Vector3 targetPos = MySceneObjects.GetDraftTokenRowIndexPosition(tokenIndex, tokenCount);
 
                     await tokenView.Animator.Play(AnimationSequenceBuilder
                         .Start()
@@ -233,14 +226,6 @@ namespace Drakken.Client.States
                 : $"Select {CountToDiscard} tokens to discard";
 
             client.UI.SetStatus("Drafting", statusText);
-        }
-
-        private Vector3 GetDiceRowIndexPosition(int clientIndex, int diceIndex)
-        {
-            var diceViews = SceneObjects.Player(clientIndex).DiceViews;
-            var diceRow = SceneLayout.Game.Player(clientIndex).DiceRow;
-            float offset = (diceIndex - (diceViews.Length - 1) / 2f) * SceneLayout.DiceSpacing;
-            return diceRow.position + diceRow.right * offset;
         }
 
         private void OnTokenClicked(TokenView tokenView)
@@ -330,8 +315,7 @@ namespace Drakken.Client.States
                 tokenView.OnClicked.RemoveListener(OnTokenClicked);
                 tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
-                float targetOffsetX = (i - (MySceneObjects.TokenViews.Length - 1) / 2f) * SceneLayout.TokenSpacing;
-                Vector3 targetPos = MyDraftingLayout.DraftTokenRow.position + MyDraftingLayout.DraftTokenRow.right * targetOffsetX;
+                Vector3 targetPos = MySceneObjects.GetDraftTokenRowIndexPosition(i, MySceneObjects.TokenViews.Length);
 
                 // Animate directly into the row
                 tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
