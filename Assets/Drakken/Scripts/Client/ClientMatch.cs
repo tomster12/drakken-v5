@@ -13,7 +13,7 @@ namespace Drakken.Client
         public Action OnOtherPlayerJoined = delegate { };
         public Action OnOtherPlayerReady = delegate { };
         public Action OnDraftingPhaseStarted = delegate { };
-        public Action OnOtherPlayerDiscarded = delegate { };
+        public Action OnDraftingOtherPlayerDiscarded = delegate { };
         public Action OnPlayingPhaseStarted = delegate { };
         public Action<TokenResolutionMessage> OnTokenResolved = delegate { };
 
@@ -110,7 +110,7 @@ namespace Drakken.Client
 
             IsOpDiscarded = true;
 
-            OnOtherPlayerDiscarded.Invoke();
+            OnDraftingOtherPlayerDiscarded.Invoke();
         }
 
         // -------------------------------- Playing
@@ -147,6 +147,14 @@ namespace Drakken.Client
             GameState.Clients[message.SourceClientIndex].Tokens.RemoveAll(t => t.InstanceId == message.TokenInstanceId);
 
             OnTokenResolved.Invoke(message);
+        }
+
+        public async Task MessageAnimatedTokenResolved()
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Log.Info($"ClientMatch-{MatchId}", $"Sending token animated");
+
+            await GameEntrypoint.Singleton.Connection.Client_MessageMatchAnimatedTokenResolved(MatchId);
         }
     }
 }

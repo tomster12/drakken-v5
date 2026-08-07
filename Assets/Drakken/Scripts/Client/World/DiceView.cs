@@ -62,16 +62,16 @@ namespace Drakken.Client.World
 
         // ------------------------------ Animation
 
-        public async Task AnimateRoll(CancellationToken ct)
+        public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1)
         {
-            // Generate 5 random values evenly spaced across duration
-            float duration = 2.0f;
-            float values = 15;
+            float duration = 1.5f * durationMultiplier;
+            int valueCount = (int)(15 * durationMultiplier);
+
             List<(float Time, int Value)> timedValues = new();
 
-            for (int i = 0; i < values; i++)
+            for (int i = 0; i < valueCount; i++)
             {
-                float time = Easing.InverseEaseInOutQuad((float)i / (values - 1)) * duration;
+                float time = Easing.InverseEaseInOutQuad((float)i / (valueCount - 1)) * duration;
                 int value = Random.Range(1, DiceInstance.Sides + 1);
                 timedValues.Add((time, value));
             }
@@ -80,7 +80,7 @@ namespace Drakken.Client.World
             // Build and play animation
             var animationBuilder = AnimationSequenceBuilder
                 .Start()
-                .Next(AnimationTracks.EulerLocalRotation(duration, transform, transform.localRotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
+                .Next(AnimationTracks.LocalEulerRotation(duration, transform, transform.localRotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
 
             foreach (var pair in timedValues)
             {
@@ -89,6 +89,17 @@ namespace Drakken.Client.World
 
             var animation = animationBuilder.Build();
             await Animator.Play(animation, ct);
+        }
+
+        public async Task AnimateGrowThenRoll(CancellationToken ct, float durationMultiplier)
+        {
+            await Animator.Play(AnimationSequenceBuilder
+                .Start()
+                .Next(AnimationTracks.LocalScale(
+                    0.3f, transform, Vector3.zero, transform.localScale, Easing.EaseOutCubic))
+                .Build(), ct);
+
+            await AnimateRoll(ct, durationMultiplier);
         }
 
         public async Task AnimateShrinkAndDestroy(CancellationToken ct)

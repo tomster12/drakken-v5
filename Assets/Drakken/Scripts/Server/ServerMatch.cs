@@ -216,5 +216,13 @@ namespace Drakken.Server
                 Resolution = resolution
             });
         }
+
+        public void OnClientMessageTokenResolved(ulong clientId)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Assert.True(clientIdIndexAssignment.ContainsKey(clientId));
+
+            // TODO
+        }
     }
 }

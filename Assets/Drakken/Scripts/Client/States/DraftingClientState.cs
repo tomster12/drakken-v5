@@ -26,16 +26,15 @@ namespace Drakken.Client.States
         private bool SelectedEnoughTokens => selectedTokenViews.Count >= CountToDiscard;
         private readonly List<TokenView> selectedTokenViews = new();
         private bool hasDiscarded;
-        private CancellationTokenSource cts = null;
 
         // ------------------------------ Setup
 
-        public override async Task Enter(ClientStateType fromStateType)
+        public override async Task Enter(ClientStateType fromType)
         {
-            cts = new();
+            await base.Enter(fromType);
 
             Match.OnPlayingPhaseStarted += OnPlayingPhaseStarted;
-            Match.OnOtherPlayerDiscarded += OnOtherPlayerDiscarded;
+            Match.OnDraftingOtherPlayerDiscarded += OnOtherPlayerDiscarded;
 
             // Initialise this scenes objects
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
@@ -50,18 +49,18 @@ namespace Drakken.Client.States
 
             UpdateStatusUI();
 
-            if (fromStateType == ClientStateType.Title)
+            // Starting new game
+            if (fromType == ClientStateType.Title)
             {
                 SceneLayout.Game.P1.Mat.SetActive(true);
                 SceneLayout.Game.P2.Mat.SetActive(true);
 
-                // When coming from the title create the dice
                 await CreateAndRollDice();
             }
 
+            // Starting next round
             else
             {
-                // Otherwise roll the existing dice
                 RollExistingDice();
             }
 
@@ -69,20 +68,18 @@ namespace Drakken.Client.States
             SpawnTokens();
         }
 
-        public override async Task Exit(ClientStateType toStateType)
+        public override async Task Exit(ClientStateType toType)
         {
-            cts.Cancel();
-            cts.Dispose();
-            cts = null;
+            await base.Exit(toType);
 
             Match.OnPlayingPhaseStarted -= OnPlayingPhaseStarted;
-            Match.OnOtherPlayerDiscarded -= OnOtherPlayerDiscarded;
+            Match.OnDraftingOtherPlayerDiscarded -= OnOtherPlayerDiscarded;
 
             client.UI.SetMyAvatar(AvatarState.Visible);
             client.UI.SetOpAvatar(AvatarState.Visible);
 
             // If we are going back to title then clean up the token / dice views
-            if (toStateType == ClientStateType.Title)
+            if (toType == ClientStateType.Title)
             {
                 SceneLayout.Game.OnDisconnect();
                 SceneObjects.OnDisconnect();
@@ -92,12 +89,6 @@ namespace Drakken.Client.States
             // Cleanup this scenes specific objects
             SceneLayout.Drafting.DraftConfirmButton.Clicked -= OnConfirmDiscardClicked;
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
-        }
-
-        public override void OnDestroy()
-        {
-            cts?.Cancel();
-            cts?.Dispose();
         }
 
         private async Task CreateAndRollDice()

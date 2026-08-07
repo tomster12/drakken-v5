@@ -4,12 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
-using Drakken.Client.World.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
-using Drakken.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -91,10 +89,9 @@ namespace Drakken.Domain.Tokens.Implementation
             DragonTokenResolution resolution,
             CancellationToken ct)
         {
-            await Task.Delay(500);
+            await Task.Delay(250);
 
             var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
-
 
             // Spawn a D3 next to the token showing how many dice it's about to replace
             var d3Instance = DiceInstance.Create(sides: 3, value: resolution.D3Roll);
@@ -104,8 +101,8 @@ namespace Drakken.Domain.Tokens.Implementation
             Vector3 d3Pos = tokenTransform.position + tokenTransform.right * D3OffsetDistance;
             d3View.transform.SetPositionAndRotation(d3Pos, tokenTransform.rotation);
 
-            await d3View.AnimateRoll(ct);
-            await Task.Delay(300);
+            await d3View.AnimateRoll(ct, durationMultiplier: 0.7f);
+            await Task.Delay(200);
 
             await d3View.AnimateShrinkAndDestroy(ct);
 
@@ -118,20 +115,20 @@ namespace Drakken.Domain.Tokens.Implementation
             }
             await Task.WhenAll(removeDiceAnimationTasks);
 
-            await Task.Delay(200);
+            await Task.Delay(100);
 
             // Create new dice at each of the position and roll sequentially
             Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
 
+            List<Task> tasks = new();
             for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
                 var diceIndex = resolution.ReplacedIndices[i];
-
                 var newDiceView = sourcePlayerObjects.SpawnDiceAtIndex(resolution.AddedDiceInstances[i], diceIndex, targetRot);
-                await newDiceView.AnimateRoll(ct);
-
-                await Task.Delay(200);
+                tasks.Add(newDiceView.AnimateGrowThenRoll(ct, durationMultiplier: 0.7f));
             }
+
+            await Task.WhenAll(tasks);
 
             visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 

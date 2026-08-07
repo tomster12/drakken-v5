@@ -155,6 +155,14 @@ namespace Drakken.Networking
                 clientsById[clientId].Match.OnServerTokenResolved(message);
             }
         }
+
+        public Task Client_MessageMatchAnimatedTokenResolved(ulong matchId)
+        {
+            var match = Server.GetMatch(matchId);
+            match.OnClientMessageTokenResolved(myClientId);
+
+            return Task.CompletedTask;
+        }
     }
 
     public class DebugGameClient : IGameClient

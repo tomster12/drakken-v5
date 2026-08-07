@@ -19,34 +19,29 @@ namespace Drakken.Client.States
         private SceneObjects SceneObjects => GameEntrypoint.Singleton.Client.SceneObjects;
         private GamePlayerLayout MyGameLayout => SceneLayout.Game.Player(Match.ClientIndex);
         private ScenePlayerObjects MySceneObjects => SceneObjects.Player(Match.ClientIndex);
-        private CancellationTokenSource cts = new();
 
         // ------------------------------ Setup
 
         public override async Task Enter(ClientStateType fromType)
         {
-            cts = new();
+            await base.Enter(fromType);
 
             Match.OnTokenResolved += OnTokenResolved;
 
             GameEntrypoint.Singleton.Client.Camera
                 .SetTarget(MyGameLayout.PlayingCameraPosition);
 
-            SetupTokens();
-
-            UpdateStatusUI();
+            StartRound();
         }
 
-        public override async Task Exit(ClientStateType toStateType)
+        public override async Task Exit(ClientStateType toType)
         {
-            cts.Cancel();
-            cts.Dispose();
-            cts = null;
+            await base.Exit(toType);
 
             Match.OnTokenResolved -= OnTokenResolved;
 
             // If we are going back to title then clean up the token / dice views
-            if (toStateType == ClientStateType.Title)
+            if (toType == ClientStateType.Title)
             {
                 SceneLayout.Game.OnDisconnect();
                 SceneObjects.OnDisconnect();
@@ -54,13 +49,7 @@ namespace Drakken.Client.States
             }
         }
 
-        public override void OnDestroy()
-        {
-            cts?.Cancel();
-            cts?.Dispose();
-        }
-
-        private async void SetupTokens()
+        private async void StartRound()
         {
             List<Task> tasks = new();
 
@@ -72,7 +61,8 @@ namespace Drakken.Client.States
                 tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
                 var targetPos = MySceneObjects.GetTokenRowIndexPosition(i);
-                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
+                tasks.Add(tokenView.Animator.Play(
+                    AnimationSequenceBuilder
                     .Start()
                     .Next(
                         tokenView.CreateCurrentPositionAnimationTrack(
@@ -100,21 +90,26 @@ namespace Drakken.Client.States
                 tokenView.SetPositionAndRotation(targetPos, targetRot);
             }
 
-            StartTurn(GameState.TurnClientIndex);
+            StartTurn();
         }
 
-        private void StartTurn(int clientIndex)
+        private void StartTurn()
         {
-            // Enable all tokens to be playable
-            foreach (var tokenView in SceneObjects.Player(clientIndex).TokenViews)
-            {
-                tokenView.SetInteractionMode(TokenView.InteractionModeType.Play);
+            UpdateStatusUI();
 
-                if (clientIndex == Match.ClientIndex)
+            if (Match.ClientIndex == GameState.TurnClientIndex)
+            {
+                // Enable all tokens to be playable
+                foreach (var tokenView in SceneObjects.Player(Match.ClientIndex).TokenViews)
                 {
-                    tokenView.OnDragStarted.AddListener(OnTokenDragStarted);
-                    tokenView.OnDragMoved.AddListener(OnTokenDragMoved);
-                    tokenView.OnDragEnded.AddListener(OnTokenDragEnded);
+                    tokenView.SetInteractionMode(TokenView.InteractionModeType.Play);
+
+                    if (Match.ClientIndex == Match.ClientIndex)
+                    {
+                        tokenView.OnDragStarted.AddListener(OnTokenDragStarted);
+                        tokenView.OnDragMoved.AddListener(OnTokenDragMoved);
+                        tokenView.OnDragEnded.AddListener(OnTokenDragEnded);
+                    }
                 }
             }
         }
@@ -274,8 +269,7 @@ namespace Drakken.Client.States
                 message.Resolution,
                 cts.Token);
 
-            SetAllTokensInteractionLocked(false);
-            SetAllDiceInteractionLocked(false);
+            // Tell the server the we have finished animating
         }
 
         public TokenVisualContext GetVisualContext(TokenView tokenView) => new()
