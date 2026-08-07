@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -29,23 +28,25 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class ForgeTokenExecutor : TokenExecutor<EmptyTokenIntent, ForgeTokenResolution>
+    public class ForgeTokenExecutor : TokenExecutor<PickDiceTokenIntent, ForgeTokenResolution>
     {
-        protected override ForgeTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex)
+        protected override ForgeTokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex)
         {
             var client = gameState.Clients[sourceClientIndex];
 
             Assert.True(client.Dice.Count >= 2);
+            Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 2);
+            Assert.True(intent.TargetDiceInstanceIds[0] != intent.TargetDiceInstanceIds[1]);
 
-            // Randomly pick 2 dice to combine
-            var indices = Enumerable.Range(0, client.Dice.Count)
-                .OrderBy(_ => Random.value)
-                .Take(2)
-                .OrderBy(index => index)
-                .ToList();
+            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == intent.TargetDiceInstanceIds[0]);
+            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == intent.TargetDiceInstanceIds[1]);
 
-            int firstIndex = indices[0];
-            int secondIndex = indices[1];
+            Assert.True(firstIndex >= 0 && secondIndex >= 0);
+
+            if (firstIndex > secondIndex)
+            {
+                (firstIndex, secondIndex) = (secondIndex, firstIndex);
+            }
 
             // Combine into a single fresh dice with sides equal to the sum of the two values
             int combinedSides = client.Dice[firstIndex].Value + client.Dice[secondIndex].Value;

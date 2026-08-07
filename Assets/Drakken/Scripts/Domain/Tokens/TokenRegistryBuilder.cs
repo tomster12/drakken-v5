@@ -49,16 +49,16 @@ namespace Drakken.Domain.Tokens
                 {
                     TokenId = "forge",
                     DisplayName = "Forge",
-                    Description = "Randomly combine 2 dice into 1 with total sides equal to the sum of the values.",
+                    Description = "Combine 2 dice into 1 with total sides equal to the sum of the values.",
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
                 new ForgeTokenExecutor(),
-                typeof(EmptyTokenIntent),
+                typeof(PickDiceTokenIntent),
                 typeof(ForgeTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
                     new ForgeTokenAnimator(),
-                    new EmptyTokenIntentPicker(),
+                    new PickDiceTokenIntentPicker(TargetOwner.Self, count: 2),
                     prefabFactory?.Invoke("forge")
                 )
             );

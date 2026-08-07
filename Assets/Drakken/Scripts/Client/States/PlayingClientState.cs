@@ -269,6 +269,13 @@ namespace Drakken.Client.States
 
             var tokenIntent = await tokenRegistryEntry.Visuals.IntentPicker.PickIntent(visualContext, Match.ClientIndex);
 
+            // A null intent means the player cancelled the pick (e.g. clicked off), so return the token to hand
+            if (tokenIntent == null)
+            {
+                await CancelPlayToken(tokenView);
+                return;
+            }
+
             // Tell the server our intended play
             var response = await Match.RequestPlayToken(new()
             {
@@ -279,6 +286,20 @@ namespace Drakken.Client.States
 
             // TODO: Handle failure response
             Assert.True(response);
+        }
+
+        private async Task CancelPlayToken(TokenView tokenView)
+        {
+            // Re-enable interaction on all my tokens now that the play was cancelled
+            foreach (var otherTokenView in MySceneObjects.TokenViews)
+            {
+                otherTokenView.SetInteractionMode(TokenView.InteractionModeType.Play);
+                otherTokenView.OnDragStarted.AddListener(OnTokenDragStarted);
+                otherTokenView.OnDragMoved.AddListener(OnTokenDragMoved);
+                otherTokenView.OnDragEnded.AddListener(OnTokenDragEnded);
+            }
+
+            await ReturnTokenToRow(tokenView);
         }
 
         private async void OnTokenResolved(TokenResolutionMessage message)

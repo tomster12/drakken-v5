@@ -207,6 +207,7 @@ namespace Drakken.Networking
 
             TokenIntent intent = tokenInstance.TokenId switch
             {
+                "forge" => PickDiceTokenIntent.PickRandom(match.GameState.Clients[clientIndex].Dice, 2),
                 _ => new EmptyTokenIntent()
             };
 

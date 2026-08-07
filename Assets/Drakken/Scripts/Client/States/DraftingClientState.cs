@@ -48,8 +48,7 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.transform.SetPositionAndRotation(
                 MyDraftingLayout.DraftConfirmButtonPosition.position, MyDraftingLayout.DraftConfirmButtonPosition.rotation);
 
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(
-                MyDraftingLayout.CameraPosition, snap: true);
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(MyDraftingLayout.CameraPosition);
 
             UpdateStatusUI();
 
