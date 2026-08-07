@@ -30,7 +30,10 @@ namespace Drakken.Domain.Tokens.Implementation.Common
                 ? context.SceneObjects.Player(1 - clientIndex).DiceViews
                 : context.SceneObjects.Player(clientIndex).DiceViews;
 
-            return new PickDiceTokenIntent { TargetDiceInstanceId = pickableDiceViews[0].DiceInstance.InstanceId };
+            return new PickDiceTokenIntent
+            {
+                TargetDiceInstanceId = pickableDiceViews[0].DiceInstance.InstanceId
+            };
         }
     }
 }

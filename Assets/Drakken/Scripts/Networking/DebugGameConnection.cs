@@ -5,6 +5,9 @@ using Drakken.Client;
 using Drakken.Common;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
+using Drakken.Domain.Tokens.Implementation;
+using Drakken.Domain.Tokens.Implementation.Common;
+using Drakken.Domain.Tokens.Logic;
 using Drakken.Server;
 
 namespace Drakken.Networking
@@ -136,6 +139,8 @@ namespace Drakken.Networking
             {
                 clientsById[clientId].Match.OnServerStartPlayingPhase(gameState.Clone());
             }
+
+            ScheduleOpPlayTokenIfTheirTurn(gameState);
         }
 
         public Task<bool> Client_RequestMatchPlayToken(ulong matchId, TokenIntentMessage message)
@@ -178,6 +183,39 @@ namespace Drakken.Networking
             {
                 clientsById[clientId].Match.OnServerNextTurn(gameState.Clone());
             }
+
+            ScheduleOpPlayTokenIfTheirTurn(gameState);
+        }
+
+        private void ScheduleOpPlayTokenIfTheirTurn(GameState gameState)
+        {
+            if (gameState.TurnClientIndex != opClient.Match.ClientIndex) return;
+
+            ScheduleOpPlayToken(opClient.Match.MatchId);
+        }
+
+        private async void ScheduleOpPlayToken(ulong matchId)
+        {
+            await Task.Delay(opponentReactionDelay);
+
+            var match = Server.GetMatch(matchId);
+            var clientIndex = opClient.Match.ClientIndex;
+            var opponentIndex = 1 - clientIndex;
+
+            var tokens = match.GameState.Clients[clientIndex].Tokens;
+            var tokenInstance = tokens[UnityEngine.Random.Range(0, tokens.Count)];
+
+            TokenIntent intent = tokenInstance.TokenId switch
+            {
+                _ => new EmptyTokenIntent()
+            };
+
+            match.OnClientRequestPlayToken(opClientId, new TokenIntentMessage
+            {
+                TokenId = tokenInstance.TokenId,
+                InstanceId = tokenInstance.InstanceId,
+                Intent = intent
+            }, (response) => { });
         }
 
         public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState)

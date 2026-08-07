@@ -22,7 +22,6 @@ namespace Drakken.Client.World
 
         [Header("Config")]
         [SerializeField] private Color normalColor = new(0.19f, 0.15f, 0.133f);
-        [SerializeField] private Color colorAffected = new(1f, 0.6f, 0.2f);
         [SerializeField] private Color hoverOutlineColor = Color.white;
 
         public DiceInstance DiceInstance { get; private set; }
@@ -58,6 +57,13 @@ namespace Drakken.Client.World
             // Update labels to match dice instance values
             if (valueLabel != null) valueLabel.text = DiceInstance.Value.ToString();
             if (sidesLabel != null) sidesLabel.text = $"D{DiceInstance.Sides}";
+        }
+
+        // Repoints this view at the latest DiceInstance for the same dice (e.g. after a new round's GameState
+        // replaces the old one) without recreating the view or re-running one-time setup
+        public void Rebind(DiceInstance dice)
+        {
+            this.DiceInstance = dice;
         }
 
         // ------------------------------ Animation
@@ -124,9 +130,7 @@ namespace Drakken.Client.World
             outline.SetEnabled(IsHovered && IsInteractable);
             if (IsHovered && IsInteractable) outline.OutlineColor = hoverOutlineColor;
 
-            // Update material based on if has effects
-            bool hasEffects = DiceInstance.Effects != null && DiceInstance.Effects.Count > 0;
-            if (renderer != null) renderer.material.color = hasEffects ? colorAffected : normalColor;
+            renderer.material.color = normalColor;
         }
 
         public void SetInteractionLocked(bool interactionLocked)

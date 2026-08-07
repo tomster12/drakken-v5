@@ -50,7 +50,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
       propertyPath: m_Name
-      value: Dragon Token Mesh
+      value: Dragon Token
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -58,14 +58,14 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2380942914537198768}
+      addedObject: {fileID: 1705203800929451854}
   m_SourcePrefab: {fileID: 100100000, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
 --- !u!1 &4482217670635567624 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
   m_PrefabInstance: {fileID: 3671947623494518617}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &2380942914537198768
+--- !u!64 &1705203800929451854
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -86,4 +86,4 @@ MeshCollider:
   serializedVersion: 5
   m_Convex: 1
   m_CookingOptions: 30
-  m_Mesh: {fileID: 7047847224752525301, guid: cce1af95624d68d40ac65803b59a5410, type: 3}
+  m_Mesh: {fileID: -5343610744793323734, guid: cce1af95624d68d40ac65803b59a5410, type: 3}

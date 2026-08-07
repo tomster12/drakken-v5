@@ -13,7 +13,6 @@ namespace Drakken.Domain
         public int InstanceId;
         public int Sides;
         public int Value;
-        public List<DiceEffect> Effects = new();
 
         public static DiceInstance Create(int sides, int value = 0)
         {
@@ -36,7 +35,6 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref InstanceId);
             serializer.SerializeValue(ref Sides);
             serializer.SerializeValue(ref Value);
-            serializer.SerializeList(ref Effects);
         }
 
         public DiceInstance Clone()
@@ -45,8 +43,7 @@ namespace Drakken.Domain
             {
                 InstanceId = InstanceId,
                 Sides = Sides,
-                Value = Value,
-                Effects = Effects.Select(effect => effect.Clone()).ToList(),
+                Value = Value
             };
         }
     }

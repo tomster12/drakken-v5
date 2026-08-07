@@ -192,9 +192,6 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Playing;
 
-            // TODO: Remove, just for debug connection
-            GameState.TurnClientIndex = 1;
-
             Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
         }
 
@@ -273,6 +270,15 @@ namespace Drakken.Server
             GameState.Round++;
             GameState.Phase = GamePhase.Drafting;
             discardReadyCount = 0;
+
+            // Reroll each player's dice for the new round
+            for (int p = 0; p < 2; p++)
+            {
+                foreach (var dice in GameState.Clients[p].Dice)
+                {
+                    dice.Roll();
+                }
+            }
 
             // Deal a fresh set of tokens
             DealDraftTokens();

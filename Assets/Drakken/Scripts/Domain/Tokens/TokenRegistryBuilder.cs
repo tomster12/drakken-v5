@@ -47,19 +47,19 @@ namespace Drakken.Domain.Tokens
             registry.Register(
                 new TokenDefinition
                 {
-                    TokenId = "parasite",
-                    DisplayName = "Parasite",
-                    Description = "Attach to an opponent dice. At end of round, halve its value.",
+                    TokenId = "forge",
+                    DisplayName = "Forge",
+                    Description = "Randomly combine 2 dice into 1 with total sides equal to the sum of the values.",
                     Rarity = TokenRarity.Common,
-                    Categories = new[] { TokenCategory.Attack, TokenCategory.Effect }
+                    Categories = new[] { TokenCategory.DiceGrowth }
                 },
-                new ParasiteTokenExecutor(),
-                typeof(PickDiceTokenIntent),
-                typeof(ParasiteTokenResolution),
+                new ForgeTokenExecutor(),
+                typeof(EmptyTokenIntent),
+                typeof(ForgeTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
-                    new ParasiteTokenAnimator(),
-                    new PickDiceTokenIntentPicker(TargetOwner.Any),
-                    prefabFactory?.Invoke("parasite")
+                    new ForgeTokenAnimator(),
+                    new EmptyTokenIntentPicker(),
+                    prefabFactory?.Invoke("forge")
                 )
             );
         }

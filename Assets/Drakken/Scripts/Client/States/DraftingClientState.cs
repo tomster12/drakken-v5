@@ -36,6 +36,10 @@ namespace Drakken.Client.States
             Match.OnPlayingPhaseStarted += OnPlayingPhaseStarted;
             Match.OnDraftingOtherPlayerDiscarded += OnOtherPlayerDiscarded;
 
+            // Reset per-round selection state
+            hasDiscarded = false;
+            selectedTokenViews.Clear();
+
             // Initialise this scenes objects
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(true);
             SceneLayout.Drafting.DraftConfirmButton.Interactable = false;
@@ -135,9 +139,13 @@ namespace Drakken.Client.States
             List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
+                var clientDice = GameState.Clients[clientIndex].Dice;
                 for (int i = 0; i < SceneObjects.Player(clientIndex).DiceViews.Length; i++)
                 {
                     var diceView = SceneObjects.Player(clientIndex).DiceViews[i];
+
+                    // Rebind to this round's DiceInstances and animate roll
+                    diceView.Rebind(clientDice[i]);
                     tasks.Add(diceView.AnimateRoll(cts.Token));
                 }
             }
@@ -217,6 +225,7 @@ namespace Drakken.Client.States
                 : $"Select {CountToDiscard} tokens to discard";
 
             client.UI.SetStatus("Drafting", statusText);
+            client.UI.UpdateScore(GameState.Clients[Match.ClientIndex].Score, GameState.Clients[Match.OpClientIndex].Score);
         }
 
         private void OnTokenClicked(TokenView tokenView)

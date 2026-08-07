@@ -18,5 +18,5 @@ MonoBehaviour:
   tokenMeshPrefabs:
   - TokenId: dragon
     Prefab: {fileID: 4482217670635567624, guid: 8cf7b91a941a9624cb13b9d159cee4f1, type: 3}
-  - TokenId: parasite
-    Prefab: {fileID: 8821973979540590540, guid: 47b1e727d2155544a827ef64c1faa58b, type: 3}
+  - TokenId: forge
+    Prefab: {fileID: 7514494852266716030, guid: 43aac607fc09d1f4282a4c4037cc2760, type: 3}

@@ -27,6 +27,8 @@ namespace Drakken.Client.States
             await base.Enter(fromType);
 
             Match.OnTokenResolved += OnTokenResolved;
+            Match.OnNextTurnStarted += OnNextTurnStarted;
+            Match.OnRoundEnded += OnRoundEnded;
 
             GameEntrypoint.Singleton.Client.Camera
                 .SetTarget(MyGameLayout.PlayingCameraPosition);
@@ -39,6 +41,8 @@ namespace Drakken.Client.States
             await base.Exit(toType);
 
             Match.OnTokenResolved -= OnTokenResolved;
+            Match.OnNextTurnStarted -= OnNextTurnStarted;
+            Match.OnRoundEnded -= OnRoundEnded;
 
             // If we are going back to title then clean up the token / dice views
             if (toType == ClientStateType.Title)
@@ -95,6 +99,10 @@ namespace Drakken.Client.States
 
         private void StartTurn()
         {
+            // Interaction is locked while a token is resolving/animating, release it for the new turn
+            SetAllTokensInteractionLocked(false);
+            SetAllDiceInteractionLocked(false);
+
             UpdateStatusUI();
 
             if (Match.ClientIndex == GameState.TurnClientIndex)
@@ -104,14 +112,21 @@ namespace Drakken.Client.States
                 {
                     tokenView.SetInteractionMode(TokenView.InteractionModeType.Play);
 
-                    if (Match.ClientIndex == Match.ClientIndex)
-                    {
-                        tokenView.OnDragStarted.AddListener(OnTokenDragStarted);
-                        tokenView.OnDragMoved.AddListener(OnTokenDragMoved);
-                        tokenView.OnDragEnded.AddListener(OnTokenDragEnded);
-                    }
+                    tokenView.OnDragStarted.AddListener(OnTokenDragStarted);
+                    tokenView.OnDragMoved.AddListener(OnTokenDragMoved);
+                    tokenView.OnDragEnded.AddListener(OnTokenDragEnded);
                 }
             }
+        }
+
+        private void OnNextTurnStarted()
+        {
+            StartTurn();
+        }
+
+        private async void OnRoundEnded()
+        {
+            await client.GotoState(ClientStateType.Drafting);
         }
 
         // ------------------------------ Main
@@ -120,6 +135,7 @@ namespace Drakken.Client.States
         {
             var whoseTurn = Match.IsMyTurn ? "Your Turn" : "Opponent's Turn";
             client.UI.SetStatus($"Round {Match.GameState.Round}", whoseTurn);
+            client.UI.UpdateScore(GameState.Clients[Match.ClientIndex].Score, GameState.Clients[Match.OpClientIndex].Score);
         }
 
         private void SetAllDiceInteractionLocked(bool interactionLocked)
@@ -269,7 +285,15 @@ namespace Drakken.Client.States
                 message.Resolution,
                 cts.Token);
 
-            // Tell the server the we have finished animating
+            // Remove the now-resolved token so it can't be interacted with again next turn
+            var sourcePlayerObjects = SceneObjects.Player(message.SourceClientIndex);
+            sourcePlayerObjects.TokenViews = sourcePlayerObjects.TokenViews
+                .Where(tv => tv != tokenView)
+                .ToArray();
+            GameObject.Destroy(tokenView.gameObject);
+
+            // Tell the server we have finished animating so it can advance the turn/round
+            await Match.MessageAnimatedTokenResolved();
         }
 
         public TokenVisualContext GetVisualContext(TokenView tokenView) => new()
