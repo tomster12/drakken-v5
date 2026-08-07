@@ -16,6 +16,8 @@ namespace Drakken.Client
         public Action OnDraftingOtherPlayerDiscarded = delegate { };
         public Action OnPlayingPhaseStarted = delegate { };
         public Action<TokenResolutionMessage> OnTokenResolved = delegate { };
+        public Action OnNextTurnStarted = delegate { };
+        public Action OnRoundEnded = delegate { };
 
         private readonly TokenRegistry tokenRegistry;
 
@@ -155,6 +157,29 @@ namespace Drakken.Client
             Log.Info($"ClientMatch-{MatchId}", $"Sending token animated");
 
             await GameEntrypoint.Singleton.Connection.Client_MessageMatchAnimatedTokenResolved(MatchId);
+        }
+
+        public void OnServerNextTurn(GameState gameState)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Log.Info($"ClientMatch-{MatchId}", $"OnServerNextTurn, next clientIndex={gameState.TurnClientIndex}");
+
+            // Authoritively update entire game state
+            GameState = gameState;
+
+            OnNextTurnStarted.Invoke();
+        }
+
+        public void OnServerNextRound(GameState gameState)
+        {
+            Assert.True(GameState.Phase == GamePhase.Playing);
+            Log.Info($"ClientMatch-{MatchId}", $"OnServerNextRound, round={gameState.Round}");
+
+            // Authoritively update entire game state
+            GameState = gameState;
+            IsOpDiscarded = false;
+
+            OnRoundEnded.Invoke();
         }
     }
 }

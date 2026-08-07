@@ -27,6 +27,7 @@ namespace Drakken.Server
         private int connectedCount;
         private int startReadyCount = 0;
         private int discardReadyCount = 0;
+        private int animatedTokenResolvedConfirmCount = 0;
 
         public bool IsMatch(ulong matchId)
             => this.matchId == matchId;
@@ -116,6 +117,15 @@ namespace Drakken.Server
                 }
             }
 
+            DealDraftTokens();
+
+            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState);
+        }
+
+        private void DealDraftTokens()
+        {
+            Assert.True(GameState.Phase == GamePhase.Drafting);
+
             // Build a pool from all available token definitions and shuffle it
             var allTokenIds = new List<string>();
             foreach (var tokenDef in tokenRegistry.AllDefinitions)
@@ -139,8 +149,6 @@ namespace Drakken.Server
                     GameState.Clients[p].Tokens.Add(tokenInstance);
                 }
             }
-
-            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState);
         }
 
         public void OnClientRequestDraftDiscard(ulong clientId, DraftDiscardMessage message, Action<bool> respond)
@@ -221,8 +229,55 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
             Assert.True(clientIdIndexAssignment.ContainsKey(clientId));
+            Log.Info($"ServerMatch-{matchId}", $"Client {clientId} confirmed animated resolution ({animatedTokenResolvedConfirmCount + 1}/2)");
 
-            // TODO
+            // Wait until both clients have finished animating before advancing
+            animatedTokenResolvedConfirmCount++;
+            if (animatedTokenResolvedConfirmCount < 2) return;
+
+            animatedTokenResolvedConfirmCount = 0;
+
+            bool roundIsOver =
+                GameState.Clients[0].Tokens.Count == 0 &&
+                GameState.Clients[1].Tokens.Count == 0;
+
+            if (roundIsOver)
+            {
+                EndRound();
+            }
+            else
+            {
+                AdvanceTurn();
+            }
+        }
+
+        private void AdvanceTurn()
+        {
+            GameState.TurnClientIndex = 1 - GameState.TurnClientIndex;
+            Log.Info($"ServerMatch-{matchId}", $"Advancing turn, next clientIndex={GameState.TurnClientIndex}");
+
+            Connection.Server_BroadcastMatchNextTurn(clientIds, GameState);
+        }
+
+        private void EndRound()
+        {
+            Log.Info($"ServerMatch-{matchId}", $"Round {GameState.Round} complete, calculating winner");
+
+            // Score the round based on each players dice total, ties award nothing
+            var p0DiceTotal = GameState.Clients[0].GetDiceTotal();
+            var p1DiceTotal = GameState.Clients[1].GetDiceTotal();
+
+            if (p0DiceTotal > p1DiceTotal) GameState.Clients[0].Score++;
+            else if (p1DiceTotal > p0DiceTotal) GameState.Clients[1].Score++;
+
+            GameState.Round++;
+            GameState.Phase = GamePhase.Drafting;
+            discardReadyCount = 0;
+
+            // Deal a fresh set of tokens
+            DealDraftTokens();
+
+            Connection.Server_BroadcastMatchNextRound(clientIds, GameState);
         }
     }
 }

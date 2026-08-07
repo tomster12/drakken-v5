@@ -23,5 +23,7 @@ namespace Drakken.Networking
         Task<bool> Client_RequestMatchPlayToken(ulong matchId, TokenIntentMessage message);
         void Server_BroadcastMatchTokenResolved(ulong[] clientIds, TokenResolutionMessage message);
         Task Client_MessageMatchAnimatedTokenResolved(ulong matchId);
+        void Server_BroadcastMatchNextTurn(ulong[] clientIds, GameState gameState);
+        void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState);
     }
 }

@@ -186,7 +186,6 @@ namespace Drakken.Networking
             tasks.Complete(requestId, response);
         }
 
-
         public void Server_BroadcastMatchTokenResolved(ulong[] clientIds, TokenResolutionMessage message)
         {
             S2C_BroadcastMatchTokenResolved_Rpc(message, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
@@ -196,6 +195,41 @@ namespace Drakken.Networking
         private void S2C_BroadcastMatchTokenResolved_Rpc(TokenResolutionMessage message, RpcParams rpc = default)
         {
             Client.Match.OnServerTokenResolved(message);
+        }
+
+        public Task Client_MessageMatchAnimatedTokenResolved(ulong matchId)
+        {
+            C2S_MessageMatchAnimatedTokenResolved_Rpc(matchId);
+            return Task.CompletedTask;
+        }
+
+        [Rpc(SendTo.Server)]
+        private void C2S_MessageMatchAnimatedTokenResolved_Rpc(ulong matchId, RpcParams rpc = default)
+        {
+            var clientId = rpc.Receive.SenderClientId;
+            Server.GetMatch(matchId).OnClientMessageTokenResolved(clientId);
+        }
+
+        public void Server_BroadcastMatchNextTurn(ulong[] clientIds, GameState gameState)
+        {
+            S2C_BroadcastMatchNextTurn_Rpc(gameState, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void S2C_BroadcastMatchNextTurn_Rpc(GameState gameState, RpcParams rpc = default)
+        {
+            Client.Match.OnServerNextTurn(gameState);
+        }
+
+        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState)
+        {
+            S2C_BroadcastMatchNextRound_Rpc(gameState, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void S2C_BroadcastMatchNextRound_Rpc(GameState gameState, RpcParams rpc = default)
+        {
+            Client.Match.OnServerNextRound(gameState);
         }
     }
 }

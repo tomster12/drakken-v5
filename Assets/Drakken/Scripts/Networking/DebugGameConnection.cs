@@ -161,7 +161,31 @@ namespace Drakken.Networking
             var match = Server.GetMatch(matchId);
             match.OnClientMessageTokenResolved(myClientId);
 
+            ScheduleOpMessageAnimatedTokenResolved(match);
+
             return Task.CompletedTask;
+        }
+
+        private async void ScheduleOpMessageAnimatedTokenResolved(ServerMatch match)
+        {
+            await Task.Delay(opponentReactionDelay);
+            match.OnClientMessageTokenResolved(opClientId);
+        }
+
+        public void Server_BroadcastMatchNextTurn(ulong[] clientIds, GameState gameState)
+        {
+            foreach (var clientId in clientIds)
+            {
+                clientsById[clientId].Match.OnServerNextTurn(gameState.Clone());
+            }
+        }
+
+        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState)
+        {
+            foreach (var clientId in clientIds)
+            {
+                clientsById[clientId].Match.OnServerNextRound(gameState.Clone());
+            }
         }
     }
 
