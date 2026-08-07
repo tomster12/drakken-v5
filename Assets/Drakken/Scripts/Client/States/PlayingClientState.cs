@@ -97,6 +97,47 @@ namespace Drakken.Client.States
             StartTurn();
         }
 
+        private async void OnNextTurnStarted()
+        {
+            await ReAlignTokens();
+
+            StartTurn();
+        }
+
+        private async Task ReAlignTokens()
+        {
+            List<Task> tasks = new();
+
+            // Re-align my tokens in the row
+            for (int i = 0; i < MySceneObjects.TokenViews.Length; i++)
+            {
+                var tokenView = MySceneObjects.TokenViews[i];
+                var targetPos = MySceneObjects.GetTokenRowIndexPosition(i);
+
+                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
+                    .Start()
+                    .Next(tokenView.CreateCurrentPositionAnimationTrack(
+                        0.3f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
+                    .Build(), cts.Token));
+            }
+
+            // Re-align opponent tokens in the row
+            var opPlayerObjects = SceneObjects.Player(Match.OpClientIndex);
+            for (int i = 0; i < opPlayerObjects.TokenViews.Length; i++)
+            {
+                var tokenView = opPlayerObjects.TokenViews[i];
+                var targetPos = opPlayerObjects.GetTokenRowIndexPosition(i);
+
+                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
+                    .Start()
+                    .Next(tokenView.CreateCurrentPositionAnimationTrack(
+                        0.3f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
+                    .Build(), cts.Token));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
         private void StartTurn()
         {
             // Interaction is locked while a token is resolving/animating, release it for the new turn
@@ -117,11 +158,6 @@ namespace Drakken.Client.States
                     tokenView.OnDragEnded.AddListener(OnTokenDragEnded);
                 }
             }
-        }
-
-        private void OnNextTurnStarted()
-        {
-            StartTurn();
         }
 
         private async void OnRoundEnded()

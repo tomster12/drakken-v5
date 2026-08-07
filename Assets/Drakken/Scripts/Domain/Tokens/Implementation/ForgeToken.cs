@@ -76,6 +76,7 @@ namespace Drakken.Domain.Tokens.Implementation
     public class ForgeTokenAnimator : TokenAnimator<ForgeTokenResolution>
     {
         private const float PullTogetherDuration = 0.35f;
+        private const float PullTogetherArchHeight = 1.5f;
         private const float ShiftDuration = 0.3f;
 
         protected override async Task Animate(
@@ -94,25 +95,36 @@ namespace Drakken.Domain.Tokens.Implementation
             var firstDiceView = oldDiceViews[resolution.FirstIndex];
             var secondDiceView = oldDiceViews[resolution.SecondIndex];
 
-            // Pull the two dice together to a shared midpoint
-            Vector3 midpoint = (firstDiceView.transform.position + secondDiceView.transform.position) / 2f;
+            // Pull the two dice together to a shared midpoint, arching up and across, shrinking away as they arrive
+            Vector3 firstStartPosition = firstDiceView.transform.position;
+            Vector3 secondStartPosition = secondDiceView.transform.position;
+            Vector3 midpoint = (firstStartPosition + secondStartPosition) / 2f + Vector3.up * 1.0f;
+
+            Vector3 firstControlPosition = Vector3.Lerp(firstStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
+            Vector3 secondControlPosition = Vector3.Lerp(secondStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
+
+            var firstArc = AnimationCurves.QuadraticBezier(firstStartPosition, firstControlPosition, midpoint);
+            var secondArc = AnimationCurves.QuadraticBezier(secondStartPosition, secondControlPosition, midpoint);
 
             await Task.WhenAll(
                 firstDiceView.Animator.Play(AnimationSequenceBuilder
                     .Start()
-                    .Next(AnimationTracks.Position(PullTogetherDuration, firstDiceView.transform, firstDiceView.transform.position, midpoint, Easing.EaseInOutQuad))
+                    .Next(
+                        AnimationTracks.PositionFunc(PullTogetherDuration, firstDiceView.transform, firstArc, Easing.EaseInOutQuad),
+                        AnimationTracks.LocalScale(PullTogetherDuration, firstDiceView.transform, firstDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
                     .Build(), ct),
                 secondDiceView.Animator.Play(AnimationSequenceBuilder
                     .Start()
-                    .Next(AnimationTracks.Position(PullTogetherDuration, secondDiceView.transform, secondDiceView.transform.position, midpoint, Easing.EaseInOutQuad))
+                    .Next(
+                        AnimationTracks.PositionFunc(PullTogetherDuration, secondDiceView.transform, secondArc, Easing.EaseInOutQuad),
+                        AnimationTracks.LocalScale(PullTogetherDuration, secondDiceView.transform, secondDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
                     .Build(), ct));
 
             await Task.Delay(100);
 
-            // Merge them away, making room for the forged dice
-            await Task.WhenAll(
-                firstDiceView.AnimateShrinkAndDestroy(ct),
-                secondDiceView.AnimateShrinkAndDestroy(ct));
+            // Both dice have already shrunk to nothing at the midpoint, so just clean them up
+            GameObject.Destroy(firstDiceView.gameObject);
+            GameObject.Destroy(secondDiceView.gameObject);
 
             // Rebuild the dice row without the two merged dice, reserving a slot for the forged dice
             var newDiceViews = new DiceView[oldDiceViews.Length - 1];
