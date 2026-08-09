@@ -4,10 +4,11 @@ using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
 using Drakken.Networking;
+using Drakken.Server.Dice;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Unity.Mathematics;
+using UnityEngine;
 
 namespace Drakken.Server
 {
@@ -21,6 +22,7 @@ namespace Drakken.Server
         private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
 
         public GameState GameState { get; private set; }
+        public DicePhysicsWorld[] DiceWorlds { get; }
         private readonly ulong[] clientIds = new ulong[2];
         private readonly Dictionary<ulong, int> clientIdIndexAssignment = new();
         private readonly ulong matchId;
@@ -42,6 +44,12 @@ namespace Drakken.Server
             this.tokenRegistry = tokenRegistry;
             matchId = nextMatchId++;
             GameState = new();
+
+            DiceWorlds = new DicePhysicsWorld[2]
+            {
+                new($"Match-{matchId} Dice World P1", GameConstants.DiceTrayCenter(0), GameConstants.DiceTraySize, GameConstants.DiceTrayWallHeight),
+                new($"Match-{matchId} Dice World P2", GameConstants.DiceTrayCenter(1), GameConstants.DiceTraySize, GameConstants.DiceTrayWallHeight),
+            };
 
             Log.Info($"ServerMatch-{matchId}", $"Created new match");
         }
@@ -106,20 +114,69 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Drafting;
 
-            // Give each client a set of new dice
+            // Give each client a set of new dice, thrown into their physics table
             for (int p = 0; p < 2; p++)
             {
+                List<DiceInstance> newDice = new();
                 for (int d = 0; d < GameConstants.StandardDiceCount; d++)
                 {
-                    var dice = DiceInstance.Create(sides: GameConstants.StandardDiceSideCount);
-                    dice.Roll();
-                    GameState.Clients[p].Dice.Add(dice);
+                    newDice.Add(DiceInstance.Create(sides: GameConstants.StandardDiceSideCount));
                 }
+
+                ThrowNewDice(p, newDice);
+                GameState.Clients[p].Dice.AddRange(newDice);
             }
 
             DealDraftTokens();
 
-            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState);
+            var diceTraces = ExtractDiceTraces();
+            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
+        }
+
+        // -------------------------------- Dice Physics
+
+        private void ThrowNewDice(int clientIndex, List<DiceInstance> diceInstances)
+        {
+            var world = DiceWorlds[clientIndex];
+            var trayCenter = GameConstants.DiceTrayCenter(clientIndex);
+            var traySize = GameConstants.DiceTraySize;
+            Vector3 spawnCorner = trayCenter + new Vector3(-traySize.x / 2f + 0.4f, 0.6f, -traySize.z / 2f + 0.4f);
+
+            for (int i = 0; i < diceInstances.Count; i++)
+            {
+                Vector3 spawnPos = spawnCorner + new Vector3(i * 0.5f, 0f, 0f);
+                Vector3 throwVelocity = (trayCenter - spawnPos).normalized * GameConstants.DiceThrowImpulseSpeed;
+                Vector3 torque = UnityEngine.Random.insideUnitSphere * GameConstants.DiceThrowTorque;
+
+                world.Spawn(diceInstances[i], spawnPos, Quaternion.identity, throwVelocity, torque);
+            }
+
+            world.SettleAll();
+            world.FreezeAll();
+        }
+
+        private void RerollDice(int clientIndex, List<DiceInstance> diceInstances)
+        {
+            var world = DiceWorlds[clientIndex];
+
+            foreach (var dice in diceInstances)
+            {
+                Vector3 impulse = Vector3.up * GameConstants.DiceThrowImpulseSpeed * 0.5f;
+                Vector3 torque = UnityEngine.Random.insideUnitSphere * GameConstants.DiceThrowTorque;
+                world.Wake(dice.InstanceId, impulse, torque);
+            }
+
+            world.SettleAll();
+            world.FreezeAll();
+        }
+
+        private MatchDiceTraces ExtractDiceTraces()
+        {
+            return new MatchDiceTraces
+            {
+                P1 = DiceWorlds[0].ExtractTraceSinceLastExtract(),
+                P2 = DiceWorlds[1].ExtractTraceSinceLastExtract(),
+            };
         }
 
         private void DealDraftTokens()
@@ -271,19 +328,17 @@ namespace Drakken.Server
             GameState.Phase = GamePhase.Drafting;
             discardReadyCount = 0;
 
-            // Reroll each player's dice for the new round
+            // Reroll each player's dice for the new round, resuming their existing physics table
             for (int p = 0; p < 2; p++)
             {
-                foreach (var dice in GameState.Clients[p].Dice)
-                {
-                    dice.Roll();
-                }
+                RerollDice(p, GameState.Clients[p].Dice);
             }
 
             // Deal a fresh set of tokens
             DealDraftTokens();
 
-            Connection.Server_BroadcastMatchNextRound(clientIds, GameState);
+            var diceTraces = ExtractDiceTraces();
+            Connection.Server_BroadcastMatchNextRound(clientIds, GameState, diceTraces);
         }
     }
 }

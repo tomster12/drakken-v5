@@ -22,6 +22,7 @@ namespace Drakken.Client
         private readonly TokenRegistry tokenRegistry;
 
         public GameState GameState { get; private set; }
+        public MatchDiceTraces LastDiceTraces { get; private set; }
         public ulong MatchId { get; private set; }
         public int ClientIndex { get; private set; }
         public bool IsOpJoined { get; private set; }
@@ -77,7 +78,7 @@ namespace Drakken.Client
 
         // -------------------------------- Drafting
 
-        public void OnServerStartDraftingPhase(GameState gameState)
+        public void OnServerStartDraftingPhase(GameState gameState, MatchDiceTraces diceTraces)
         {
             // TODO: Allow coming to drafting after round end
             Assert.True(GameState.Phase == GamePhase.NotStarted);
@@ -85,6 +86,7 @@ namespace Drakken.Client
 
             // Authoritively update entire game state
             GameState = gameState;
+            LastDiceTraces = diceTraces;
 
             OnDraftingPhaseStarted.Invoke();
         }
@@ -170,13 +172,14 @@ namespace Drakken.Client
             OnNextTurnStarted.Invoke();
         }
 
-        public void OnServerNextRound(GameState gameState)
+        public void OnServerNextRound(GameState gameState, MatchDiceTraces diceTraces)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
             Log.Info($"ClientMatch-{MatchId}", $"OnServerNextRound, round={gameState.Round}");
 
             // Authoritively update entire game state
             GameState = gameState;
+            LastDiceTraces = diceTraces;
             IsOpDiscarded = false;
 
             OnRoundEnded.Invoke();

@@ -90,11 +90,11 @@ namespace Drakken.Networking
             targetClient.Match.OnServerOtherPlayerReady();
         }
 
-        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState)
+        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
         {
             foreach (var clientId in clientIds)
             {
-                clientsById[clientId].Match.OnServerStartDraftingPhase(gameState.Clone());
+                clientsById[clientId].Match.OnServerStartDraftingPhase(gameState.Clone(), diceTraces);
             }
         }
 
@@ -219,11 +219,11 @@ namespace Drakken.Networking
             }, (response) => { });
         }
 
-        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState)
+        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
         {
             foreach (var clientId in clientIds)
             {
-                clientsById[clientId].Match.OnServerNextRound(gameState.Clone());
+                clientsById[clientId].Match.OnServerNextRound(gameState.Clone(), diceTraces);
             }
         }
     }

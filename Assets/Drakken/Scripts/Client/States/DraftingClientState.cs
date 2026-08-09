@@ -102,24 +102,24 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            // For both you and opponent
-            Quaternion targetRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
+            // Play the server-recorded physics roll first (temporary procedural dice)
+            await PlayDiceTraces(Match.LastDiceTraces);
 
-            List<Task> tasks = new();
+            // Then settle the real, interactable dice into their row at the resolved values
+            Quaternion targetRot = Quaternion.Euler(0, Match.ClientIndex * 180f, 0);
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
-                // Create a row of dice views
                 var clientDice = GameState.Clients[clientIndex].Dice;
                 var sceneObjects = SceneObjects.Player(clientIndex);
                 sceneObjects.DiceViews = new DiceView[clientDice.Count];
 
                 for (int i = 0; i < clientDice.Count; i++)
                 {
-                    var diceView = sceneObjects.SpawnDiceAtIndex(clientDice[i], i, targetRot);
-                    tasks.Add(diceView.AnimateRoll(cts.Token));
+                    sceneObjects.SpawnDiceAtIndex(clientDice[i], i, targetRot);
                 }
+
+                sceneObjects.DicePhysicsReplayer.ClearAll();
             }
-            await Task.WhenAll(tasks);
 
             // Update UI to match dice totals
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0);
@@ -134,25 +134,50 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            // For both you and opponent roll all dice
-            List<Task> tasks = new();
+            // Hide the resting row dice while the physics reroll plays out in their place
+            SetDiceViewsVisible(Match.ClientIndex, visible: false);
+            SetDiceViewsVisible(Match.OpClientIndex, visible: false);
+
+            await PlayDiceTraces(Match.LastDiceTraces);
+
+            // Rebind the row dice to this round's resolved values and reveal them again
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var clientDice = GameState.Clients[clientIndex].Dice;
-                for (int i = 0; i < SceneObjects.Player(clientIndex).DiceViews.Length; i++)
+                var sceneObjects = SceneObjects.Player(clientIndex);
+                for (int i = 0; i < sceneObjects.DiceViews.Length; i++)
                 {
-                    var diceView = SceneObjects.Player(clientIndex).DiceViews[i];
-
-                    // Rebind to this round's DiceInstances and animate roll
-                    diceView.Rebind(clientDice[i]);
-                    tasks.Add(diceView.AnimateRoll(cts.Token));
+                    sceneObjects.DiceViews[i].Rebind(clientDice[i]);
                 }
+
+                sceneObjects.DicePhysicsReplayer.ClearAll();
             }
-            await Task.WhenAll(tasks);
+
+            SetDiceViewsVisible(Match.ClientIndex, visible: true);
+            SetDiceViewsVisible(Match.OpClientIndex, visible: true);
 
             // Update UI to match dice totals
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1);
+        }
+
+        private async Task PlayDiceTraces(MatchDiceTraces diceTraces)
+        {
+            List<Task> tasks = new();
+            for (int clientIndex = 0; clientIndex < 2; clientIndex++)
+            {
+                var sceneObjects = SceneObjects.Player(clientIndex);
+                tasks.Add(sceneObjects.DicePhysicsReplayer.Play(client.Assets, diceTraces.Player(clientIndex), cts.Token));
+            }
+            await Task.WhenAll(tasks);
+        }
+
+        private void SetDiceViewsVisible(int clientIndex, bool visible)
+        {
+            foreach (var diceView in SceneObjects.Player(clientIndex).DiceViews)
+            {
+                diceView.gameObject.SetActive(visible);
+            }
         }
 
         private async void SpawnTokens()

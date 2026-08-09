@@ -109,15 +109,15 @@ namespace Drakken.Networking
 
         // -------------------------------- Drafting
 
-        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState)
+        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
         {
-            S2C_BroadcastMatchStartDraftingPhase_Rpc(gameState, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
+            S2C_BroadcastMatchStartDraftingPhase_Rpc(gameState, diceTraces, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        private void S2C_BroadcastMatchStartDraftingPhase_Rpc(GameState gameState, RpcParams rpc = default)
+        private void S2C_BroadcastMatchStartDraftingPhase_Rpc(GameState gameState, MatchDiceTraces diceTraces, RpcParams rpc = default)
         {
-            Client.Match.OnServerStartDraftingPhase(gameState);
+            Client.Match.OnServerStartDraftingPhase(gameState, diceTraces);
         }
 
         public Task<bool> Client_RequestMatchDraftDiscard(ulong matchId, DraftDiscardMessage message)
@@ -221,15 +221,15 @@ namespace Drakken.Networking
             Client.Match.OnServerNextTurn(gameState);
         }
 
-        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState)
+        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
         {
-            S2C_BroadcastMatchNextRound_Rpc(gameState, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
+            S2C_BroadcastMatchNextRound_Rpc(gameState, diceTraces, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        private void S2C_BroadcastMatchNextRound_Rpc(GameState gameState, RpcParams rpc = default)
+        private void S2C_BroadcastMatchNextRound_Rpc(GameState gameState, MatchDiceTraces diceTraces, RpcParams rpc = default)
         {
-            Client.Match.OnServerNextRound(gameState);
+            Client.Match.OnServerNextRound(gameState, diceTraces);
         }
     }
 }
