@@ -7,19 +7,6 @@ namespace Drakken.Generation
 {
     public static class DiceMeshFactory
     {
-        public readonly struct DiceMesh
-        {
-            public readonly GameObject GameObject;
-            // Index i is the local-space direction (from the die's center) toward face value i+1.
-            public readonly IReadOnlyList<Vector3> LocalFaceDirections;
-
-            public DiceMesh(GameObject gameObject, IReadOnlyList<Vector3> localFaceDirections)
-            {
-                GameObject = gameObject;
-                LocalFaceDirections = localFaceDirections;
-            }
-        }
-
         public static DiceMesh Create(DiceInstance diceInstance, Material material = null)
         {
             DiceMesh diceMesh = diceInstance.Sides switch
@@ -38,14 +25,14 @@ namespace Drakken.Generation
             return diceMesh;
         }
 
-        public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<Vector3> localFaceDirections)
+        public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
         {
             int bestFaceIndex = 0;
             float bestDot = float.NegativeInfinity;
 
-            for (int i = 0; i < localFaceDirections.Count; i++)
+            for (int i = 0; i < faces.Count; i++)
             {
-                float dot = Vector3.Dot(dieTransform.TransformDirection(localFaceDirections[i]), Vector3.up);
+                float dot = Vector3.Dot(dieTransform.TransformDirection(faces[i].Direction), Vector3.up);
                 if (dot > bestDot)
                 {
                     bestDot = dot;
@@ -56,23 +43,37 @@ namespace Drakken.Generation
             return bestFaceIndex + 1;
         }
 
+        private static Quaternion GetFaceLabelRotation(Vector3 direction)
+        {
+            Vector3 upHint = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+            return Quaternion.LookRotation(-direction, upHint);
+        }
+
         private static DiceMesh CreateCube()
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "D6 (Generated)";
 
             // Opposite faces sum to 7, matching standard D6 convention.
-            Vector3[] localFaceDirections =
+            Vector3[] directions =
             {
-                Vector3.up,      // 1
-                Vector3.right,   // 2
+                Vector3.up, // 1
+                Vector3.right, // 2
                 Vector3.forward, // 3
-                Vector3.back,    // 4
-                Vector3.left,    // 5
-                Vector3.down     // 6
+                Vector3.back, // 4
+                Vector3.left, // 5
+                Vector3.down // 6
             };
 
-            return new DiceMesh(go, localFaceDirections);
+            // GameObject.CreatePrimitive(Cube) is a unit cube, so faces sit at half-extent 0.5.
+            const float halfExtent = 0.5f;
+            DiceFacePose[] faces = new DiceFacePose[directions.Length];
+            for (int i = 0; i < directions.Length; i++)
+            {
+                faces[i] = new DiceFacePose(directions[i], directions[i] * halfExtent, GetFaceLabelRotation(directions[i]));
+            }
+
+            return new DiceMesh(go, faces);
         }
 
         private static DiceMesh CreateTetrahedron()
@@ -93,7 +94,7 @@ namespace Drakken.Generation
             builder.AddTriangle(c[0], c[2], c[1]);
 
             GameObject go = builder.Build("D4 (Generated)");
-            return new DiceMesh(go, builder.FaceDirections);
+            return new DiceMesh(go, builder.Faces);
         }
 
         private static DiceMesh CreateBipyramid(int sides)
@@ -128,26 +129,23 @@ namespace Drakken.Generation
             }
 
             GameObject go = builder.Build($"D{sides} (Generated)");
-            return new DiceMesh(go, builder.FaceDirections);
+            return new DiceMesh(go, builder.Faces);
         }
 
         private class ConvexMeshBuilder
         {
-            // Builds a flat-shaded convex mesh from triangles given in any winding order, fixing
-            // winding so normals face outward from the origin (valid for our origin-centered shapes),
-            // and records each face's centroid direction for later up-face lookups.
-
             private readonly List<Vector3> vertices = new();
             private readonly List<int> triangles = new();
-            private readonly List<Vector3> faceDirections = new();
+            private readonly List<DiceFacePose> faces = new();
 
-            public IReadOnlyList<Vector3> FaceDirections => faceDirections;
+            public IReadOnlyList<DiceFacePose> Faces => faces;
 
             public void AddTriangle(Vector3 a, Vector3 b, Vector3 c)
             {
                 Vector3 centroid = (a + b + c) / 3f;
                 Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
 
+                // Fix winding direction
                 if (Vector3.Dot(normal, centroid) < 0f)
                 {
                     (b, c) = (c, b);
@@ -162,7 +160,8 @@ namespace Drakken.Generation
                 triangles.Add(startIndex + 1);
                 triangles.Add(startIndex + 2);
 
-                faceDirections.Add(centroid.normalized);
+                Vector3 direction = centroid.normalized;
+                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction)));
             }
 
             public GameObject Build(string name)
@@ -182,6 +181,32 @@ namespace Drakken.Generation
                 collider.convex = true;
 
                 return go;
+            }
+        }
+
+        public readonly struct DiceFacePose
+        {
+            public readonly Vector3 Direction;
+            public readonly Vector3 Position;
+            public readonly Quaternion LabelRotation;
+
+            public DiceFacePose(Vector3 direction, Vector3 position, Quaternion labelRotation)
+            {
+                Direction = direction;
+                Position = position;
+                LabelRotation = labelRotation;
+            }
+        }
+
+        public readonly struct DiceMesh
+        {
+            public readonly GameObject GameObject;
+            public readonly IReadOnlyList<DiceFacePose> Faces; // Index i is the pose for face value i+1
+
+            public DiceMesh(GameObject gameObject, IReadOnlyList<DiceFacePose> faces)
+            {
+                GameObject = gameObject;
+                Faces = faces;
             }
         }
     }

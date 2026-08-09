@@ -1,6 +1,7 @@
 using System;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
+using TMPro;
 using UnityEngine;
 
 namespace Drakken.Client
@@ -16,6 +17,9 @@ namespace Drakken.Client
 
         [Header("Materials")]
         [SerializeField] public Material DiceMeshMaterial;
+
+        [Header("Fonts")]
+        [SerializeField] public TMP_FontAsset DiceFaceLabelFont;
 
         public GameObject GetTokenMeshPrefabById(string tokenId)
         {

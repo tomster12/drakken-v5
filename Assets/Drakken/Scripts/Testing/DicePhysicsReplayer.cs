@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Drakken.Client;
+using Drakken.Client.World;
 using Drakken.Common.Utility;
-using Drakken.Generation;
 using UnityEngine;
 
 namespace Drakken.Testing
@@ -30,12 +30,11 @@ namespace Drakken.Testing
 
             foreach (InitialDiceRecord record in activeTrace.initialDice)
             {
-                var diceMesh = DiceMeshFactory.Create(record.Instance, assetDatabase.DiceMeshMaterial);
-                var diceGO = diceMesh.GameObject;
+                var diceView = DiceView.CreateProcedural(assetDatabase, record.Instance);
 
-                diceGO.transform.SetPositionAndRotation(record.spawnPosition, Quaternion.identity);
+                diceView.transform.SetPositionAndRotation(record.spawnPosition, Quaternion.identity);
 
-                replayTransformsByInstanceId[record.Instance.InstanceId] = diceGO.transform;
+                replayTransformsByInstanceId[record.Instance.InstanceId] = diceView.transform;
             }
         }
 

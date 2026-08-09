@@ -69,7 +69,7 @@ namespace Drakken.Testing
                     Instance = diceInstance,
                     spawnPosition = spawnPosition,
                     rigidbody = diceRB,
-                    localFaceDirections = diceMesh.LocalFaceDirections
+                    faces = diceMesh.Faces
                 });
 
                 settledTimers[diceInstance.InstanceId] = 0f;
@@ -173,7 +173,7 @@ namespace Drakken.Testing
         {
             foreach (PhysicsDice dice in physicsDice)
             {
-                dice.Instance.Value = DiceMeshFactory.GetUpFaceValue(dice.rigidbody.transform, dice.localFaceDirections);
+                dice.Instance.Value = DiceMeshFactory.GetUpFaceValue(dice.rigidbody.transform, dice.faces);
             }
         }
 
@@ -203,7 +203,7 @@ namespace Drakken.Testing
             public DiceInstance Instance;
             public Vector3 spawnPosition;
             public Rigidbody rigidbody;
-            public IReadOnlyList<Vector3> localFaceDirections;
+            public IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         }
     }
 }
