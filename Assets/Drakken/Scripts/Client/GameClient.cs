@@ -41,7 +41,7 @@ namespace Drakken.Client
 
         private void Awake()
         {
-            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenPrefabById);
+            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenMeshPrefabById);
 
             SceneObjects.Init(layout, assets);
 

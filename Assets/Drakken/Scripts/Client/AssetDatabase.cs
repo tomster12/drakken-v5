@@ -14,7 +14,10 @@ namespace Drakken.Client
         [SerializeField] public DiceView DiceViewPrefab;
         [SerializeField] private TokenPrefabEntry[] tokenMeshPrefabs;
 
-        public GameObject GetTokenPrefabById(string tokenId)
+        [Header("Materials")]
+        [SerializeField] public Material DiceMeshMaterial;
+
+        public GameObject GetTokenMeshPrefabById(string tokenId)
         {
             foreach (var entry in tokenMeshPrefabs)
             {
@@ -25,12 +28,19 @@ namespace Drakken.Client
             Log.Warning("AssetDatabase", $"No prefab found for tokenId='{tokenId}'");
             return null;
         }
-    }
 
-    [Serializable]
-    public struct TokenPrefabEntry
-    {
-        public string TokenId;
-        public GameObject Prefab;
+        [Serializable]
+        public struct TokenPrefabEntry
+        {
+            public string TokenId;
+            public GameObject Prefab;
+        }
+
+        [Serializable]
+        private struct DicePrefabEntry
+        {
+            public int SideCount;
+            public GameObject Prefab;
+        }
     }
 }

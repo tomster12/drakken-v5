@@ -20,6 +20,15 @@ namespace Drakken.Common.Utility
             }
         }
 
+        public static void Null<T>(T obj, string message = null) where T : class
+        {
+            if (obj != null)
+            {
+                Log.Error("Assert", message);
+                throw new System.Exception($"Assertion failed: {message}");
+            }
+        }
+
         public static void NotNull<T>(T obj, string message = null) where T : class
         {
             if (obj == null)

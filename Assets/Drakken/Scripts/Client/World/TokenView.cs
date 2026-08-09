@@ -139,7 +139,7 @@ namespace Drakken.Client.World
         private void DebugBindRandom()
         {
             GameEntrypoint.Singleton.TokenRegistry ??=
-                TokenRegistryBuilder.BuildClientRegistry(GameEntrypoint.Singleton.Client.Assets.GetTokenPrefabById);
+                TokenRegistryBuilder.BuildClientRegistry(GameEntrypoint.Singleton.Client.Assets.GetTokenMeshPrefabById);
 
             var tokenId = GameEntrypoint.Singleton.TokenRegistry.AllDefinitions
                 .ToList()

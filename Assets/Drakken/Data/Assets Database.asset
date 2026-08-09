@@ -20,3 +20,4 @@ MonoBehaviour:
     Prefab: {fileID: 4482217670635567624, guid: 8cf7b91a941a9624cb13b9d159cee4f1, type: 3}
   - TokenId: forge
     Prefab: {fileID: 7514494852266716030, guid: 43aac607fc09d1f4282a4c4037cc2760, type: 3}
+  DiceMeshMaterial: {fileID: 2100000, guid: 756f505a9b2d1cd45bf70fc5796f5662, type: 2}
