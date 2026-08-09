@@ -326,7 +326,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Drakken.Testing.PhysicsRecorderTestRunner
   recorder: {fileID: 782509926}
   replayer: {fileID: 782509925}
-  sideCountsToSpawn: 06000000060000000400000008000000
+  sideCountsToSpawn: 0400000006000000080000000c00000014000000
   spawnOrigin: {x: 0, y: 2, z: -10}
   throwTarget: {x: 0, y: 2, z: 0}
 --- !u!1 &799451033

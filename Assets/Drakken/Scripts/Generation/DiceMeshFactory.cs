@@ -13,7 +13,10 @@ namespace Drakken.Generation
             {
                 4 => CreateTetrahedron(),
                 6 => CreateCube(),
-                _ when diceInstance.Sides > 0 && diceInstance.Sides % 2 == 0 => CreateBipyramid(diceInstance.Sides),
+                8 => CreateOctohedron(),
+                12 => CreateDodecahedron(),
+                20 => CreateIcosahedron(),
+                _ when diceInstance.Sides > 2 && diceInstance.Sides % 2 == 0 => CreateBipyramid(diceInstance.Sides),
                 _ => throw new NotSupportedException($"Procedural dice mesh generation for a D{diceInstance.Sides} is not implemented yet.")
             };
 
@@ -32,7 +35,7 @@ namespace Drakken.Generation
 
             for (int i = 0; i < faces.Count; i++)
             {
-                float dot = Vector3.Dot(dieTransform.TransformDirection(faces[i].Direction), Vector3.up);
+                float dot = Vector3.Dot(dieTransform.TransformDirection(faces[i].UpDetectionDirection), Vector3.up);
                 if (dot > bestDot)
                 {
                     bestDot = dot;
@@ -87,13 +90,168 @@ namespace Drakken.Generation
                 new(-0.5f, -0.5f, 0.5f)
             };
 
+            // A regular tetrahedron rests on one face with the opposite vertex pointing up, so it's read
+            // from that vertex rather than any face normal (which are all symmetric around that vertex
+            // and would otherwise tie). Each triangle below is opposite vertex c[i], in that order.
             ConvexMeshBuilder builder = new();
-            builder.AddTriangle(c[1], c[2], c[3]);
-            builder.AddTriangle(c[0], c[3], c[2]);
-            builder.AddTriangle(c[0], c[1], c[3]);
-            builder.AddTriangle(c[0], c[2], c[1]);
+            builder.AddTriangle(c[1], c[2], c[3], upDetectionDirection: c[0]);
+            builder.AddTriangle(c[0], c[3], c[2], upDetectionDirection: c[1]);
+            builder.AddTriangle(c[0], c[1], c[3], upDetectionDirection: c[2]);
+            builder.AddTriangle(c[0], c[2], c[1], upDetectionDirection: c[3]);
 
             GameObject go = builder.Build("D4 (Generated)");
+            return new DiceMesh(go, builder.Faces);
+        }
+
+        private static DiceMesh CreateOctohedron()
+        {
+            Vector3 posX = Vector3.right;
+            Vector3 negX = Vector3.left;
+            Vector3 posY = Vector3.up;
+            Vector3 negY = Vector3.down;
+            Vector3 posZ = Vector3.forward;
+            Vector3 negZ = Vector3.back;
+
+            // Opposite faces sum to 9, matching standard D8 convention.
+            (Vector3 a, Vector3 b, Vector3 c)[] faceVerts =
+            {
+                (posX, posY, posZ), // 1
+                (posX, posY, negZ), // 2
+                (posX, negY, posZ), // 3
+                (negX, posY, posZ), // 4
+                (posX, negY, negZ), // 5
+                (negX, posY, negZ), // 6
+                (negX, negY, posZ), // 7
+                (negX, negY, negZ)  // 8
+            };
+
+            ConvexMeshBuilder builder = new();
+            foreach ((Vector3 a, Vector3 b, Vector3 c) in faceVerts)
+            {
+                builder.AddTriangle(a, b, c);
+            }
+
+            GameObject go = builder.Build("D8 (Generated)");
+            return new DiceMesh(go, builder.Faces);
+        }
+
+        private static DiceMesh CreateDodecahedron()
+        {
+            float phi = (1f + Mathf.Sqrt(5f)) / 2f;
+            float inv = 1f / phi;
+
+            // All 20 vertices of a regular dodecahedron sit at the same distance from the
+            // origin; this scale normalizes that circumradius to 1.
+            float scale = 1f / Mathf.Sqrt(3f);
+
+            Vector3[] v =
+            {
+                new Vector3(1, 1, 1) * scale,       // 0
+                new Vector3(1, 1, -1) * scale,      // 1
+                new Vector3(1, -1, 1) * scale,      // 2
+                new Vector3(1, -1, -1) * scale,     // 3
+                new Vector3(-1, 1, 1) * scale,      // 4
+                new Vector3(-1, 1, -1) * scale,     // 5
+                new Vector3(-1, -1, 1) * scale,     // 6
+                new Vector3(-1, -1, -1) * scale,    // 7
+                new Vector3(0, inv, phi) * scale,   // 8
+                new Vector3(inv, phi, 0) * scale,   // 9
+                new Vector3(phi, 0, inv) * scale,   // 10
+                new Vector3(0, inv, -phi) * scale,  // 11
+                new Vector3(inv, -phi, 0) * scale,  // 12
+                new Vector3(-phi, 0, inv) * scale,  // 13
+                new Vector3(0, -inv, phi) * scale,  // 14
+                new Vector3(-inv, phi, 0) * scale,  // 15
+                new Vector3(phi, 0, -inv) * scale,  // 16
+                new Vector3(0, -inv, -phi) * scale, // 17
+                new Vector3(-inv, -phi, 0) * scale, // 18
+                new Vector3(-phi, 0, -inv) * scale  // 19
+            };
+
+            // Opposite faces sum to 13, matching standard D12 convention. Each entry lists a
+            // pentagon's vertices in perimeter order.
+            int[][] faceIndices =
+            {
+                new[] { 11, 17, 7, 19, 5 },  // 1
+                new[] { 9, 1, 11, 5, 15 },   // 2
+                new[] { 4, 15, 5, 19, 13 },  // 3
+                new[] { 14, 8, 4, 13, 6 },   // 4
+                new[] { 7, 18, 6, 13, 19 },  // 5
+                new[] { 3, 12, 18, 7, 17 },  // 6
+                new[] { 0, 9, 15, 4, 8 },    // 7
+                new[] { 10, 16, 1, 9, 0 },   // 8
+                new[] { 1, 16, 3, 17, 11 },  // 9
+                new[] { 16, 10, 2, 12, 3 },  // 10
+                new[] { 12, 2, 14, 6, 18 },  // 11
+                new[] { 2, 10, 0, 8, 14 }    // 12
+            };
+
+            ConvexMeshBuilder builder = new();
+            foreach (int[] face in faceIndices)
+            {
+                builder.AddFace(new[] { v[face[0]], v[face[1]], v[face[2]], v[face[3]], v[face[4]] });
+            }
+
+            GameObject go = builder.Build("D12 (Generated)");
+            return new DiceMesh(go, builder.Faces);
+        }
+
+        private static DiceMesh CreateIcosahedron()
+        {
+            float phi = (1f + Mathf.Sqrt(5f)) / 2f;
+
+            // All 12 vertices of a regular icosahedron sit at the same distance from the
+            // origin; this scale normalizes that circumradius to 1.
+            float scale = 1f / Mathf.Sqrt(phi + 2f);
+
+            Vector3[] v =
+            {
+                new Vector3(0, 1, phi) * scale,    // 0
+                new Vector3(1, phi, 0) * scale,    // 1
+                new Vector3(phi, 0, 1) * scale,    // 2
+                new Vector3(0, 1, -phi) * scale,   // 3
+                new Vector3(1, -phi, 0) * scale,   // 4
+                new Vector3(-phi, 0, 1) * scale,   // 5
+                new Vector3(0, -1, phi) * scale,   // 6
+                new Vector3(-1, phi, 0) * scale,   // 7
+                new Vector3(phi, 0, -1) * scale,   // 8
+                new Vector3(0, -1, -phi) * scale,  // 9
+                new Vector3(-1, -phi, 0) * scale,  // 10
+                new Vector3(-phi, 0, -1) * scale   // 11
+            };
+
+            // Opposite faces sum to 21, matching standard D20 convention.
+            int[][] faceIndices =
+            {
+                new[] { 6, 4, 2 },    // 1
+                new[] { 7, 1, 3 },    // 2
+                new[] { 8, 1, 2 },    // 3
+                new[] { 8, 4, 2 },    // 4
+                new[] { 8, 1, 3 },    // 5
+                new[] { 8, 9, 3 },    // 6
+                new[] { 8, 9, 4 },    // 7
+                new[] { 10, 9, 4 },   // 8
+                new[] { 0, 1, 2 },    // 9
+                new[] { 0, 6, 2 },    // 10
+                new[] { 11, 9, 3 },   // 11
+                new[] { 11, 10, 9 },  // 12
+                new[] { 0, 7, 1 },    // 13
+                new[] { 0, 7, 5 },    // 14
+                new[] { 0, 6, 5 },    // 15
+                new[] { 10, 6, 5 },   // 16
+                new[] { 11, 7, 5 },   // 17
+                new[] { 11, 10, 5 },  // 18
+                new[] { 10, 6, 4 },   // 19
+                new[] { 11, 7, 3 }    // 20
+            };
+
+            ConvexMeshBuilder builder = new();
+            foreach (int[] face in faceIndices)
+            {
+                builder.AddTriangle(v[face[0]], v[face[1]], v[face[2]]);
+            }
+
+            GameObject go = builder.Build("D20 (Generated)");
             return new DiceMesh(go, builder.Faces);
         }
 
@@ -140,7 +298,9 @@ namespace Drakken.Generation
 
             public IReadOnlyList<DiceFacePose> Faces => faces;
 
-            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c)
+            // upDetectionDirection overrides what GetUpFaceValue checks against world-up for this face,
+            // for shapes (e.g. tetrahedron) read from a vertex rather than the face's own normal.
+            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3? upDetectionDirection = null)
             {
                 Vector3 centroid = (a + b + c) / 3f;
                 Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
@@ -161,7 +321,41 @@ namespace Drakken.Generation
                 triangles.Add(startIndex + 2);
 
                 Vector3 direction = centroid.normalized;
-                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction)));
+                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection));
+            }
+
+            // Adds a convex planar polygon (e.g. a pentagon) as a single dice face, fan-triangulated
+            // from its centroid. verts must already be ordered around the polygon's perimeter.
+            public void AddFace(Vector3[] verts, Vector3? upDetectionDirection = null)
+            {
+                Vector3 centroid = Vector3.zero;
+                foreach (Vector3 vertex in verts)
+                {
+                    centroid += vertex;
+                }
+                centroid /= verts.Length;
+
+                Vector3 normal = Vector3.Cross(verts[1] - verts[0], verts[2] - verts[0]).normalized;
+
+                // Fix winding direction
+                if (Vector3.Dot(normal, centroid) < 0f)
+                {
+                    Array.Reverse(verts);
+                }
+
+                int centerIndex = vertices.Count;
+                vertices.Add(centroid);
+                vertices.AddRange(verts);
+
+                for (int i = 0; i < verts.Length; i++)
+                {
+                    triangles.Add(centerIndex);
+                    triangles.Add(centerIndex + 1 + i);
+                    triangles.Add(centerIndex + 1 + (i + 1) % verts.Length);
+                }
+
+                Vector3 direction = centroid.normalized;
+                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection));
             }
 
             public GameObject Build(string name)
@@ -186,15 +380,23 @@ namespace Drakken.Generation
 
         public readonly struct DiceFacePose
         {
+            // The face's own outward normal direction; used to place/orient a label flush against it.
             public readonly Vector3 Direction;
             public readonly Vector3 Position;
             public readonly Quaternion LabelRotation;
 
-            public DiceFacePose(Vector3 direction, Vector3 position, Quaternion labelRotation)
+            // Direction checked against world-up to decide whether this face's value is "the" reading
+            // once the die settles. Usually the same as Direction, since the settled face really does
+            // point up (cube, bipyramid). For shapes read from a vertex rather than a face (tetrahedron),
+            // this instead points toward that vertex.
+            public readonly Vector3 UpDetectionDirection;
+
+            public DiceFacePose(Vector3 direction, Vector3 position, Quaternion labelRotation, Vector3? upDetectionDirection = null)
             {
                 Direction = direction;
                 Position = position;
                 LabelRotation = labelRotation;
+                UpDetectionDirection = (upDetectionDirection ?? direction).normalized;
             }
         }
 

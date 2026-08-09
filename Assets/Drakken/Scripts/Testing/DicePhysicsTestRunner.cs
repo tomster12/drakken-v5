@@ -9,7 +9,7 @@ namespace Drakken.Testing
         [SerializeField] private DicePhysicsReplayer replayer;
 
         [Header("Config")]
-        [SerializeField] private int[] sideCountsToSpawn = { 6, 6, 4, 8 };
+        [SerializeField] private int[] sideCountsToSpawn = { 4, 6, 8, 12, 20, 40 };
         [SerializeField] private Vector3 spawnOrigin = new(-5f, 1f, 0f);
         [SerializeField] private Vector3 throwTarget = Vector3.zero;
 

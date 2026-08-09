@@ -6,12 +6,12 @@ namespace Drakken.Testing
 {
     public class DicePhysicsReplayTrace
     {
-        public List<InitialDiceRecord> initialDice;
+        public List<DiceInstanceRecord> dice;
         public List<DicePhysicsTickSnapshot> tickSnapshots;
         public float FixedTimestep;
     }
 
-    public struct InitialDiceRecord
+    public struct DiceInstanceRecord
     {
         public DiceInstance Instance;
         public Vector3 spawnPosition;

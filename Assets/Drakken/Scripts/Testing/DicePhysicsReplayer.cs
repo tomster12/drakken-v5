@@ -28,7 +28,7 @@ namespace Drakken.Testing
         {
             replayTransformsByInstanceId = new Dictionary<int, Transform>();
 
-            foreach (InitialDiceRecord record in activeTrace.initialDice)
+            foreach (DiceInstanceRecord record in activeTrace.dice)
             {
                 var diceView = DiceView.CreateProcedural(assetDatabase, record.Instance);
 

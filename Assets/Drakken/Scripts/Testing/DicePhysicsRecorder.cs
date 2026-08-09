@@ -179,11 +179,11 @@ namespace Drakken.Testing
 
         private DicePhysicsReplayTrace BuildTrace()
         {
-            List<InitialDiceRecord> initialDice = new(physicsDice.Count);
+            List<DiceInstanceRecord> initialDice = new(physicsDice.Count);
 
             foreach (PhysicsDice dice in physicsDice)
             {
-                initialDice.Add(new InitialDiceRecord
+                initialDice.Add(new DiceInstanceRecord
                 {
                     Instance = dice.Instance,
                     spawnPosition = dice.spawnPosition
@@ -192,7 +192,7 @@ namespace Drakken.Testing
 
             return new DicePhysicsReplayTrace
             {
-                initialDice = initialDice,
+                dice = initialDice,
                 tickSnapshots = new(tickSnapshots),
                 FixedTimestep = fixedTimestep
             };
