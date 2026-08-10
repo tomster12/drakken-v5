@@ -19,13 +19,14 @@ namespace Drakken.Client.World
     {
         public UnityEvent<DiceView> OnClicked = new();
 
-        private readonly Color hoverOutlineColor = Color.white;
-        private readonly Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
-        private const float FaceLabelFontSize = 3f;
-        private const float FaceLabelSurfaceOffset = 0.01f;
-        private static readonly Vector2 FaceLabelSize = new(0.8f, 0.8f);
 
         private Outline outline;
+        private Color hoverOutlineColor = Color.white;
+        private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
+        private float FaceLabelFontSize = 1.3f;
+        private float FaceLabelSurfaceOffset = 0.01f;
+        private Vector2 FaceLabelSize = new(0.8f, 0.8f);
+
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         public DiceInstance DiceInstance { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
@@ -80,7 +81,9 @@ namespace Drakken.Client.World
                 label.text = dice.Faces[i].Value.ToString();
                 label.alignment = TextAlignmentOptions.Center;
                 label.fontSize = FaceLabelFontSize;
+
                 if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
+                if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
             }
         }
 

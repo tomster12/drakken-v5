@@ -8,12 +8,14 @@ namespace Drakken.Client.World
         public TitleLayout Title;
         public DraftingLayout Drafting;
         public GameLayout Game;
+        public DiceTrayLayout Dice;
         public float TokenSpacing = 0.4f;
 
         private void Awake()
         {
             Title.SetInitialState();
             Drafting.SetInitialState();
+            Dice.SetInitialState();
         }
     }
 
@@ -79,5 +81,20 @@ namespace Drakken.Client.World
         public Transform PlayingCameraPosition;
         public Transform TokenRow;
         public GameObject Bag;
+    }
+
+    [Serializable]
+    public class DiceTrayLayout
+    {
+        public DiceTray P1;
+        public DiceTray P2;
+
+        public void SetInitialState()
+        {
+            P1.gameObject.SetActive(false);
+            P2.gameObject.SetActive(false);
+        }
+
+        public DiceTray Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
     }
 }

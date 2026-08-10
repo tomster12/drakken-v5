@@ -2,6 +2,7 @@ using System.Linq;
 using UnityEngine;
 using Drakken.Common.Utility;
 using Drakken.Client;
+using Drakken.Client.World;
 using Drakken.Server;
 using System;
 using Drakken.Networking;
@@ -15,6 +16,7 @@ namespace Drakken
 
         public GameClient Client => client;
         public GameServer Server => server;
+        public SceneLayout SceneLayout => sceneLayout;
         public IGameConnection Connection =>
             (IGameConnection)debugConnection
             ?? UnityGameConnection.Singleton;
@@ -23,6 +25,7 @@ namespace Drakken
         [Header("References")]
         [SerializeField] private GameClient client;
         [SerializeField] private GameServer server;
+        [SerializeField] private SceneLayout sceneLayout;
 
         [Header("Debug")]
         [SerializeField] private bool debugPreventApplication = false;

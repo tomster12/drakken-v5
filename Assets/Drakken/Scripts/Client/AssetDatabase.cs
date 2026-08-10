@@ -19,6 +19,7 @@ namespace Drakken.Client
 
         [Header("Fonts")]
         [SerializeField] public TMP_FontAsset DiceFaceLabelFont;
+        [SerializeField] public Material DiceFaceLabelMaterial;
 
         public GameObject GetTokenMeshPrefabById(string tokenId)
         {

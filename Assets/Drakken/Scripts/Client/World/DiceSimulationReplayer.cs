@@ -18,15 +18,15 @@ namespace Drakken.Client.World
             List<(DiceLifetimeTrace Record, DiceView View)> pairs = new();
 
             float maxTimeSeconds = 0f;
-            foreach (var record in trace.Dice)
+            foreach (var diceRecord in trace.Dice)
             {
-                if (record.PoseTraces.Count == 0) continue;
+                if (diceRecord.PoseTraces.Count == 0) continue;
 
-                var view = DiceView.Create(assets, record.Instance);
-                view.transform.SetPositionAndRotation(record.PoseTraces[0].Position, record.PoseTraces[0].Rotation);
-                pairs.Add((record, view));
+                var view = DiceView.Create(assets, diceRecord.Instance);
+                view.transform.SetPositionAndRotation(diceRecord.PoseTraces[0].Position, diceRecord.PoseTraces[0].Rotation);
+                pairs.Add((diceRecord, view));
 
-                maxTimeSeconds = Mathf.Max(maxTimeSeconds, record.PoseTraces[^1].Tick * trace.FixedTimestep);
+                maxTimeSeconds = Mathf.Max(maxTimeSeconds, diceRecord.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
 
             float elapsedSeconds = 0f;

@@ -7,7 +7,7 @@ namespace Drakken.Generation
 {
     public static class DiceMeshFactory
     {
-        private const float BaseScale = 0.5f;
+        public const float BaseScale = 0.3f;
 
         public static DiceMesh Create(DiceInstance diceInstance, Material material = null, float scale = 1f)
         {

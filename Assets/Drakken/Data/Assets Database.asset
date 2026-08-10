@@ -14,7 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Drakken.DrakkenAssetDatabase
   TokenViewPrefab: {fileID: 3855784460158510969, guid: 97f47f7dda7e4554c9244eed5f04093d, type: 3}
   EmptyTokenMeshPrefab: {fileID: 5067687471921541806, guid: a90b2d4ba41805c48a79fc3d7b4351b2, type: 3}
-  DiceViewPrefab: {fileID: 6660603119417165138, guid: 4eb5b6f0e6bf8d14d9b2dc4a3bf3f9ea, type: 3}
   tokenMeshPrefabs:
   - TokenId: dragon
     Prefab: {fileID: 4482217670635567624, guid: 8cf7b91a941a9624cb13b9d159cee4f1, type: 3}
@@ -22,3 +21,4 @@ MonoBehaviour:
     Prefab: {fileID: 7514494852266716030, guid: 43aac607fc09d1f4282a4c4037cc2760, type: 3}
   DiceMeshMaterial: {fileID: 2100000, guid: 756f505a9b2d1cd45bf70fc5796f5662, type: 2}
   DiceFaceLabelFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  DiceFaceLabelMaterial: {fileID: 2100000, guid: 30e602683ef98cc448a350c56f81cab4, type: 2}

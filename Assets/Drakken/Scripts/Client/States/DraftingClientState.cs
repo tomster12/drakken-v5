@@ -51,11 +51,15 @@ namespace Drakken.Client.States
             GameEntrypoint.Singleton.Client.Camera.SetTarget(
                 MyDraftingLayout.CameraPosition, snap: fromType == ClientStateType.Title);
 
-            UpdateStatusUI();
+            SceneLayout.Dice.P1.gameObject.SetActive(true);
+            SceneLayout.Dice.P2.gameObject.SetActive(true);
 
+            UpdateClientUI();
+
+            await Task.Delay(500);
             await RollDice();
 
-            // And now spawn tokens ready to discard
+            await Task.Delay(2000);
             SpawnTokens();
         }
 
@@ -86,27 +90,30 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            // Destroy any dice from a previous round - the physics replay below creates their replacements,
-            // which then stay in place as the real, interactable dice for the rest of the game.
+            // Reset dice views to let the simulation replayer spawn
             SceneObjects.P1.DestroyAllDice();
             SceneObjects.P2.DestroyAllDice();
 
-            await PlayDiceTraces(Match.LastDiceTraces);
+            await SimulateDiceTraces(Match.LastDiceTraces);
 
             // Update UI to match dice totals
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1);
         }
 
-        private async Task PlayDiceTraces(MatchDiceSimulationTraces diceTraces)
+        private async Task SimulateDiceTraces(MatchDiceSimulationTraces diceTraces)
         {
             List<Task<DiceView[]>> tasks = new();
+
+            // Replay the dice simulation traces for each player
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
-                tasks.Add(sceneObjects.DiceSimReplayer.Play(client.Assets, diceTraces.Player(clientIndex), cts.Token));
+                tasks.Add(sceneObjects.DiceSimReplayer.Play(
+                    client.Assets, diceTraces.Player(clientIndex), cts.Token));
             }
 
+            // Get the final dice views out and update scene objects
             var results = await Task.WhenAll(tasks);
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
@@ -175,7 +182,7 @@ namespace Drakken.Client.States
 
         // ------------------------------ Main
 
-        private void UpdateStatusUI()
+        private void UpdateClientUI()
         {
             var statusText =
                 hasDiscarded ? "Waiting for opponent..."
@@ -183,7 +190,9 @@ namespace Drakken.Client.States
                 : $"Select {CountToDiscard} tokens to discard";
 
             client.UI.SetStatus("Drafting", statusText);
-            client.UI.UpdateScore(GameState.Clients[Match.ClientIndex].Score, GameState.Clients[Match.OpClientIndex].Score);
+            client.UI.UpdateScore(
+                GameState.Clients[Match.ClientIndex].Score,
+                GameState.Clients[Match.OpClientIndex].Score);
         }
 
         private void OnTokenClicked(TokenView tokenView)
@@ -227,7 +236,7 @@ namespace Drakken.Client.States
             // Cannot interact once we've selected enough
             SceneLayout.Drafting.DraftConfirmButton.Interactable = SelectedEnoughTokens;
 
-            UpdateStatusUI();
+            UpdateClientUI();
         }
 
         private async void OnConfirmDiscardClicked()
@@ -284,7 +293,7 @@ namespace Drakken.Client.States
             }
             await Task.WhenAll(tasks);
 
-            UpdateStatusUI();
+            UpdateClientUI();
         }
 
         private async void OnOtherPlayerDiscarded()

@@ -1,8 +1,10 @@
+using Drakken.Client.World;
 using Drakken.Common.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
+using Drakken.Generation;
 using Drakken.Networking;
 using Drakken.Server.Simulation;
 using System;
@@ -45,10 +47,12 @@ namespace Drakken.Server
             matchId = nextMatchId++;
             GameState = new();
 
+            var diceLayout = GameEntrypoint.Singleton.SceneLayout.Dice;
+
             DiceWorlds = new DiceSimulationWorld[2]
             {
-                new($"Match-{matchId} Dice World P1", GameConstants.DiceTrayCenter(0), GameConstants.DiceTraySize, GameConstants.DiceTrayWallHeight),
-                new($"Match-{matchId} Dice World P2", GameConstants.DiceTrayCenter(1), GameConstants.DiceTraySize, GameConstants.DiceTrayWallHeight),
+                new($"Match-{matchId} Dice World P1", diceLayout.P1),
+                new($"Match-{matchId} Dice World P2", diceLayout.P2),
             };
 
             Log.Info($"ServerMatch-{matchId}", $"Created new match");
@@ -118,9 +122,10 @@ namespace Drakken.Server
             for (int p = 0; p < 2; p++)
             {
                 List<DiceInstance> newDice = new();
-                for (int d = 0; d < GameConstants.StandardDiceCount; d++)
+                for (int d = 0; d < 5; d++)
                 {
-                    newDice.Add(DiceInstance.Create(sides: GameConstants.StandardDiceSideCount));
+                    var sides = d * 2 + 4;
+                    newDice.Add(DiceInstance.Create(sides: sides));
                 }
 
                 SimulateRollDice(p, newDice);
@@ -300,20 +305,44 @@ namespace Drakken.Server
         private void SimulateRollDice(int clientIndex, List<DiceInstance> diceInstances)
         {
             var world = DiceWorlds[clientIndex];
-            var trayCenter = GameConstants.DiceTrayCenter(clientIndex);
-            var traySize = GameConstants.DiceTraySize;
-            Vector3 spawnCorner = trayCenter + new Vector3(
-                -traySize.x / 2f + 0.4f,
-                2.0f,
-                -traySize.z / 2f + 0.4f);
+            var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(clientIndex);
+            var trayCenter = tray.transform.position;
+            var traySize = tray.Size;
 
-            for (int i = 0; i < diceInstances.Count; i++)
+            const float edgeMargin = 0.2f;
+            const float spawnY = 1.5f;
+            const float throwY = 5f;
+            const float diceThrowImpulseSpeed = 5f;
+            const float diceThrowTorque = 30f;
+
+            float diceSpacing = DiceMeshFactory.BaseScale * 2.0f;
+            float clientSideSignZ = clientIndex == 0 ? -1f : 1f;
+            float rowStart = trayCenter.x - traySize.x / 2f + edgeMargin;
+            float rowWidth = traySize.x - edgeMargin * 2f;
+            int diceCount = diceInstances.Count;
+            int maxPerRow = Mathf.Max(1, Mathf.FloorToInt(rowWidth / diceSpacing));
+            int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
+
+            int diceIndex = 0;
+            for (int row = 0; row < rowCount; row++)
             {
-                Vector3 spawnPos = spawnCorner + new Vector3(i * 0.5f, 0f, 0f);
-                Vector3 throwVelocity = (trayCenter - spawnPos).normalized * GameConstants.DiceThrowImpulseSpeed;
-                Vector3 torque = UnityEngine.Random.insideUnitSphere * GameConstants.DiceThrowTorque;
+                int rowDiceCount = diceCount / rowCount + (row < diceCount % rowCount ? 1 : 0);
+                float spawnZ = trayCenter.z + clientSideSignZ * (traySize.z / 2f - edgeMargin - row * diceSpacing);
 
-                world.Spawn(diceInstances[i], spawnPos, Quaternion.identity, throwVelocity, torque);
+                for (int i = 0; i < rowDiceCount; i++)
+                {
+                    float t = (i + 1f) / (rowDiceCount + 1f);
+                    float spawnX = rowStart + t * rowWidth;
+                    Vector3 spawnPos = new(spawnX, spawnY, spawnZ);
+                    Quaternion spawnRotation = UnityEngine.Random.rotationUniform;
+
+                    Vector3 throwTarget = trayCenter + Vector3.up * throwY * UnityEngine.Random.Range(0.6f, 1.4f);
+                    Vector3 throwVelocity = (throwTarget - spawnPos).normalized * diceThrowImpulseSpeed;
+                    Vector3 throwTorque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
+
+                    world.Spawn(diceInstances[diceIndex], spawnPos, spawnRotation, throwVelocity, throwTorque);
+                    diceIndex++;
+                }
             }
 
             world.SimulateUntilAllSettled();
@@ -324,10 +353,13 @@ namespace Drakken.Server
         {
             var world = DiceWorlds[clientIndex];
 
+            float diceThrowImpulseSpeed = 4f;
+            float diceThrowTorque = 20f;
+
             foreach (var dice in diceInstances)
             {
-                Vector3 impulse = Vector3.up * GameConstants.DiceThrowImpulseSpeed * 0.5f;
-                Vector3 torque = UnityEngine.Random.insideUnitSphere * GameConstants.DiceThrowTorque;
+                Vector3 impulse = Vector3.up * diceThrowImpulseSpeed * 0.5f;
+                Vector3 torque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
                 world.Wake(dice.InstanceId, impulse, torque);
             }
 

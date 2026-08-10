@@ -21,11 +21,10 @@ namespace Drakken.Client
         [SerializeField] private AssetDatabase assets;
         [SerializeField] private new CameraController camera;
         [SerializeField] private ClientUI ui;
-        [SerializeField] private SceneLayout layout;
 
         public ClientMatch Match { get; private set; }
         public SceneObjects SceneObjects { get; private set; } = new();
-        public SceneLayout SceneLayout => layout;
+        public SceneLayout SceneLayout => GameEntrypoint.Singleton.SceneLayout;
         public AssetDatabase Assets => assets;
         public CameraController Camera => camera;
         public ClientUI UI => ui;
@@ -43,7 +42,7 @@ namespace Drakken.Client
         {
             GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenMeshPrefabById);
 
-            SceneObjects.Init(layout, assets);
+            SceneObjects.Init(SceneLayout, assets);
 
             titleState.Init(this);
             draftingState.Init(this);
