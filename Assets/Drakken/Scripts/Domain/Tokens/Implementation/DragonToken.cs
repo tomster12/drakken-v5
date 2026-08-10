@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
+using Drakken.Domain.Dice;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
@@ -18,6 +19,7 @@ namespace Drakken.Domain.Tokens.Implementation
         public int D3Roll;
         public List<int> ReplacedIndices = new();
         public List<DiceInstance> AddedDiceInstances = new();
+        public DiceSimulationTraces DiceTrace = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
@@ -25,12 +27,18 @@ namespace Drakken.Domain.Tokens.Implementation
             serializer.SerializeValue(ref D3Roll);
             serializer.SerializeList(ref ReplacedIndices);
             serializer.SerializeList(ref AddedDiceInstances);
+            serializer.SerializeValue(ref DiceTrace);
         }
     }
 
     public class DragonTokenExecutor : TokenExecutor<EmptyTokenIntent, DragonTokenResolution>
     {
-        protected override DragonTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex)
+        private const float SpawnY = 1.5f;
+        private const float ThrowY = 5f;
+        private const float DiceThrowImpulseSpeed = 5f;
+        private const float DiceThrowTorque = 30f;
+
+        protected override DragonTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
 
@@ -44,20 +52,37 @@ namespace Drakken.Domain.Tokens.Implementation
                 .Take(replaceCount)
                 .ToList();
 
-            // Create replacement D8s
+            var trayCenter = GameEntrypoint.Singleton.SceneLayout.Dice.Player(sourceClientIndex).transform.position;
+
+            diceWorld.BeginSession();
+
+            // Remove the replaced dice from the physical world and throw in their replacements
             var addedDice = new List<DiceInstance>();
-            for (int i = 0; i < replaceCount; i++)
+            foreach (var replacedIndex in replacedIndices)
             {
+                diceWorld.RemoveDice(client.Dice[replacedIndex].InstanceId);
+
                 var newDice = DiceInstance.Create(sides: 8);
-                newDice.Roll();
+
+                Vector3 spawnPos = trayCenter + new Vector3(Random.Range(-0.3f, 0.3f), SpawnY, Random.Range(-0.3f, 0.3f));
+                Quaternion spawnRotation = Random.rotationUniform;
+                Vector3 throwTarget = trayCenter + Vector3.up * ThrowY * Random.Range(0.6f, 1.4f);
+                Vector3 throwVelocity = (throwTarget - spawnPos).normalized * DiceThrowImpulseSpeed;
+                Vector3 throwTorque = Random.insideUnitSphere * DiceThrowTorque;
+
+                diceWorld.SpawnDice(newDice, spawnPos, spawnRotation, throwVelocity, throwTorque);
                 addedDice.Add(newDice);
             }
+
+            diceWorld.SimulateUntilAllSettled();
+            var trace = diceWorld.EndSession();
 
             return new DragonTokenResolution
             {
                 D3Roll = replaceCount,
                 ReplacedIndices = replacedIndices,
                 AddedDiceInstances = addedDice,
+                DiceTrace = trace,
             };
         }
 
@@ -94,6 +119,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
 
             // Spawn a D3 next to the token showing how many dice it's about to replace
+            // TODO: Fix D3 reliance
             var d3Instance = DiceInstance.Create(sides: 3, value: resolution.D3Roll);
             var d3View = DiceView.Create(visualContext.Assets, d3Instance);
 
@@ -106,32 +132,30 @@ namespace Drakken.Domain.Tokens.Implementation
 
             await d3View.AnimateShrinkAndDestroy(ct);
 
-            // Shrink each removed dice to localScale 0, remembering where each one was so its
-            // replacement can grow in from the same spot
+            // Shrink and remove each replaced dice
             List<Task> removeDiceAnimationTasks = new();
-            var replacedPositions = new Dictionary<int, Vector3>();
             foreach (int removedDiceIndex in resolution.ReplacedIndices)
             {
-                var diceView = sourcePlayerObjects.DiceViews[removedDiceIndex];
-                replacedPositions[removedDiceIndex] = diceView.transform.position;
-                removeDiceAnimationTasks.Add(diceView.AnimateShrinkAndDestroy(ct));
+                removeDiceAnimationTasks.Add(sourcePlayerObjects.DiceViews[removedDiceIndex].AnimateShrinkAndDestroy(ct));
+                sourcePlayerObjects.DiceViews[removedDiceIndex] = null;
             }
             await Task.WhenAll(removeDiceAnimationTasks);
 
             await Task.Delay(100);
 
-            // Create new dice at each of the replaced positions and roll sequentially
-            Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
+            // Replay dice simulation
+            var viewsByInstanceId = await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Assets, resolution.DiceTrace, sourcePlayerObjects, ct);
 
-            List<Task> tasks = new();
+            // Slot the newly rolled dice into their replaced positions
+            // Be careful to rebind the dice view to the official dice instance
             for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
-                var diceIndex = resolution.ReplacedIndices[i];
-                var newDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.AddedDiceInstances[i], diceIndex, replacedPositions[diceIndex], targetRot);
-                tasks.Add(newDiceView.AnimateGrow(ct));
+                var addedInstance = resolution.AddedDiceInstances[i];
+                var newDiceView = viewsByInstanceId[addedInstance.InstanceId];
+                newDiceView.Rebind(addedInstance);
+                sourcePlayerObjects.DiceViews[resolution.ReplacedIndices[i]] = newDiceView;
             }
-
-            await Task.WhenAll(tasks);
 
             visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 

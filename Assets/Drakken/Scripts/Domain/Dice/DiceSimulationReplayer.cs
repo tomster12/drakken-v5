@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -11,25 +10,47 @@ namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
-        public async Task<DiceView[]> Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
+        public Task<Dictionary<int, DiceView>> Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
+            => Play(assets, trace, existingViews: null, ct);
+
+        // Reuses whatever view already exists (looked up by dice instance id) for any dice already on
+        // screen for this player - e.g. one the session's physics disturbed without replacing it - rather
+        // than spawning a duplicate. Never writes back to existingViews; placing a freshly-created view
+        // into a specific slot is the caller's responsibility.
+        public async Task<Dictionary<int, DiceView>> Play(
+            AssetDatabase assets,
+            DiceSimulationTraces trace,
+            ScenePlayerObjects existingViews,
+            CancellationToken ct)
         {
-            // Plays the physics trace and returns the DiceViews it created, left at their final settled pose -
-            // these become the permanent, interactable dice for the rest of the game (no separate "row" spawn).
+            List<(DiceSessionTrace Traces, DiceView View)> pairs = new();
+            Dictionary<int, DiceView> viewsByInstanceId = new();
 
-            List<(DiceSessionTrace Record, DiceView View)> pairs = new();
-
-            float maxTimeSeconds = 0f;
-            foreach (var diceRecord in trace.Dice)
+            // For each dice in the simulation trace
+            foreach (var diceTrace in trace.Dice)
             {
-                if (diceRecord.PoseTraces.Count == 0) continue;
+                if (diceTrace.PoseTraces.Count == 0) continue;
 
-                var view = DiceView.Create(assets, diceRecord.Instance);
-                view.transform.SetPositionAndRotation(diceRecord.PoseTraces[0].Position, diceRecord.PoseTraces[0].Rotation);
-                pairs.Add((diceRecord, view));
+                // If we have not been given a relevant diceView then make a new one
+                var view = existingViews?.FindDiceView(diceTrace.Instance.InstanceId);
+                if (view == null)
+                {
+                    view = DiceView.Create(assets, diceTrace.Instance);
+                    view.transform.SetPositionAndRotation(diceTrace.PoseTraces[0].Position, diceTrace.PoseTraces[0].Rotation);
+                }
 
-                maxTimeSeconds = Mathf.Max(maxTimeSeconds, diceRecord.PoseTraces[^1].Tick * trace.FixedTimestep);
+                // Now track the trace / view for re-simulating
+                pairs.Add((diceTrace, view));
+                viewsByInstanceId[diceTrace.Instance.InstanceId] = view;
             }
 
+            float maxTimeSeconds = 0f;
+            foreach (var (Traces, _) in pairs)
+            {
+                maxTimeSeconds = Mathf.Max(maxTimeSeconds, Traces.PoseTraces[^1].Tick * trace.FixedTimestep);
+            }
+
+            // Scrub through the simulating with interpolated frames
             float elapsedSeconds = 0f;
             while (elapsedSeconds < maxTimeSeconds)
             {
@@ -44,16 +65,16 @@ namespace Drakken.Domain.Dice
             if (!ct.IsCancellationRequested)
                 ApplyAtTime(pairs, trace.FixedTimestep, maxTimeSeconds);
 
-            return pairs.Select(pair => pair.View).ToArray();
+            return viewsByInstanceId;
         }
 
-        private void ApplyAtTime(List<(DiceSessionTrace Record, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
+        private void ApplyAtTime(List<(DiceSessionTrace Traces, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
         {
             float rawTick = elapsedSeconds / fixedTimestep;
 
-            foreach (var (record, view) in pairs)
+            foreach (var (Traces, view) in pairs)
             {
-                var (lower, upper, t) = SampleAt(record.PoseTraces, rawTick);
+                var (lower, upper, t) = SampleAt(Traces.PoseTraces, rawTick);
 
                 view.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),

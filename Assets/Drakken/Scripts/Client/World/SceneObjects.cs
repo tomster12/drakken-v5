@@ -71,6 +71,17 @@ namespace Drakken.Client.World
         public void DestroyDiceAtIndex(int diceIndex)
         {
             GameObject.Destroy(DiceViews[diceIndex].gameObject);
+            DiceViews[diceIndex] = null;
+        }
+
+        public DiceView FindDiceView(int diceInstanceId)
+        {
+            foreach (var diceView in DiceViews)
+            {
+                if (diceView != null && diceView.DiceInstance.InstanceId == diceInstanceId)
+                    return diceView;
+            }
+            return null;
         }
 
         public void DestroyAllDice()

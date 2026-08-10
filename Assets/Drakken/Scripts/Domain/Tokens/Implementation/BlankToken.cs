@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
+using Drakken.Domain.Dice;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
 using Unity.Netcode;
@@ -17,7 +18,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class BlankTokenExecutor : TokenExecutor<EmptyTokenIntent, BlankTokenResolution>
     {
-        protected override BlankTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex)
+        protected override BlankTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
         {
             // TODO
 

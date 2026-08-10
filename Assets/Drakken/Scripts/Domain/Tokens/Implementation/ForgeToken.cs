@@ -5,6 +5,7 @@ using Drakken.Client;
 using Drakken.Client.World;
 using Drakken.Domain.Animation;
 using Drakken.Common.Utility;
+using Drakken.Domain.Dice;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
 using Drakken.Utility;
@@ -30,7 +31,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class ForgeTokenExecutor : TokenExecutor<PickDiceTokenIntent, ForgeTokenResolution>
     {
-        protected override ForgeTokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex)
+        protected override ForgeTokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
 

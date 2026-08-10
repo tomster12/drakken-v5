@@ -44,6 +44,7 @@ namespace Drakken.Domain.Tokens
                 )
             );
 
+            /*
             registry.Register(
                 new TokenDefinition
                 {
@@ -62,6 +63,7 @@ namespace Drakken.Domain.Tokens
                     prefabFactory?.Invoke("forge")
                 )
             );
+            */
         }
     }
 }

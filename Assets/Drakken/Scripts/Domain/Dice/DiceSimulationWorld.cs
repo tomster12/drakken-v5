@@ -22,6 +22,7 @@ namespace Drakken.Domain.Dice
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
         private int currentTick;
         private int sessionStartTick;
+        private bool isInSession;
 
         public bool AllDynamicSettled =>
             diceBodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
@@ -63,6 +64,42 @@ namespace Drakken.Domain.Dice
             await SceneManager.UnloadSceneAsync(scene);
         }
 
+        // ------------------------------ Session
+
+        public void BeginSession()
+        {
+            Assert.True(!isInSession, "Cannot begin a session while one is already in progress");
+
+            isInSession = true;
+            sessionStartTick = currentTick;
+        }
+
+        public DiceSimulationTraces EndSession()
+        {
+            Assert.True(isInSession, "Cannot end a session that has not begun");
+
+            DiceSimulationTraces traces = new() { FixedTimestep = fixedTimestep };
+
+            // Get a trace of each dice for this session and clear out traces
+            foreach (var body in diceBodiesByInstanceId.Values)
+            {
+                if (body.SessionPoses.Count == 0) continue;
+
+                traces.Dice.Add(BuildSessionTrace(body, removeTick: -1));
+                body.SessionPoses.Clear();
+            }
+
+            // Make sure to also include any dice that was removed this session
+            foreach (var trace in sessionRemovedTraces)
+            {
+                traces.Dice.Add(trace);
+            }
+            sessionRemovedTraces.Clear();
+
+            isInSession = false;
+            return traces;
+        }
+
         // ------------------------------ Dice
 
         public int SpawnDice(
@@ -72,6 +109,8 @@ namespace Drakken.Domain.Dice
             Vector3 linearImpulse,
             Vector3 angularImpulse)
         {
+            Assert.True(isInSession, "Cannot spawn dice outside of a session");
+
             var diceMesh = DiceMeshFactory.Create(instance);
             SceneManager.MoveGameObjectToScene(diceMesh.GameObject, scene);
 
@@ -99,6 +138,8 @@ namespace Drakken.Domain.Dice
 
         public void WakeDice(int diceInstanceId, Vector3 linearImpulse, Vector3 angularImpulse)
         {
+            Assert.True(isInSession, "Cannot wake dice outside of a session");
+
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
 
             // Record resting pose as the start of this session
@@ -113,6 +154,8 @@ namespace Drakken.Domain.Dice
 
         public void RemoveDice(int diceInstanceId)
         {
+            Assert.True(isInSession, "Cannot remove dice outside of a session");
+
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
             diceBodiesByInstanceId.Remove(diceInstanceId);
 
@@ -122,14 +165,22 @@ namespace Drakken.Domain.Dice
             GameObject.Destroy(diceBody.Rigidbody.gameObject);
         }
 
+        public int PeekUpFaceValue(int diceInstanceId)
+        {
+            var diceBody = diceBodiesByInstanceId[diceInstanceId];
+            return DiceMeshFactory.GetUpFaceValue(diceBody.Rigidbody.transform, diceBody.MeshFaces);
+        }
+
         public void FreezeAllDice()
         {
+            Assert.True(isInSession, "Cannot freeze dice outside of a session");
+
             // Officially lock all dices in place as kinematic and record value
             foreach (var body in diceBodiesByInstanceId.Values)
             {
                 if (body.Rigidbody.isKinematic) continue;
 
-                body.Instance.Value = DiceMeshFactory.GetUpFaceValue(body.Rigidbody.transform, body.MeshFaces);
+                body.Instance.Value = PeekUpFaceValue(body.Instance.InstanceId);
                 body.RecordPose(currentTick);
                 body.Rigidbody.isKinematic = true;
             }
@@ -137,15 +188,20 @@ namespace Drakken.Domain.Dice
 
         public void SimulateUntilAllSettled(bool freezeOnSettled = true)
         {
+            Assert.True(isInSession, "Cannot simulate outside of a session");
+
             // Run until all dice are settled
             while (!AllDynamicSettled)
             {
                 var settled = SimulateUntilAnySettled();
 
                 // If we do not get the list of settled dice then we hit the tick limit
+                // We log this as an error and continue, everything will go on fine but we
+                // need it to be clearly logged it went wrong
                 if (settled == null)
                 {
-                    throw new InvalidOperationException("Could not finish simulation");
+                    Log.Error("DiceSimulationWorld", "Could not finish simulation");
+                    break;
                 }
             }
 
@@ -157,6 +213,8 @@ namespace Drakken.Domain.Dice
 
         public List<int> SimulateUntilAnySettled()
         {
+            Assert.True(isInSession, "Cannot simulate outside of a session");
+
             float settleLinSqr = settledLinearVelocity * settledLinearVelocity;
             float settleAngSqr = settledAngularVelocity * settledAngularVelocity;
 
@@ -204,30 +262,6 @@ namespace Drakken.Domain.Dice
             }
 
             return null;
-        }
-
-        public DiceSimulationTraces ExtractSessionTraces()
-        {
-            DiceSimulationTraces traces = new() { FixedTimestep = fixedTimestep };
-
-            // Get a trace of each dice for this session and clear out traces
-            foreach (var body in diceBodiesByInstanceId.Values)
-            {
-                if (body.SessionPoses.Count == 0) continue;
-
-                traces.Dice.Add(BuildSessionTrace(body, removeTick: -1));
-                body.SessionPoses.Clear();
-            }
-
-            // Make sure to also include any dice that was removed this session
-            foreach (var trace in sessionRemovedTraces)
-            {
-                traces.Dice.Add(trace);
-            }
-            sessionRemovedTraces.Clear();
-
-            sessionStartTick = currentTick;
-            return traces;
         }
 
         private DiceSessionTrace BuildSessionTrace(DiceBody body, int removeTick)

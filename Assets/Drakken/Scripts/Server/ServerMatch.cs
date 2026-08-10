@@ -218,7 +218,7 @@ namespace Drakken.Server
 
             // Calculate and apply resolution to game state
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            var resolution = entry.Executor.Execute(GameState, message.Intent, sourceClientIndex);
+            var resolution = entry.Executor.Execute(GameState, message.Intent, sourceClientIndex, DiceWorlds[sourceClientIndex]);
             entry.Executor.Apply(GameState, resolution, sourceClientIndex);
             GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);
 
@@ -294,13 +294,15 @@ namespace Drakken.Server
         {
             for (int p = 0; p < 2; p++)
             {
+                var world = DiceWorlds[p];
+                world.BeginSession();
+
                 const float edgeMargin = 0.2f;
                 const float spawnY = 1.5f;
                 const float throwY = 5f;
                 const float diceThrowImpulseSpeed = 5f;
                 const float diceThrowTorque = 30f;
 
-                var world = DiceWorlds[p];
                 var diceInstances = GameState.Clients[p].Dice;
                 int diceCount = diceInstances.Count;
                 var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
@@ -341,8 +343,8 @@ namespace Drakken.Server
 
             return new()
             {
-                P1 = DiceWorlds[0].ExtractSessionTraces(),
-                P2 = DiceWorlds[1].ExtractSessionTraces(),
+                P1 = DiceWorlds[0].EndSession(),
+                P2 = DiceWorlds[1].EndSession(),
             };
         }
 
@@ -350,10 +352,12 @@ namespace Drakken.Server
         {
             for (int p = 0; p < 2; p++)
             {
-                float diceThrowImpulseSpeed = 4f;
-                float diceThrowTorque = 20f;
-
                 var world = DiceWorlds[p];
+                world.BeginSession();
+
+                const float diceThrowImpulseSpeed = 4f;
+                const float diceThrowTorque = 20f;
+
                 var diceInstances = GameState.Clients[p].Dice;
 
                 foreach (var dice in diceInstances)
@@ -368,8 +372,8 @@ namespace Drakken.Server
 
             return new()
             {
-                P1 = DiceWorlds[0].ExtractSessionTraces(),
-                P2 = DiceWorlds[1].ExtractSessionTraces(),
+                P1 = DiceWorlds[0].EndSession(),
+                P2 = DiceWorlds[1].EndSession(),
             };
         }
     }
