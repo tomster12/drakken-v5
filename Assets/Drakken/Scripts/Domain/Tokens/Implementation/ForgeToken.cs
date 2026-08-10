@@ -78,7 +78,6 @@ namespace Drakken.Domain.Tokens.Implementation
     {
         private const float PullTogetherDuration = 0.35f;
         private const float PullTogetherArchHeight = 1.5f;
-        private const float ShiftDuration = 0.3f;
 
         protected override async Task Animate(
             ClientMatch match,
@@ -127,7 +126,7 @@ namespace Drakken.Domain.Tokens.Implementation
             GameObject.Destroy(firstDiceView.gameObject);
             GameObject.Destroy(secondDiceView.gameObject);
 
-            // Rebuild the dice row without the two merged dice, reserving a slot for the forged dice
+            // Rebuild the dice list without the two merged dice, reserving a slot for the forged dice
             var newDiceViews = new DiceView[oldDiceViews.Length - 1];
             int writeIndex = 0;
             int forgedSlotIndex = -1;
@@ -146,27 +145,10 @@ namespace Drakken.Domain.Tokens.Implementation
             }
             sourcePlayerObjects.DiceViews = newDiceViews;
 
-            // Slide the remaining dice into their new positions in the shortened row
-            List<Task> shiftTasks = new();
-            for (int i = 0; i < newDiceViews.Length; i++)
-            {
-                if (i == forgedSlotIndex) continue;
-
-                var diceView = newDiceViews[i];
-                Vector3 targetPosition = sourcePlayerObjects.GetDiceRowIndexPosition(i);
-                shiftTasks.Add(diceView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
-                    .Next(AnimationTracks.Position(ShiftDuration, diceView.transform, diceView.transform.position, targetPosition, Easing.EaseInOutQuad))
-                    .Build(), ct));
-            }
-            await Task.WhenAll(shiftTasks);
-
-            await Task.Delay(100);
-
-            // Spawn the forged dice into its slot and roll it
+            // Spawn the forged dice at the merge point and roll it
             Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
-            var forgedDiceView = sourcePlayerObjects.SpawnDiceAtIndex(resolution.CombinedDiceInstance, forgedSlotIndex, targetRot);
-            await forgedDiceView.AnimateGrowThenRoll(ct, durationMultiplier: 0.7f);
+            var forgedDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.CombinedDiceInstance, forgedSlotIndex, midpoint, targetRot);
+            await forgedDiceView.AnimateGrow(ct);
 
             visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 

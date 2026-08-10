@@ -21,3 +21,4 @@ MonoBehaviour:
   - TokenId: forge
     Prefab: {fileID: 7514494852266716030, guid: 43aac607fc09d1f4282a4c4037cc2760, type: 3}
   DiceMeshMaterial: {fileID: 2100000, guid: 756f505a9b2d1cd45bf70fc5796f5662, type: 2}
+  DiceFaceLabelFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

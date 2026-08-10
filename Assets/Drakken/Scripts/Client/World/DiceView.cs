@@ -19,21 +19,14 @@ namespace Drakken.Client.World
     {
         public UnityEvent<DiceView> OnClicked = new();
 
-        [Header("References")]
-        [SerializeField] private new Renderer renderer;
-        [SerializeField] private TextMeshPro valueLabel;
-        [SerializeField] private TextMeshPro sidesLabel;
-        [SerializeField] private Outline outline;
-
-        [Header("Config")]
-        [SerializeField] private Color normalColor = new(0.19f, 0.15f, 0.133f);
-        [SerializeField] private Color hoverOutlineColor = Color.white;
-        [SerializeField] private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
-
+        private readonly Color hoverOutlineColor = Color.white;
+        private readonly Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
         private const float FaceLabelFontSize = 3f;
         private const float FaceLabelSurfaceOffset = 0.01f;
         private static readonly Vector2 FaceLabelSize = new(0.8f, 0.8f);
 
+        private Outline outline;
+        private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         public DiceInstance DiceInstance { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
         public bool IsHovered { get; private set; } = false;
@@ -42,57 +35,30 @@ namespace Drakken.Client.World
         private bool isInteractionLocked = false;
         public bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
 
-        private bool isProcedural = false;
-
         // ------------------------------ Binding
 
         public static DiceView Create(AssetDatabase assets, DiceInstance instance)
         {
-            var prefab = assets.DiceViewPrefab;
-            var diceGo = Instantiate(prefab);
-            var diceView = diceGo.GetComponent<DiceView>();
-
-            diceView.Bind(instance);
-
-            return diceView;
-        }
-
-        public static DiceView CreateProcedural(AssetDatabase assets, DiceInstance instance)
-        {
             GameObject diceGo = new($"Dice View (D{instance.Sides})");
             var diceView = diceGo.AddComponent<DiceView>();
 
-            diceView.BindProcedural(assets, instance);
+            diceView.Bind(assets, instance);
 
             return diceView;
         }
 
-        void Awake()
+        private void Bind(AssetDatabase assets, DiceInstance dice)
         {
-            if (sidesLabel != null) sidesLabel.gameObject.SetActive(false);
-        }
-
-        public void Bind(DiceInstance dice)
-        {
-            this.DiceInstance = dice;
-
-            outline.Setup();
-
-            // Update labels to match dice instance values
-            if (valueLabel != null) valueLabel.text = DiceInstance.Value.ToString();
-            if (sidesLabel != null) sidesLabel.text = $"D{DiceInstance.Sides}";
-        }
-
-        public void BindProcedural(AssetDatabase assets, DiceInstance dice)
-        {
-            isProcedural = true;
             this.DiceInstance = dice;
 
             var diceMesh = DiceMeshFactory.Create(dice, assets.DiceMeshMaterial);
             diceMesh.GameObject.transform.SetParent(transform, false);
-            renderer = diceMesh.GameObject.GetComponent<Renderer>();
+            faces = diceMesh.Faces;
 
             CreateFaceLabels(assets, dice, diceMesh.Faces);
+
+            outline = gameObject.AddComponent<Outline>();
+            outline.Setup();
         }
 
         private void CreateFaceLabels(AssetDatabase assets, DiceInstance dice, IReadOnlyList<DiceMeshFactory.DiceFacePose> faces)
@@ -127,44 +93,13 @@ namespace Drakken.Client.World
 
         // ------------------------------ Animation
 
-        public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1)
-        {
-            float duration = 1.5f * durationMultiplier;
-            int valueCount = (int)(15 * durationMultiplier);
-
-            List<(float Time, int Value)> timedValues = new();
-
-            for (int i = 0; i < valueCount; i++)
-            {
-                float time = Easing.InverseEaseInOutQuad((float)i / (valueCount - 1)) * duration;
-                int value = Random.Range(1, DiceInstance.Sides + 1);
-                timedValues.Add((time, value));
-            }
-            timedValues.Add((duration, DiceInstance.Value));
-
-            // Build and play animation
-            var animationBuilder = AnimationSequenceBuilder
-                .Start()
-                .Next(AnimationTracks.LocalEulerRotation(duration, transform, transform.localRotation, new Vector3(0, 360f * 3, 0), Easing.EaseInOutQuad));
-
-            foreach (var pair in timedValues)
-            {
-                animationBuilder.At(pair.Time, () => valueLabel.text = pair.Value.ToString());
-            }
-
-            var animation = animationBuilder.Build();
-            await Animator.Play(animation, ct);
-        }
-
-        public async Task AnimateGrowThenRoll(CancellationToken ct, float durationMultiplier)
+        public async Task AnimateGrow(CancellationToken ct)
         {
             await Animator.Play(AnimationSequenceBuilder
                 .Start()
                 .Next(AnimationTracks.LocalScale(
-                    0.3f, transform, Vector3.zero, transform.localScale, Easing.EaseOutCubic))
+                    0.3f, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
                 .Build(), ct);
-
-            await AnimateRoll(ct, durationMultiplier);
         }
 
         public async Task AnimateShrinkAndDestroy(CancellationToken ct)
@@ -182,18 +117,10 @@ namespace Drakken.Client.World
 
         private void Update()
         {
-            // Procedural test dice have no outline/hover-label setup to drive.
-            if (isProcedural) return;
-
-            // Show sides label when hovered
-            sidesLabel.gameObject.SetActive(IsHovered && IsInteractable);
-
             // Enable / disable outline, preferring the selected color over the hover color
             bool showOutline = IsSelected || (IsHovered && IsInteractable);
             outline.SetEnabled(showOutline);
             if (showOutline) outline.OutlineColor = IsSelected ? selectedOutlineColor : hoverOutlineColor;
-
-            renderer.material.color = normalColor;
         }
 
         public void SetInteractionLocked(bool interactionLocked)

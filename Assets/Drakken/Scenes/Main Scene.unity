@@ -1226,7 +1226,7 @@ GameObject:
   m_Component:
   - component: {fileID: 734454805}
   m_Layer: 0
-  m_Name: '=============== SCENE: DRAFT'
+  m_Name: ======== DRAFTING
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1658,18 +1658,15 @@ MonoBehaviour:
   Game:
     P1:
       PlayingCameraPosition: {fileID: 1969812398}
-      DiceRow: {fileID: 786596933}
       TokenRow: {fileID: 153358487}
       Bag: {fileID: 1526400226359339687}
     P2:
       PlayingCameraPosition: {fileID: 378854362}
-      DiceRow: {fileID: 749899255}
       TokenRow: {fileID: 453743380}
       Bag: {fileID: 774944794}
     CentrePos: {fileID: 1927735674}
     PlayDropRadius: 2
   TokenSpacing: 1.2
-  DiceSpacing: 1
 --- !u!114 &865993108
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2358,7 +2355,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1057451770}
   m_Layer: 0
-  m_Name: =============== SCENE
+  m_Name: ======== SCENE
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2400,7 +2397,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1129743063}
   m_Layer: 0
-  m_Name: '=============== SCENE: TITLE'
+  m_Name: ======== TITLE
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2903,7 +2900,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1557478224}
   m_Layer: 0
-  m_Name: '=============== SCENE: PLAYING'
+  m_Name: =============== PLAYING
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3955,7 +3952,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1979924876}
   m_Layer: 0
-  m_Name: =============== SCRIPTS
+  m_Name: ======== SCRIPTS
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -55,22 +55,14 @@ namespace Drakken.Client.World
         {
             DestroyAllTokens();
             DestroyAllDice();
-            DiceSimReplayer.ClearAll();
         }
 
         // ------------------------------ Dice
 
-        public Vector3 GetDiceRowIndexPosition(int diceIndex)
-        {
-            var diceRow = GameLayout.DiceRow;
-            float offset = (diceIndex - (DiceViews.Length - 1) / 2f) * sceneLayout.DiceSpacing;
-            return diceRow.position + diceRow.right * offset;
-        }
-
-        public DiceView SpawnDiceAtIndex(DiceInstance instance, int diceIndex, Quaternion rotation)
+        public DiceView SpawnDiceAt(DiceInstance instance, int diceIndex, Vector3 position, Quaternion rotation)
         {
             var diceView = DiceView.Create(assets, instance);
-            diceView.transform.SetPositionAndRotation(GetDiceRowIndexPosition(diceIndex), rotation);
+            diceView.transform.SetPositionAndRotation(position, rotation);
             DiceViews[diceIndex] = diceView;
             return diceView;
         }

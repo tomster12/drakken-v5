@@ -9,7 +9,6 @@ namespace Drakken.Client.World
         public DraftingLayout Drafting;
         public GameLayout Game;
         public float TokenSpacing = 0.4f;
-        public float DiceSpacing = 0.35f;
 
         private void Awake()
         {
@@ -78,7 +77,6 @@ namespace Drakken.Client.World
     public class GamePlayerLayout
     {
         public Transform PlayingCameraPosition;
-        public Transform DiceRow;
         public Transform TokenRow;
         public GameObject Bag;
     }

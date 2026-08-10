@@ -59,6 +59,7 @@ namespace Drakken.Server.Simulation
         {
             var mesh = DiceMeshFactory.Create(instance);
             mesh.GameObject.transform.SetPositionAndRotation(position, rotation);
+            mesh.Renderer.enabled = false;
 
             var rb = mesh.GameObject.AddComponent<Rigidbody>();
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -159,7 +160,7 @@ namespace Drakken.Server.Simulation
         public bool AllDynamicSettled =>
             bodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
 
-        public void SettleAll()
+        public void SimulateUntilAllSettled()
         {
             // Runs StepUntilSettleTransition until every dynamic die is settled, ignoring transitions -
             // for the common case (drafting, a plain reroll) where nothing needs to react per-die.
@@ -184,6 +185,7 @@ namespace Drakken.Server.Simulation
                 body.Rigidbody.isKinematic = true;
             }
         }
+
         public DiceSimulationTraces ExtractTraceSinceLastExtract()
         {
             // Extracts everything that happened since the last extraction as one self-contained trace

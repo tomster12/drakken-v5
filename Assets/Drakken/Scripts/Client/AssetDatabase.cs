@@ -12,7 +12,6 @@ namespace Drakken.Client
         [Header("Prefabs")]
         [SerializeField] public TokenView TokenViewPrefab;
         [SerializeField] public GameObject EmptyTokenMeshPrefab;
-        [SerializeField] public DiceView DiceViewPrefab;
         [SerializeField] private TokenPrefabEntry[] tokenMeshPrefabs;
 
         [Header("Materials")]
@@ -37,13 +36,6 @@ namespace Drakken.Client
         public struct TokenPrefabEntry
         {
             public string TokenId;
-            public GameObject Prefab;
-        }
-
-        [Serializable]
-        private struct DicePrefabEntry
-        {
-            public int SideCount;
             public GameObject Prefab;
         }
     }

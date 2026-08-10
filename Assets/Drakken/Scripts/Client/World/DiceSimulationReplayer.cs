@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -9,20 +10,21 @@ namespace Drakken.Client.World
 {
     public class DiceSimulationReplayer
     {
-        private readonly List<(DiceLifetimeTrace Record, DiceView View)> activePairs = new();
-
-        public async Task Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
+        public async Task<DiceView[]> Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
         {
-            ClearAll();
+            // Plays the physics trace and returns the DiceViews it created, left at their final settled pose -
+            // these become the permanent, interactable dice for the rest of the game (no separate "row" spawn).
+
+            List<(DiceLifetimeTrace Record, DiceView View)> pairs = new();
 
             float maxTimeSeconds = 0f;
             foreach (var record in trace.Dice)
             {
                 if (record.PoseTraces.Count == 0) continue;
 
-                var view = DiceView.CreateProcedural(assets, record.Instance);
+                var view = DiceView.Create(assets, record.Instance);
                 view.transform.SetPositionAndRotation(record.PoseTraces[0].Position, record.PoseTraces[0].Rotation);
-                activePairs.Add((record, view));
+                pairs.Add((record, view));
 
                 maxTimeSeconds = Mathf.Max(maxTimeSeconds, record.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
@@ -30,24 +32,25 @@ namespace Drakken.Client.World
             float elapsedSeconds = 0f;
             while (elapsedSeconds < maxTimeSeconds)
             {
-                if (ct.IsCancellationRequested) return;
+                if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(pairs, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
 
-            if (ct.IsCancellationRequested) return;
+            if (!ct.IsCancellationRequested)
+                ApplyAtTime(pairs, trace.FixedTimestep, maxTimeSeconds);
 
-            ApplyAtTime(trace.FixedTimestep, maxTimeSeconds);
+            return pairs.Select(pair => pair.View).ToArray();
         }
 
-        private void ApplyAtTime(float fixedTimestep, float elapsedSeconds)
+        private void ApplyAtTime(List<(DiceLifetimeTrace Record, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
         {
             float rawTick = elapsedSeconds / fixedTimestep;
 
-            foreach (var (record, view) in activePairs)
+            foreach (var (record, view) in pairs)
             {
                 var (lower, upper, t) = SampleAt(record.PoseTraces, rawTick);
 
@@ -71,15 +74,6 @@ namespace Drakken.Client.World
 
             var last = poses[^1];
             return (last, last, 0f);
-        }
-
-        public void ClearAll()
-        {
-            foreach (var (_, view) in activePairs)
-            {
-                GameObject.Destroy(view.gameObject);
-            }
-            activePairs.Clear();
         }
     }
 }

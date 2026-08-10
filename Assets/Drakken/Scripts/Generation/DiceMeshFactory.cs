@@ -7,22 +7,26 @@ namespace Drakken.Generation
 {
     public static class DiceMeshFactory
     {
-        public static DiceMesh Create(DiceInstance diceInstance, Material material = null)
+        private const float BaseScale = 0.5f;
+
+        public static DiceMesh Create(DiceInstance diceInstance, Material material = null, float scale = 1f)
         {
+            float effectiveScale = scale * BaseScale;
+
             DiceMesh diceMesh = diceInstance.Sides switch
             {
-                4 => CreateTetrahedron(),
-                6 => CreateCube(),
-                8 => CreateOctohedron(),
-                12 => CreateDodecahedron(),
-                20 => CreateIcosahedron(),
-                _ when diceInstance.Sides > 2 && diceInstance.Sides % 2 == 0 => CreateBipyramid(diceInstance.Sides),
+                4 => CreateTetrahedron(effectiveScale),
+                6 => CreateCube(effectiveScale),
+                8 => CreateOctohedron(effectiveScale),
+                12 => CreateDodecahedron(effectiveScale),
+                20 => CreateIcosahedron(effectiveScale),
+                _ when diceInstance.Sides > 2 && diceInstance.Sides % 2 == 0 => CreateBipyramid(diceInstance.Sides, effectiveScale),
                 _ => throw new NotSupportedException($"Procedural dice mesh generation for a D{diceInstance.Sides} is not implemented yet.")
             };
 
             if (material != null)
             {
-                diceMesh.GameObject.GetComponent<MeshRenderer>().sharedMaterial = material;
+                diceMesh.Renderer.sharedMaterial = material;
             }
 
             return diceMesh;
@@ -52,10 +56,14 @@ namespace Drakken.Generation
             return Quaternion.LookRotation(-direction, upHint);
         }
 
-        private static DiceMesh CreateCube()
+        private static DiceMesh CreateCube(float scale)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "D6 (Generated)";
+
+            // GameObject.CreatePrimitive(Cube) is a unit cube (half-extent 0.5);
+            // scale it up to reach the requested half-extent.
+            go.transform.localScale = Vector3.one * scale;
 
             // Opposite faces sum to 7, matching standard D6 convention.
             Vector3[] directions =
@@ -68,8 +76,7 @@ namespace Drakken.Generation
                 Vector3.down // 6
             };
 
-            // GameObject.CreatePrimitive(Cube) is a unit cube, so faces sit at half-extent 0.5.
-            const float halfExtent = 0.5f;
+            float halfExtent = 0.5f * scale;
             DiceFacePose[] faces = new DiceFacePose[directions.Length];
             for (int i = 0; i < directions.Length; i++)
             {
@@ -79,15 +86,16 @@ namespace Drakken.Generation
             return new DiceMesh(go, faces);
         }
 
-        private static DiceMesh CreateTetrahedron()
+        private static DiceMesh CreateTetrahedron(float scale)
         {
             // Alternating corners of a cube form a regular tetrahedron centered on the origin.
+            float h = 0.5f * scale;
             Vector3[] c =
             {
-                new(0.5f, 0.5f, 0.5f),
-                new(0.5f, -0.5f, -0.5f),
-                new(-0.5f, 0.5f, -0.5f),
-                new(-0.5f, -0.5f, 0.5f)
+                new(h, h, h),
+                new(h, -h, -h),
+                new(-h, h, -h),
+                new(-h, -h, h)
             };
 
             // A regular tetrahedron rests on one face with the opposite vertex pointing up, so it's read
@@ -103,14 +111,14 @@ namespace Drakken.Generation
             return new DiceMesh(go, builder.Faces);
         }
 
-        private static DiceMesh CreateOctohedron()
+        private static DiceMesh CreateOctohedron(float scale)
         {
-            Vector3 posX = Vector3.right;
-            Vector3 negX = Vector3.left;
-            Vector3 posY = Vector3.up;
-            Vector3 negY = Vector3.down;
-            Vector3 posZ = Vector3.forward;
-            Vector3 negZ = Vector3.back;
+            Vector3 posX = Vector3.right * scale;
+            Vector3 negX = Vector3.left * scale;
+            Vector3 posY = Vector3.up * scale;
+            Vector3 negY = Vector3.down * scale;
+            Vector3 posZ = Vector3.forward * scale;
+            Vector3 negZ = Vector3.back * scale;
 
             // Opposite faces sum to 9, matching standard D8 convention.
             (Vector3 a, Vector3 b, Vector3 c)[] faceVerts =
@@ -135,37 +143,37 @@ namespace Drakken.Generation
             return new DiceMesh(go, builder.Faces);
         }
 
-        private static DiceMesh CreateDodecahedron()
+        private static DiceMesh CreateDodecahedron(float scale)
         {
             float phi = (1f + Mathf.Sqrt(5f)) / 2f;
             float inv = 1f / phi;
 
             // All 20 vertices of a regular dodecahedron sit at the same distance from the
-            // origin; this scale normalizes that circumradius to 1.
-            float scale = 1f / Mathf.Sqrt(3f);
+            // origin; this normalizes that circumradius to 1 before applying the requested scale.
+            float unitScale = 1f / Mathf.Sqrt(3f) * scale;
 
             Vector3[] v =
             {
-                new Vector3(1, 1, 1) * scale, // 0
-                new Vector3(1, 1, -1) * scale, // 1
-                new Vector3(1, -1, 1) * scale, // 2
-                new Vector3(1, -1, -1) * scale, // 3
-                new Vector3(-1, 1, 1) * scale, // 4
-                new Vector3(-1, 1, -1) * scale, // 5
-                new Vector3(-1, -1, 1) * scale, // 6
-                new Vector3(-1, -1, -1) * scale, // 7
-                new Vector3(0, inv, phi) * scale, // 8
-                new Vector3(inv, phi, 0) * scale, // 9
-                new Vector3(phi, 0, inv) * scale, // 10
-                new Vector3(0, inv, -phi) * scale, // 11
-                new Vector3(inv, -phi, 0) * scale, // 12
-                new Vector3(-phi, 0, inv) * scale, // 13
-                new Vector3(0, -inv, phi) * scale, // 14
-                new Vector3(-inv, phi, 0) * scale, // 15
-                new Vector3(phi, 0, -inv) * scale, // 16
-                new Vector3(0, -inv, -phi) * scale, // 17
-                new Vector3(-inv, -phi, 0) * scale, // 18
-                new Vector3(-phi, 0, -inv) * scale // 19
+                new Vector3(1, 1, 1) * unitScale, // 0
+                new Vector3(1, 1, -1) * unitScale, // 1
+                new Vector3(1, -1, 1) * unitScale, // 2
+                new Vector3(1, -1, -1) * unitScale, // 3
+                new Vector3(-1, 1, 1) * unitScale, // 4
+                new Vector3(-1, 1, -1) * unitScale, // 5
+                new Vector3(-1, -1, 1) * unitScale, // 6
+                new Vector3(-1, -1, -1) * unitScale, // 7
+                new Vector3(0, inv, phi) * unitScale, // 8
+                new Vector3(inv, phi, 0) * unitScale, // 9
+                new Vector3(phi, 0, inv) * unitScale, // 10
+                new Vector3(0, inv, -phi) * unitScale, // 11
+                new Vector3(inv, -phi, 0) * unitScale, // 12
+                new Vector3(-phi, 0, inv) * unitScale, // 13
+                new Vector3(0, -inv, phi) * unitScale, // 14
+                new Vector3(-inv, phi, 0) * unitScale, // 15
+                new Vector3(phi, 0, -inv) * unitScale, // 16
+                new Vector3(0, -inv, -phi) * unitScale, // 17
+                new Vector3(-inv, -phi, 0) * unitScale, // 18
+                new Vector3(-phi, 0, -inv) * unitScale // 19
             };
 
             // Opposite faces sum to 13, matching standard D12 convention. Each entry lists a
@@ -196,28 +204,28 @@ namespace Drakken.Generation
             return new DiceMesh(go, builder.Faces);
         }
 
-        private static DiceMesh CreateIcosahedron()
+        private static DiceMesh CreateIcosahedron(float scale)
         {
             float phi = (1f + Mathf.Sqrt(5f)) / 2f;
 
             // All 12 vertices of a regular icosahedron sit at the same distance from the
-            // origin; this scale normalizes that circumradius to 1.
-            float scale = 1f / Mathf.Sqrt(phi + 2f);
+            // origin; this normalizes that circumradius to 1 before applying the requested scale.
+            float unitScale = 1f / Mathf.Sqrt(phi + 2f) * scale;
 
             Vector3[] v =
             {
-                new Vector3(0, 1, phi) * scale, // 0
-                new Vector3(1, phi, 0) * scale, // 1
-                new Vector3(phi, 0, 1) * scale, // 2
-                new Vector3(0, 1, -phi) * scale, // 3
-                new Vector3(1, -phi, 0) * scale, // 4
-                new Vector3(-phi, 0, 1) * scale, // 5
-                new Vector3(0, -1, phi) * scale, // 6
-                new Vector3(-1, phi, 0) * scale, // 7
-                new Vector3(phi, 0, -1) * scale, // 8
-                new Vector3(0, -1, -phi) * scale, // 9
-                new Vector3(-1, -phi, 0) * scale, // 10
-                new Vector3(-phi, 0, -1) * scale // 11
+                new Vector3(0, 1, phi) * unitScale, // 0
+                new Vector3(1, phi, 0) * unitScale, // 1
+                new Vector3(phi, 0, 1) * unitScale, // 2
+                new Vector3(0, 1, -phi) * unitScale, // 3
+                new Vector3(1, -phi, 0) * unitScale, // 4
+                new Vector3(-phi, 0, 1) * unitScale, // 5
+                new Vector3(0, -1, phi) * unitScale, // 6
+                new Vector3(-1, phi, 0) * unitScale, // 7
+                new Vector3(phi, 0, -1) * unitScale, // 8
+                new Vector3(0, -1, -phi) * unitScale, // 9
+                new Vector3(-1, -phi, 0) * unitScale, // 10
+                new Vector3(-phi, 0, -1) * unitScale // 11
             };
 
             // Opposite faces sum to 21, matching standard D20 convention.
@@ -255,7 +263,7 @@ namespace Drakken.Generation
             return new DiceMesh(go, builder.Faces);
         }
 
-        private static DiceMesh CreateBipyramid(int sides)
+        private static DiceMesh CreateBipyramid(int sides, float scale)
         {
             int baseSideCount = sides / 2;
             if (baseSideCount < 3)
@@ -263,8 +271,8 @@ namespace Drakken.Generation
                 throw new NotSupportedException($"Procedural dice mesh generation for a D{sides} is not implemented yet.");
             }
 
-            const float baseRadius = 1f;
-            const float apexHeight = 1f;
+            float baseRadius = scale;
+            float apexHeight = scale;
 
             Vector3[] baseVertices = new Vector3[baseSideCount];
             for (int i = 0; i < baseSideCount; i++)
@@ -404,11 +412,13 @@ namespace Drakken.Generation
         {
             public readonly GameObject GameObject;
             public readonly IReadOnlyList<DiceFacePose> Faces; // Index i is the pose for face value i+1
+            public readonly MeshRenderer Renderer;
 
             public DiceMesh(GameObject gameObject, IReadOnlyList<DiceFacePose> faces)
             {
                 GameObject = gameObject;
                 Faces = faces;
+                Renderer = gameObject.GetComponent<MeshRenderer>();
             }
         }
     }

@@ -101,31 +101,34 @@ namespace Drakken.Domain.Tokens.Implementation
             Vector3 d3Pos = tokenTransform.position + tokenTransform.right * D3OffsetDistance;
             d3View.transform.SetPositionAndRotation(d3Pos, tokenTransform.rotation);
 
-            await d3View.AnimateRoll(ct, durationMultiplier: 0.7f);
+            // await d3View.AnimateRoll(ct, durationMultiplier: 0.7f);
             await Task.Delay(200);
 
             await d3View.AnimateShrinkAndDestroy(ct);
 
-            // Shrink each removed dice to localScale 0
+            // Shrink each removed dice to localScale 0, remembering where each one was so its
+            // replacement can grow in from the same spot
             List<Task> removeDiceAnimationTasks = new();
+            var replacedPositions = new Dictionary<int, Vector3>();
             foreach (int removedDiceIndex in resolution.ReplacedIndices)
             {
                 var diceView = sourcePlayerObjects.DiceViews[removedDiceIndex];
+                replacedPositions[removedDiceIndex] = diceView.transform.position;
                 removeDiceAnimationTasks.Add(diceView.AnimateShrinkAndDestroy(ct));
             }
             await Task.WhenAll(removeDiceAnimationTasks);
 
             await Task.Delay(100);
 
-            // Create new dice at each of the position and roll sequentially
+            // Create new dice at each of the replaced positions and roll sequentially
             Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
 
             List<Task> tasks = new();
             for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
             {
                 var diceIndex = resolution.ReplacedIndices[i];
-                var newDiceView = sourcePlayerObjects.SpawnDiceAtIndex(resolution.AddedDiceInstances[i], diceIndex, targetRot);
-                tasks.Add(newDiceView.AnimateGrowThenRoll(ct, durationMultiplier: 0.7f));
+                var newDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.AddedDiceInstances[i], diceIndex, replacedPositions[diceIndex], targetRot);
+                tasks.Add(newDiceView.AnimateGrow(ct));
             }
 
             await Task.WhenAll(tasks);

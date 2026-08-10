@@ -302,7 +302,10 @@ namespace Drakken.Server
             var world = DiceWorlds[clientIndex];
             var trayCenter = GameConstants.DiceTrayCenter(clientIndex);
             var traySize = GameConstants.DiceTraySize;
-            Vector3 spawnCorner = trayCenter + new Vector3(-traySize.x / 2f + 0.4f, 0.6f, -traySize.z / 2f + 0.4f);
+            Vector3 spawnCorner = trayCenter + new Vector3(
+                -traySize.x / 2f + 0.4f,
+                2.0f,
+                -traySize.z / 2f + 0.4f);
 
             for (int i = 0; i < diceInstances.Count; i++)
             {
@@ -313,7 +316,7 @@ namespace Drakken.Server
                 world.Spawn(diceInstances[i], spawnPos, Quaternion.identity, throwVelocity, torque);
             }
 
-            world.SettleAll();
+            world.SimulateUntilAllSettled();
             world.FreezeAll();
         }
 
@@ -328,7 +331,7 @@ namespace Drakken.Server
                 world.Wake(dice.InstanceId, impulse, torque);
             }
 
-            world.SettleAll();
+            world.SimulateUntilAllSettled();
             world.FreezeAll();
         }
 
