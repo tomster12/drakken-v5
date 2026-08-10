@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Drakken.Client.World.Animation
+namespace Drakken.Domain.Animation
 {
     public class AnimationSequence
     {

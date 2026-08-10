@@ -3,10 +3,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
+using Drakken.Client.World;
 using Drakken.Domain;
 using UnityEngine;
 
-namespace Drakken.Client.World
+namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
@@ -15,7 +16,7 @@ namespace Drakken.Client.World
             // Plays the physics trace and returns the DiceViews it created, left at their final settled pose -
             // these become the permanent, interactable dice for the rest of the game (no separate "row" spawn).
 
-            List<(DiceLifetimeTrace Record, DiceView View)> pairs = new();
+            List<(DiceSessionTrace Record, DiceView View)> pairs = new();
 
             float maxTimeSeconds = 0f;
             foreach (var diceRecord in trace.Dice)
@@ -46,7 +47,7 @@ namespace Drakken.Client.World
             return pairs.Select(pair => pair.View).ToArray();
         }
 
-        private void ApplyAtTime(List<(DiceLifetimeTrace Record, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
+        private void ApplyAtTime(List<(DiceSessionTrace Record, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
         {
             float rawTick = elapsedSeconds / fixedTimestep;
 

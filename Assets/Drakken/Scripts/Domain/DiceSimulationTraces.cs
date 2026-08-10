@@ -8,7 +8,7 @@ namespace Drakken.Domain
     public class DiceSimulationTraces : INetworkSerializable
     {
         public float FixedTimestep;
-        public List<DiceLifetimeTrace> Dice = new();
+        public List<DiceSessionTrace> Dice = new();
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -17,7 +17,7 @@ namespace Drakken.Domain
         }
     }
 
-    public class DiceLifetimeTrace : INetworkSerializable
+    public class DiceSessionTrace : INetworkSerializable
     {
         public DiceInstance Instance = new();
         public List<DicePoseTrace> PoseTraces = new();

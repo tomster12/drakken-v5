@@ -1,8 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Drakken.Client.World.Animation;
+using Drakken.Domain.Animation;
 using Drakken.Domain;
+using Drakken.Domain.Dice;
 using Drakken.Domain.Tokens;
 using Drakken.Utility;
 using UnityEngine;

@@ -1,10 +1,11 @@
 using Drakken.Domain;
 using Drakken.Common.Utility;
 using System;
-using Drakken.Domain.Networking;
+using Drakken.Networking;
 using System.Threading.Tasks;
 using System.Linq;
 using Drakken.Domain.Tokens;
+using Drakken.Domain.Networking;
 
 namespace Drakken.Client
 {

@@ -1,7 +1,7 @@
 using Drakken.Common.Utility;
 using Drakken.Config;
-using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens;
+using Drakken.Domain.Networking;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 

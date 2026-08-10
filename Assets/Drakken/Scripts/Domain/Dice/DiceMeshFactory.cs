@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Drakken.Domain;
 using UnityEngine;
 
-namespace Drakken.Generation
+namespace Drakken.Domain.Dice
 {
     public static class DiceMeshFactory
     {

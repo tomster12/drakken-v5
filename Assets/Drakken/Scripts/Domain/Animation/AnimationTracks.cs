@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using Drakken.Utility;
 
-namespace Drakken.Client.World.Animation
+namespace Drakken.Domain.Animation
 {
     public static class AnimationTracks
     {

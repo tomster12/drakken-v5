@@ -1,12 +1,10 @@
-using Drakken.Client.World;
 using Drakken.Common.Utility;
 using Drakken.Domain;
+using Drakken.Domain.Dice;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Static;
 using Drakken.Domain.Tokens;
-using Drakken.Generation;
 using Drakken.Networking;
-using Drakken.Server.Simulation;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -17,8 +15,6 @@ namespace Drakken.Server
     public class ServerMatch
     {
         private static ulong nextMatchId = 1;
-        private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(1);
-        private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(1);
 
         private readonly TokenRegistry tokenRegistry;
         private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
@@ -108,34 +104,36 @@ namespace Drakken.Server
 
         private async void StartDraftingPhase()
         {
-            // TODO: Allow coming to drafting after round end
             Assert.True(GameState.Phase == GamePhase.NotStarted);
             Assert.True(startReadyCount == 2);
             Log.Info($"ServerMatch-{matchId}", $"Match starting drafting phase");
 
-            // Arbitrary delay before starting
-            await Task.Delay(draftingStartDelay);
-
             GameState.Phase = GamePhase.Drafting;
 
-            // Give each client a set of new dice, thrown into their physics table
+            DealDraftDice();
+            DealDraftTokens();
+
+            var diceTraces = SimulateRollDice();
+
+            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
+        }
+
+        private void DealDraftDice()
+        {
+            Assert.True(GameState.Phase == GamePhase.Drafting);
+
+            // Give each client a set of new dice
             for (int p = 0; p < 2; p++)
             {
                 List<DiceInstance> newDice = new();
-                for (int d = 0; d < 5; d++)
+
+                for (int d = 0; d < GameConstants.StandardDiceCount; d++)
                 {
-                    var sides = d * 2 + 4;
-                    newDice.Add(DiceInstance.Create(sides: sides));
+                    newDice.Add(DiceInstance.Create(sides: GameConstants.StandardDiceSideCount));
                 }
 
-                SimulateRollDice(p, newDice);
                 GameState.Clients[p].Dice.AddRange(newDice);
             }
-
-            DealDraftTokens();
-
-            var diceTraces = ExtractDiceSimulationTraces();
-            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
         }
 
         private void DealDraftTokens()
@@ -202,9 +200,6 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
             Log.Info($"ServerMatch-{matchId}", $"Match starting playing phase");
-
-            // Arbitrary delay before starting
-            await Task.Delay(playingStartDelay);
 
             GameState.Phase = GamePhase.Playing;
 
@@ -287,92 +282,94 @@ namespace Drakken.Server
             GameState.Phase = GamePhase.Drafting;
             discardReadyCount = 0;
 
-            // Reroll each player's dice for the new round, resuming their existing physics table
-            for (int p = 0; p < 2; p++)
-            {
-                SimulateRerollDice(p, GameState.Clients[p].Dice);
-            }
-
-            // Deal a fresh set of tokens
             DealDraftTokens();
 
-            var diceTraces = ExtractDiceSimulationTraces();
+            var diceTraces = SimulateRerollDice();
             Connection.Server_BroadcastMatchNextRound(clientIds, GameState, diceTraces);
         }
 
         // -------------------------------- Dice Simulation
 
-        private void SimulateRollDice(int clientIndex, List<DiceInstance> diceInstances)
+        private MatchDiceSimulationTraces SimulateRollDice()
         {
-            var world = DiceWorlds[clientIndex];
-            var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(clientIndex);
-            var trayCenter = tray.transform.position;
-            var traySize = tray.Size;
-
-            const float edgeMargin = 0.2f;
-            const float spawnY = 1.5f;
-            const float throwY = 5f;
-            const float diceThrowImpulseSpeed = 5f;
-            const float diceThrowTorque = 30f;
-
-            float diceSpacing = DiceMeshFactory.BaseScale * 2.0f;
-            float clientSideSignZ = clientIndex == 0 ? -1f : 1f;
-            float rowStart = trayCenter.x - traySize.x / 2f + edgeMargin;
-            float rowWidth = traySize.x - edgeMargin * 2f;
-            int diceCount = diceInstances.Count;
-            int maxPerRow = Mathf.Max(1, Mathf.FloorToInt(rowWidth / diceSpacing));
-            int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
-
-            int diceIndex = 0;
-            for (int row = 0; row < rowCount; row++)
+            for (int p = 0; p < 2; p++)
             {
-                int rowDiceCount = diceCount / rowCount + (row < diceCount % rowCount ? 1 : 0);
-                float spawnZ = trayCenter.z + clientSideSignZ * (traySize.z / 2f - edgeMargin - row * diceSpacing);
+                const float edgeMargin = 0.2f;
+                const float spawnY = 1.5f;
+                const float throwY = 5f;
+                const float diceThrowImpulseSpeed = 5f;
+                const float diceThrowTorque = 30f;
 
-                for (int i = 0; i < rowDiceCount; i++)
+                var world = DiceWorlds[p];
+                var diceInstances = GameState.Clients[p].Dice;
+                int diceCount = diceInstances.Count;
+                var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
+                var trayCenter = tray.transform.position;
+                var traySize = tray.Size;
+                float diceSpacing = DiceMeshFactory.BaseScale * 2.4f;
+                float clientSideSignZ = p == 0 ? -1f : 1f;
+                float rowStart = trayCenter.x - traySize.x / 2f + edgeMargin;
+                float rowWidth = traySize.x - edgeMargin * 2f;
+                int maxPerRow = Mathf.Max(1, Mathf.FloorToInt(rowWidth / diceSpacing));
+                int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
+
+                int diceIndex = 0;
+                for (int row = 0; row < rowCount; row++)
                 {
-                    float t = (i + 1f) / (rowDiceCount + 1f);
-                    float spawnX = rowStart + t * rowWidth;
-                    Vector3 spawnPos = new(spawnX, spawnY, spawnZ);
-                    Quaternion spawnRotation = UnityEngine.Random.rotationUniform;
+                    int rowDiceCount = diceCount / rowCount + (row < diceCount % rowCount ? 1 : 0);
+                    float spawnZ = trayCenter.z + clientSideSignZ * (traySize.z / 2f - edgeMargin - row * diceSpacing);
 
-                    Vector3 throwTarget = trayCenter + Vector3.up * throwY * UnityEngine.Random.Range(0.6f, 1.4f);
-                    Vector3 throwVelocity = (throwTarget - spawnPos).normalized * diceThrowImpulseSpeed;
-                    Vector3 throwTorque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
+                    for (int i = 0; i < rowDiceCount; i++)
+                    {
+                        var instance = diceInstances[diceIndex++];
 
-                    world.Spawn(diceInstances[diceIndex], spawnPos, spawnRotation, throwVelocity, throwTorque);
-                    diceIndex++;
+                        float t = (i + 1f) / (rowDiceCount + 1f);
+                        float spawnX = rowStart + t * rowWidth;
+                        Vector3 spawnPos = new(spawnX, spawnY, spawnZ);
+                        Quaternion spawnRotation = UnityEngine.Random.rotationUniform;
+
+                        Vector3 throwTarget = trayCenter + Vector3.up * throwY * UnityEngine.Random.Range(0.6f, 1.4f);
+                        Vector3 throwVelocity = (throwTarget - spawnPos).normalized * diceThrowImpulseSpeed;
+                        Vector3 throwTorque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
+
+                        world.SpawnDice(instance, spawnPos, spawnRotation, throwVelocity, throwTorque);
+                    }
                 }
+
+                world.SimulateUntilAllSettled();
             }
 
-            world.SimulateUntilAllSettled();
-            world.FreezeAll();
+            return new()
+            {
+                P1 = DiceWorlds[0].ExtractSessionTraces(),
+                P2 = DiceWorlds[1].ExtractSessionTraces(),
+            };
         }
 
-        private void SimulateRerollDice(int clientIndex, List<DiceInstance> diceInstances)
+        private MatchDiceSimulationTraces SimulateRerollDice()
         {
-            var world = DiceWorlds[clientIndex];
-
-            float diceThrowImpulseSpeed = 4f;
-            float diceThrowTorque = 20f;
-
-            foreach (var dice in diceInstances)
+            for (int p = 0; p < 2; p++)
             {
-                Vector3 impulse = Vector3.up * diceThrowImpulseSpeed * 0.5f;
-                Vector3 torque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
-                world.Wake(dice.InstanceId, impulse, torque);
+                float diceThrowImpulseSpeed = 4f;
+                float diceThrowTorque = 20f;
+
+                var world = DiceWorlds[p];
+                var diceInstances = GameState.Clients[p].Dice;
+
+                foreach (var dice in diceInstances)
+                {
+                    Vector3 impulse = Vector3.up * diceThrowImpulseSpeed * 0.5f;
+                    Vector3 torque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
+                    world.WakeDice(dice.InstanceId, impulse, torque);
+                }
+
+                world.SimulateUntilAllSettled();
             }
 
-            world.SimulateUntilAllSettled();
-            world.FreezeAll();
-        }
-
-        private MatchDiceSimulationTraces ExtractDiceSimulationTraces()
-        {
-            return new MatchDiceSimulationTraces
+            return new()
             {
-                P1 = DiceWorlds[0].ExtractTraceSinceLastExtract(),
-                P2 = DiceWorlds[1].ExtractTraceSinceLastExtract(),
+                P1 = DiceWorlds[0].ExtractSessionTraces(),
+                P2 = DiceWorlds[1].ExtractSessionTraces(),
             };
         }
     }

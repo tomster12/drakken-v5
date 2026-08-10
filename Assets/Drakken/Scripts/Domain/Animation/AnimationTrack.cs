@@ -1,6 +1,6 @@
 using System;
 
-namespace Drakken.Client.World.Animation
+namespace Drakken.Domain.Animation
 {
     public interface IAnimationTrack
     {

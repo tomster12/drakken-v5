@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Drakken.Client.World.Animation
+namespace Drakken.Domain.Animation
 {
     public static class AnimationCurves
     {

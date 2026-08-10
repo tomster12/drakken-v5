@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
-using Drakken.Client.World.Animation;
+using Drakken.Domain.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;

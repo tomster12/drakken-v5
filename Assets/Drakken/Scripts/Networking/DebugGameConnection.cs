@@ -4,10 +4,11 @@ using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Common;
 using Drakken.Domain;
-using Drakken.Domain.Networking;
+using Drakken.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
 using Drakken.Server;
+using Drakken.Domain.Networking;
 
 namespace Drakken.Networking
 {

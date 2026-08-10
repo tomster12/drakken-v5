@@ -1,4 +1,4 @@
-using Drakken.Client.World.Animation;
+using Drakken.Domain.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain.Tokens;
 using Drakken.Utility;

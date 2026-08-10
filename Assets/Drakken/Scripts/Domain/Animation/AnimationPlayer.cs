@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Drakken.Common.Utility;
 using UnityEngine;
 
-namespace Drakken.Client.World.Animation
+namespace Drakken.Domain.Animation
 {
     public class AnimationPlayer
     {

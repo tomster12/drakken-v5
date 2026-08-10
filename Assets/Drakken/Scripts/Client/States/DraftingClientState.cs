@@ -1,8 +1,8 @@
 using Drakken.Client.World;
-using Drakken.Client.World.Animation;
+using Drakken.Domain.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain;
-using Drakken.Domain.Networking;
+using Drakken.Networking;
 using Drakken.Domain.Static;
 using Drakken.Utility;
 using System.Collections.Generic;
@@ -13,6 +13,7 @@ using UnityEditor;
 using UnityEngine;
 
 using static Drakken.Client.ClientUI;
+using Drakken.Domain.Networking;
 
 namespace Drakken.Client.States
 {
