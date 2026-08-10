@@ -15,7 +15,6 @@ namespace Drakken.Client.World
         {
             Title.SetInitialState();
             Drafting.SetInitialState();
-            Game.SetInitialState();
         }
     }
 
@@ -73,17 +72,6 @@ namespace Drakken.Client.World
         public float PlayDropRadius = 1.0f;
 
         public GamePlayerLayout Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
-
-        public void SetInitialState()
-        {
-            P1.Mat.SetActive(false);
-            P2.Mat.SetActive(false);
-        }
-
-        public void OnDisconnect()
-        {
-            SetInitialState();
-        }
     }
 
     [Serializable]
@@ -92,7 +80,6 @@ namespace Drakken.Client.World
         public Transform PlayingCameraPosition;
         public Transform DiceRow;
         public Transform TokenRow;
-        public GameObject Mat;
         public GameObject Bag;
     }
 }

@@ -54,18 +54,10 @@ namespace Drakken.Client.States
 
             // Starting new game
             if (fromType == ClientStateType.Title)
-            {
-                SceneLayout.Game.P1.Mat.SetActive(true);
-                SceneLayout.Game.P2.Mat.SetActive(true);
-
                 await CreateAndRollDice();
-            }
 
             // Starting next round
-            else
-            {
-                RollExistingDice();
-            }
+            else RollExistingDice();
 
             // And now spawn tokens ready to discard
             SpawnTokens();
@@ -84,7 +76,6 @@ namespace Drakken.Client.States
             // If we are going back to title then clean up the token / dice views
             if (toType == ClientStateType.Title)
             {
-                SceneLayout.Game.OnDisconnect();
                 SceneObjects.OnDisconnect();
                 client.UI.OnDisconnect();
             }
@@ -118,7 +109,7 @@ namespace Drakken.Client.States
                     sceneObjects.SpawnDiceAtIndex(clientDice[i], i, targetRot);
                 }
 
-                sceneObjects.DicePhysicsReplayer.ClearAll();
+                sceneObjects.DiceSimReplayer.ClearAll();
             }
 
             // Update UI to match dice totals
@@ -150,7 +141,7 @@ namespace Drakken.Client.States
                     sceneObjects.DiceViews[i].Rebind(clientDice[i]);
                 }
 
-                sceneObjects.DicePhysicsReplayer.ClearAll();
+                sceneObjects.DiceSimReplayer.ClearAll();
             }
 
             SetDiceViewsVisible(Match.ClientIndex, visible: true);
@@ -161,13 +152,13 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1);
         }
 
-        private async Task PlayDiceTraces(MatchDiceTraces diceTraces)
+        private async Task PlayDiceTraces(MatchDiceSimulationTraces diceTraces)
         {
             List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
-                tasks.Add(sceneObjects.DicePhysicsReplayer.Play(client.Assets, diceTraces.Player(clientIndex), cts.Token));
+                tasks.Add(sceneObjects.DiceSimReplayer.Play(client.Assets, diceTraces.Player(clientIndex), cts.Token));
             }
             await Task.WhenAll(tasks);
         }

@@ -5,7 +5,6 @@ using Drakken.Client;
 using Drakken.Common;
 using Drakken.Domain;
 using Drakken.Domain.Networking;
-using Drakken.Domain.Tokens.Implementation;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
 using Drakken.Server;
@@ -90,7 +89,10 @@ namespace Drakken.Networking
             targetClient.Match.OnServerOtherPlayerReady();
         }
 
-        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
+        public void Server_BroadcastMatchStartDraftingPhase(
+            ulong[] clientIds,
+            GameState gameState,
+            MatchDiceSimulationTraces diceTraces)
         {
             foreach (var clientId in clientIds)
             {
@@ -219,7 +221,10 @@ namespace Drakken.Networking
             }, (response) => { });
         }
 
-        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
+        public void Server_BroadcastMatchNextRound(
+            ulong[] clientIds,
+            GameState gameState,
+            MatchDiceSimulationTraces diceTraces)
         {
             foreach (var clientId in clientIds)
             {

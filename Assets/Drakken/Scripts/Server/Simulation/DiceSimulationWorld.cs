@@ -6,27 +6,19 @@ using Drakken.Generation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Drakken.Server.Dice
+namespace Drakken.Server.Simulation
 {
-    // A persistent, per-player physics table. Lives for the whole match - dice thrown into it sit
-    // here (kinematic, at rest) between actions, so a later action (a round-start reroll, a token's
-    // dice effect) resumes against exactly where they already are rather than needing to reseed state.
-    //
-    // "Settled" and "final" are different things: StepUntilSettleTransition only reports that a die
-    // has stopped moving for long enough to look natural - it can still get knocked and unsettle again.
-    // FreezeAll is the one deliberate commit point where every currently-dynamic die's value becomes
-    // permanent (its rigidbody goes kinematic, so nothing can disturb it further).
-    public class DicePhysicsWorld
+    public class DiceSimulationWorld
     {
         private readonly Scene scene;
         private readonly PhysicsScene physicsScene;
         private readonly float fixedTimestep;
         private readonly Dictionary<int, DiceBody> bodiesByInstanceId = new();
-        private readonly List<DiceTraceRecord> removedSinceLastExtract = new();
+        private readonly List<DiceLifetimeTrace> removedSinceLastExtract = new();
         private int currentTick;
         private int lastExtractTick;
 
-        public DicePhysicsWorld(string name, Vector3 trayCenter, Vector3 traySize, float wallHeight)
+        public DiceSimulationWorld(string name, Vector3 trayCenter, Vector3 traySize, float wallHeight)
         {
             scene = SceneManager.CreateScene(name, new CreateSceneParameters(LocalPhysicsMode.Physics3D));
             physicsScene = scene.GetPhysicsScene();
@@ -58,26 +50,31 @@ namespace Drakken.Server.Dice
 
         // ------------------------------ Actions
 
-        public int Spawn(DiceInstance instance, Vector3 position, Quaternion rotation,
-            Vector3 linearImpulse, Vector3 angularImpulse, int parentInstanceId = 0)
+        public int Spawn(
+            DiceInstance instance,
+            Vector3 position,
+            Quaternion rotation,
+            Vector3 linearImpulse,
+            Vector3 angularImpulse)
         {
             var mesh = DiceMeshFactory.Create(instance);
-            SceneManager.MoveGameObjectToScene(mesh.GameObject, scene);
             mesh.GameObject.transform.SetPositionAndRotation(position, rotation);
 
-            var rigidbody = mesh.GameObject.AddComponent<Rigidbody>();
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            rigidbody.AddForce(linearImpulse, ForceMode.VelocityChange);
-            rigidbody.AddTorque(angularImpulse, ForceMode.VelocityChange);
+            var rb = mesh.GameObject.AddComponent<Rigidbody>();
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.AddForce(linearImpulse, ForceMode.VelocityChange);
+            rb.AddTorque(angularImpulse, ForceMode.VelocityChange);
+
+            SceneManager.MoveGameObjectToScene(mesh.GameObject, scene);
 
             var body = new DiceBody
             {
                 Instance = instance,
-                Rigidbody = rigidbody,
-                Faces = mesh.Faces,
-                ParentInstanceId = parentInstanceId,
+                Rigidbody = rb,
+                MeshFaces = mesh.Faces,
                 SpawnTick = currentTick,
             };
+
             body.RecordPose(currentTick);
 
             bodiesByInstanceId[instance.InstanceId] = body;
@@ -88,7 +85,9 @@ namespace Drakken.Server.Dice
         {
             var body = bodiesByInstanceId[diceInstanceId];
 
-            body.RecordPose(currentTick); // resting pose, before the impulse, as this window's start
+            // resting pose, before the impulse, as this window's start
+            body.RecordPose(currentTick);
+
             body.Rigidbody.isKinematic = false;
             body.Rigidbody.AddForce(linearImpulse, ForceMode.VelocityChange);
             body.Rigidbody.AddTorque(angularImpulse, ForceMode.VelocityChange);
@@ -106,11 +105,12 @@ namespace Drakken.Server.Dice
             GameObject.Destroy(body.Rigidbody.gameObject);
         }
 
-        // Advances ticks until at least one currently-dynamic die's settled state flips false -> true
-        // this call, or nothing is left dynamic. Returns the instance ids that just transitioned -
-        // may be empty if the loop bottoms out on AllDynamicSettled without a fresh transition.
         public List<int> StepUntilSettleTransition(int maxTicks = -1)
         {
+            // Advances ticks until at least one currently-dynamic die's settled state flips false -> true
+            // this call, or nothing is left dynamic. Returns the instance ids that just transitioned -
+            // may be empty if the loop bottoms out on AllDynamicSettled without a fresh transition.
+
             if (maxTicks < 0) maxTicks = GameConstants.DicePhysicsMaxTicksPerStep;
 
             float settleLinSqr = GameConstants.DiceSettleLinearVelocityThreshold * GameConstants.DiceSettleLinearVelocityThreshold;
@@ -159,36 +159,38 @@ namespace Drakken.Server.Dice
         public bool AllDynamicSettled =>
             bodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
 
-        // Runs StepUntilSettleTransition until every dynamic die is settled, ignoring transitions -
-        // for the common case (drafting, a plain reroll) where nothing needs to react per-die.
         public void SettleAll()
         {
+            // Runs StepUntilSettleTransition until every dynamic die is settled, ignoring transitions -
+            // for the common case (drafting, a plain reroll) where nothing needs to react per-die.
+
             while (!AllDynamicSettled)
             {
                 StepUntilSettleTransition();
             }
         }
 
-        // The one commit point: every currently-dynamic die's up-face becomes final and its rigidbody
-        // goes kinematic, so later actions (even ones that physically bump it) can never change it.
         public void FreezeAll()
         {
+            // The one commit point: every currently-dynamic die's up-face becomes final and its rigidbody
+            // goes kinematic, so later actions (even ones that physically bump it) can never change it.
+
             foreach (var body in bodiesByInstanceId.Values)
             {
                 if (body.Rigidbody.isKinematic) continue;
 
-                body.Instance.Value = DiceMeshFactory.GetUpFaceValue(body.Rigidbody.transform, body.Faces);
+                body.Instance.Value = DiceMeshFactory.GetUpFaceValue(body.Rigidbody.transform, body.MeshFaces);
                 body.RecordPose(currentTick);
                 body.Rigidbody.isKinematic = true;
             }
         }
-
-        // Extracts everything that happened since the last extraction as one self-contained trace
-        // (ticks rebased to start at 0), for shipping to clients. Dice untouched this window (already
-        // resting from a previous action) are simply omitted.
-        public DicePhysicsTrace ExtractTraceSinceLastExtract()
+        public DiceSimulationTraces ExtractTraceSinceLastExtract()
         {
-            DicePhysicsTrace trace = new() { FixedTimestep = fixedTimestep };
+            // Extracts everything that happened since the last extraction as one self-contained trace
+            // (ticks rebased to start at 0), for shipping to clients. Dice untouched this window (already
+            // resting from a previous action) are simply omitted.
+
+            DiceSimulationTraces trace = new() { FixedTimestep = fixedTimestep };
 
             foreach (var body in bodiesByInstanceId.Values)
             {
@@ -208,12 +210,12 @@ namespace Drakken.Server.Dice
             return trace;
         }
 
-        private DiceTraceRecord BuildRecord(DiceBody body, int removeTick)
+        private DiceLifetimeTrace BuildRecord(DiceBody body, int removeTick)
         {
-            List<DicePoseSample> relativePoses = new(body.PosesSinceExtract.Count);
+            List<DicePoseTrace> relativePoses = new(body.PosesSinceExtract.Count);
             foreach (var pose in body.PosesSinceExtract)
             {
-                relativePoses.Add(new DicePoseSample
+                relativePoses.Add(new DicePoseTrace
                 {
                     Tick = pose.Tick - lastExtractTick,
                     Position = pose.Position,
@@ -221,12 +223,11 @@ namespace Drakken.Server.Dice
                 });
             }
 
-            return new DiceTraceRecord
+            return new DiceLifetimeTrace
             {
                 Instance = body.Instance.Clone(),
-                ParentInstanceId = body.ParentInstanceId,
                 SpawnTick = Mathf.Max(0, body.SpawnTick - lastExtractTick),
-                Poses = relativePoses,
+                PoseTraces = relativePoses,
                 RemoveTick = removeTick < 0 ? -1 : removeTick - lastExtractTick,
             };
         }
@@ -245,17 +246,16 @@ namespace Drakken.Server.Dice
         private class DiceBody
         {
             public DiceInstance Instance;
+            public IReadOnlyList<DiceMeshFactory.DiceFacePose> MeshFaces;
             public Rigidbody Rigidbody;
-            public IReadOnlyList<DiceMeshFactory.DiceFacePose> Faces;
-            public int ParentInstanceId;
             public int SpawnTick;
             public bool IsSettled;
             public float SettledTimer;
-            public readonly List<DicePoseSample> PosesSinceExtract = new();
+            public readonly List<DicePoseTrace> PosesSinceExtract = new();
 
             public void RecordPose(int tick)
             {
-                PosesSinceExtract.Add(new DicePoseSample
+                PosesSinceExtract.Add(new DicePoseTrace
                 {
                     Tick = tick,
                     Position = Rigidbody.position,

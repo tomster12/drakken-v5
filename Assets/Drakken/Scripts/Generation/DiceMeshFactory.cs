@@ -122,7 +122,7 @@ namespace Drakken.Generation
                 (posX, negY, negZ), // 5
                 (negX, posY, negZ), // 6
                 (negX, negY, posZ), // 7
-                (negX, negY, negZ)  // 8
+                (negX, negY, negZ) // 8
             };
 
             ConvexMeshBuilder builder = new();
@@ -146,44 +146,44 @@ namespace Drakken.Generation
 
             Vector3[] v =
             {
-                new Vector3(1, 1, 1) * scale,       // 0
-                new Vector3(1, 1, -1) * scale,      // 1
-                new Vector3(1, -1, 1) * scale,      // 2
-                new Vector3(1, -1, -1) * scale,     // 3
-                new Vector3(-1, 1, 1) * scale,      // 4
-                new Vector3(-1, 1, -1) * scale,     // 5
-                new Vector3(-1, -1, 1) * scale,     // 6
-                new Vector3(-1, -1, -1) * scale,    // 7
-                new Vector3(0, inv, phi) * scale,   // 8
-                new Vector3(inv, phi, 0) * scale,   // 9
-                new Vector3(phi, 0, inv) * scale,   // 10
-                new Vector3(0, inv, -phi) * scale,  // 11
-                new Vector3(inv, -phi, 0) * scale,  // 12
-                new Vector3(-phi, 0, inv) * scale,  // 13
-                new Vector3(0, -inv, phi) * scale,  // 14
-                new Vector3(-inv, phi, 0) * scale,  // 15
-                new Vector3(phi, 0, -inv) * scale,  // 16
+                new Vector3(1, 1, 1) * scale, // 0
+                new Vector3(1, 1, -1) * scale, // 1
+                new Vector3(1, -1, 1) * scale, // 2
+                new Vector3(1, -1, -1) * scale, // 3
+                new Vector3(-1, 1, 1) * scale, // 4
+                new Vector3(-1, 1, -1) * scale, // 5
+                new Vector3(-1, -1, 1) * scale, // 6
+                new Vector3(-1, -1, -1) * scale, // 7
+                new Vector3(0, inv, phi) * scale, // 8
+                new Vector3(inv, phi, 0) * scale, // 9
+                new Vector3(phi, 0, inv) * scale, // 10
+                new Vector3(0, inv, -phi) * scale, // 11
+                new Vector3(inv, -phi, 0) * scale, // 12
+                new Vector3(-phi, 0, inv) * scale, // 13
+                new Vector3(0, -inv, phi) * scale, // 14
+                new Vector3(-inv, phi, 0) * scale, // 15
+                new Vector3(phi, 0, -inv) * scale, // 16
                 new Vector3(0, -inv, -phi) * scale, // 17
                 new Vector3(-inv, -phi, 0) * scale, // 18
-                new Vector3(-phi, 0, -inv) * scale  // 19
+                new Vector3(-phi, 0, -inv) * scale // 19
             };
 
             // Opposite faces sum to 13, matching standard D12 convention. Each entry lists a
             // pentagon's vertices in perimeter order.
             int[][] faceIndices =
             {
-                new[] { 11, 17, 7, 19, 5 },  // 1
-                new[] { 9, 1, 11, 5, 15 },   // 2
-                new[] { 4, 15, 5, 19, 13 },  // 3
-                new[] { 14, 8, 4, 13, 6 },   // 4
-                new[] { 7, 18, 6, 13, 19 },  // 5
-                new[] { 3, 12, 18, 7, 17 },  // 6
-                new[] { 0, 9, 15, 4, 8 },    // 7
-                new[] { 10, 16, 1, 9, 0 },   // 8
-                new[] { 1, 16, 3, 17, 11 },  // 9
-                new[] { 16, 10, 2, 12, 3 },  // 10
-                new[] { 12, 2, 14, 6, 18 },  // 11
-                new[] { 2, 10, 0, 8, 14 }    // 12
+                new[] { 11, 17, 7, 19, 5 }, // 1
+                new[] { 9, 1, 11, 5, 15 }, // 2
+                new[] { 4, 15, 5, 19, 13 }, // 3
+                new[] { 14, 8, 4, 13, 6 }, // 4
+                new[] { 7, 18, 6, 13, 19 }, // 5
+                new[] { 3, 12, 18, 7, 17 }, // 6
+                new[] { 0, 9, 15, 4, 8 }, // 7
+                new[] { 10, 16, 1, 9, 0 }, // 8
+                new[] { 1, 16, 3, 17, 11 }, // 9
+                new[] { 16, 10, 2, 12, 3 }, // 10
+                new[] { 12, 2, 14, 6, 18 }, // 11
+                new[] { 2, 10, 0, 8, 14 } // 12
             };
 
             ConvexMeshBuilder builder = new();
@@ -206,43 +206,43 @@ namespace Drakken.Generation
 
             Vector3[] v =
             {
-                new Vector3(0, 1, phi) * scale,    // 0
-                new Vector3(1, phi, 0) * scale,    // 1
-                new Vector3(phi, 0, 1) * scale,    // 2
-                new Vector3(0, 1, -phi) * scale,   // 3
-                new Vector3(1, -phi, 0) * scale,   // 4
-                new Vector3(-phi, 0, 1) * scale,   // 5
-                new Vector3(0, -1, phi) * scale,   // 6
-                new Vector3(-1, phi, 0) * scale,   // 7
-                new Vector3(phi, 0, -1) * scale,   // 8
-                new Vector3(0, -1, -phi) * scale,  // 9
-                new Vector3(-1, -phi, 0) * scale,  // 10
-                new Vector3(-phi, 0, -1) * scale   // 11
+                new Vector3(0, 1, phi) * scale, // 0
+                new Vector3(1, phi, 0) * scale, // 1
+                new Vector3(phi, 0, 1) * scale, // 2
+                new Vector3(0, 1, -phi) * scale, // 3
+                new Vector3(1, -phi, 0) * scale, // 4
+                new Vector3(-phi, 0, 1) * scale, // 5
+                new Vector3(0, -1, phi) * scale, // 6
+                new Vector3(-1, phi, 0) * scale, // 7
+                new Vector3(phi, 0, -1) * scale, // 8
+                new Vector3(0, -1, -phi) * scale, // 9
+                new Vector3(-1, -phi, 0) * scale, // 10
+                new Vector3(-phi, 0, -1) * scale // 11
             };
 
             // Opposite faces sum to 21, matching standard D20 convention.
             int[][] faceIndices =
             {
-                new[] { 6, 4, 2 },    // 1
-                new[] { 7, 1, 3 },    // 2
-                new[] { 8, 1, 2 },    // 3
-                new[] { 8, 4, 2 },    // 4
-                new[] { 8, 1, 3 },    // 5
-                new[] { 8, 9, 3 },    // 6
-                new[] { 8, 9, 4 },    // 7
-                new[] { 10, 9, 4 },   // 8
-                new[] { 0, 1, 2 },    // 9
-                new[] { 0, 6, 2 },    // 10
-                new[] { 11, 9, 3 },   // 11
-                new[] { 11, 10, 9 },  // 12
-                new[] { 0, 7, 1 },    // 13
-                new[] { 0, 7, 5 },    // 14
-                new[] { 0, 6, 5 },    // 15
-                new[] { 10, 6, 5 },   // 16
-                new[] { 11, 7, 5 },   // 17
-                new[] { 11, 10, 5 },  // 18
-                new[] { 10, 6, 4 },   // 19
-                new[] { 11, 7, 3 }    // 20
+                new[] { 6, 4, 2 }, // 1
+                new[] { 7, 1, 3 }, // 2
+                new[] { 8, 1, 2 }, // 3
+                new[] { 8, 4, 2 }, // 4
+                new[] { 8, 1, 3 }, // 5
+                new[] { 8, 9, 3 }, // 6
+                new[] { 8, 9, 4 }, // 7
+                new[] { 10, 9, 4 }, // 8
+                new[] { 0, 1, 2 }, // 9
+                new[] { 0, 6, 2 }, // 10
+                new[] { 11, 9, 3 }, // 11
+                new[] { 11, 10, 9 }, // 12
+                new[] { 0, 7, 1 }, // 13
+                new[] { 0, 7, 5 }, // 14
+                new[] { 0, 6, 5 }, // 15
+                new[] { 10, 6, 5 }, // 16
+                new[] { 11, 7, 5 }, // 17
+                new[] { 11, 10, 5 }, // 18
+                new[] { 10, 6, 4 }, // 19
+                new[] { 11, 7, 3 } // 20
             };
 
             ConvexMeshBuilder builder = new();

@@ -7,27 +7,24 @@ using UnityEngine;
 
 namespace Drakken.Client.World
 {
-    // Plays back one DicePhysicsTrace window with temporary procedural dice, mirroring what the
-    // server's DicePhysicsWorld actually simulated. Each Play() call owns its own batch of views -
-    // the caller decides what happens once playback finishes (e.g. settle into the gameplay dice row).
-    public class DicePhysicsReplayer
+    public class DiceSimulationReplayer
     {
-        private readonly List<(DiceTraceRecord Record, DiceView View)> activePairs = new();
+        private readonly List<(DiceLifetimeTrace Record, DiceView View)> activePairs = new();
 
-        public async Task Play(AssetDatabase assets, DicePhysicsTrace trace, CancellationToken ct)
+        public async Task Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
         {
             ClearAll();
 
             float maxTimeSeconds = 0f;
             foreach (var record in trace.Dice)
             {
-                if (record.Poses.Count == 0) continue;
+                if (record.PoseTraces.Count == 0) continue;
 
                 var view = DiceView.CreateProcedural(assets, record.Instance);
-                view.transform.SetPositionAndRotation(record.Poses[0].Position, record.Poses[0].Rotation);
+                view.transform.SetPositionAndRotation(record.PoseTraces[0].Position, record.PoseTraces[0].Rotation);
                 activePairs.Add((record, view));
 
-                maxTimeSeconds = Mathf.Max(maxTimeSeconds, record.Poses[^1].Tick * trace.FixedTimestep);
+                maxTimeSeconds = Mathf.Max(maxTimeSeconds, record.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
 
             float elapsedSeconds = 0f;
@@ -52,7 +49,7 @@ namespace Drakken.Client.World
 
             foreach (var (record, view) in activePairs)
             {
-                var (lower, upper, t) = SampleAt(record.Poses, rawTick);
+                var (lower, upper, t) = SampleAt(record.PoseTraces, rawTick);
 
                 view.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),
@@ -60,7 +57,7 @@ namespace Drakken.Client.World
             }
         }
 
-        private static (DicePoseSample Lower, DicePoseSample Upper, float T) SampleAt(List<DicePoseSample> poses, float rawTick)
+        private static (DicePoseTrace Lower, DicePoseTrace Upper, float T) SampleAt(List<DicePoseTrace> poses, float rawTick)
         {
             for (int i = 0; i < poses.Count - 1; i++)
             {
@@ -76,7 +73,6 @@ namespace Drakken.Client.World
             return (last, last, 0f);
         }
 
-        // Destroys every view spawned by the last Play() call. Safe to call even if none are active.
         public void ClearAll()
         {
             foreach (var (_, view) in activePairs)

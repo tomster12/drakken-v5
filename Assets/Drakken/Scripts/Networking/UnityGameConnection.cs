@@ -109,13 +109,13 @@ namespace Drakken.Networking
 
         // -------------------------------- Drafting
 
-        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
+        public void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceSimulationTraces diceTraces)
         {
             S2C_BroadcastMatchStartDraftingPhase_Rpc(gameState, diceTraces, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        private void S2C_BroadcastMatchStartDraftingPhase_Rpc(GameState gameState, MatchDiceTraces diceTraces, RpcParams rpc = default)
+        private void S2C_BroadcastMatchStartDraftingPhase_Rpc(GameState gameState, MatchDiceSimulationTraces diceTraces, RpcParams rpc = default)
         {
             Client.Match.OnServerStartDraftingPhase(gameState, diceTraces);
         }
@@ -221,13 +221,13 @@ namespace Drakken.Networking
             Client.Match.OnServerNextTurn(gameState);
         }
 
-        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceTraces diceTraces)
+        public void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceSimulationTraces diceTraces)
         {
             S2C_BroadcastMatchNextRound_Rpc(gameState, diceTraces, RpcTarget.Group(clientIds, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        private void S2C_BroadcastMatchNextRound_Rpc(GameState gameState, MatchDiceTraces diceTraces, RpcParams rpc = default)
+        private void S2C_BroadcastMatchNextRound_Rpc(GameState gameState, MatchDiceSimulationTraces diceTraces, RpcParams rpc = default)
         {
             Client.Match.OnServerNextRound(gameState, diceTraces);
         }

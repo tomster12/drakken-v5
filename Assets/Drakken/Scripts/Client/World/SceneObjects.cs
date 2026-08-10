@@ -34,7 +34,7 @@ namespace Drakken.Client.World
     {
         public TokenView[] TokenViews { get; set; } = new TokenView[0];
         public DiceView[] DiceViews { get; set; } = new DiceView[0];
-        public DicePhysicsReplayer DicePhysicsReplayer { get; } = new();
+        public DiceSimulationReplayer DiceSimReplayer { get; } = new();
 
         private SceneLayout sceneLayout;
         private AssetDatabase assets;
@@ -55,7 +55,7 @@ namespace Drakken.Client.World
         {
             DestroyAllTokens();
             DestroyAllDice();
-            DicePhysicsReplayer.ClearAll();
+            DiceSimReplayer.ClearAll();
         }
 
         // ------------------------------ Dice

@@ -47,7 +47,6 @@ namespace Drakken.Client.States
             // If we are going back to title then clean up the token / dice views
             if (toType == ClientStateType.Title)
             {
-                SceneLayout.Game.OnDisconnect();
                 SceneObjects.OnDisconnect();
                 client.UI.OnDisconnect();
             }
