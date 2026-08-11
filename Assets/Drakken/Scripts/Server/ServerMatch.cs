@@ -115,7 +115,7 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Drafting;
 
-            DealDraftDice();
+            DealGameDice();
             DealDraftTokens();
 
             var diceTraces = SimulateRollDice();
@@ -123,7 +123,7 @@ namespace Drakken.Server
             Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
         }
 
-        private void DealDraftDice()
+        private void DealGameDice()
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
 

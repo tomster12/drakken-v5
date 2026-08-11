@@ -16,7 +16,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &119668657862211663
 Transform:
   m_ObjectHideFlags: 0
@@ -49,7 +49,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d1dc1eaaf64effb45999ce6cd7f0a1c8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Drakken.Client.World.DiceTray
-  Size: {x: 3, y: 0, z: 3}
+  Size: {x: 7, y: 0, z: 2.2}
 --- !u!1 &2095857070684370467
 GameObject:
   m_ObjectHideFlags: 0
@@ -78,8 +78,8 @@ Transform:
   m_GameObject: {fileID: 2095857070684370467}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 3, z: -1.55}
-  m_LocalScale: {x: 0.1, y: 6, z: 3}
+  m_LocalPosition: {x: 0, y: 3, z: -1.15}
+  m_LocalScale: {x: 0.1, y: 6, z: 7}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 119668657862211663}
@@ -190,8 +190,8 @@ Transform:
   m_GameObject: {fileID: 2572098793517132931}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 3, z: 1.55}
-  m_LocalScale: {x: 0.1, y: 6, z: 3}
+  m_LocalPosition: {x: 0, y: 3, z: 1.15}
+  m_LocalScale: {x: 0.1, y: 6, z: 7}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 119668657862211663}
@@ -302,8 +302,8 @@ Transform:
   m_GameObject: {fileID: 2907753725943006311}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.55, y: 3, z: 0}
-  m_LocalScale: {x: 0.1, y: 6, z: 3}
+  m_LocalPosition: {x: -3.55, y: 3, z: 0}
+  m_LocalScale: {x: 0.1, y: 6, z: 2.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 119668657862211663}
@@ -414,8 +414,8 @@ Transform:
   m_GameObject: {fileID: 6416166096869272384}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.55, y: 3, z: 0}
-  m_LocalScale: {x: 0.1, y: 6, z: 3}
+  m_LocalPosition: {x: 3.55, y: 3, z: 0}
+  m_LocalScale: {x: 0.1, y: 6, z: 2.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 119668657862211663}
@@ -527,7 +527,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.05, z: 0}
-  m_LocalScale: {x: 3, y: 0.1, z: 3}
+  m_LocalScale: {x: 7, y: 0.1, z: 2.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 119668657862211663}

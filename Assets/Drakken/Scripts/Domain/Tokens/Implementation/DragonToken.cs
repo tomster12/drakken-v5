@@ -126,7 +126,7 @@ namespace Drakken.Domain.Tokens.Implementation
             Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;
             d4View.transform.SetPositionAndRotation(d4Pos, tokenTransform.rotation);
 
-            await d4View.AnimateRoll(ct, durationMultiplier: 1.1f);
+            await d4View.AnimateRoll(ct, durationMultiplier: 1.4f);
             await Task.Delay(500);
 
             await d4View.AnimateShrinkAndDestroy(ct);

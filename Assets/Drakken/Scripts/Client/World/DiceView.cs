@@ -110,8 +110,8 @@ namespace Drakken.Client.World
 
         public void Rebind(DiceInstance dice)
         {
-            // Repoints this view at the latest DiceInstance for the same dice (e.g. after a new round's GameState
-            // replaces the old one) without recreating the view or re-running one-time setup
+            // Repoints this view at the latest DiceInstance for the same dice
+            // This is for when we authoritively get GameState and need to update to the new ones
             this.DiceInstance = dice;
         }
 
@@ -126,30 +126,23 @@ namespace Drakken.Client.World
                 .Build(), ct);
         }
 
-        // targetDirection is the world direction the die's value-reading vertex/face should end up
-        // pointing along (default matches GetUpFaceValue's world-up convention). Pass Vector3.down (or
-        // whatever direction faces the camera) for a die that isn't resting on a surface being read from
-        // above - e.g. a floating preview die where the labels need to face the viewer instead.
         public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f, Vector3? targetDirection = null)
         {
-            // Land exactly on the rotation that reads as this die's current value, instead of an
-            // arbitrary/uncontrolled resting orientation.
+            // Start and end at targetRotation, with value facing towards targetDirection
             Quaternion targetRotation = DiceMeshFactory.GetRotationForValue(faces, DiceInstance.Value, targetDirection);
             Quaternion startRotation = targetRotation;
             transform.rotation = startRotation;
 
-            // Tumble around two of the local axes (always distinct, so never opposite/aligned) - one doing
-            // roughly four full spins and the other roughly three, which reads as a natural dice roll.
-            // These must be exact multiples of 360 degrees so the spin cancels out and the die actually
-            // lands back on targetRotation instead of drifting to an unrelated angle.
+
+            // Spin around 2 random axis in full integer rotations
             int firstAxis = Random.Range(0, 3);
             int secondAxis = (firstAxis + Random.Range(1, 3)) % 3;
 
             Vector3 spinAmount = Vector3.zero;
-            spinAmount[firstAxis] = Random.Range(4, 6) * 360f * (Random.value < 0.5f ? -1f : 1f);
-            spinAmount[secondAxis] = Random.Range(3, 5) * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[firstAxis] = Random.Range(3, 4) * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[secondAxis] = Random.Range(1, 2) * 360f * (Random.value < 0.5f ? -1f : 1f);
 
-            float durationSeconds = 0.9f * durationMultiplier;
+            float durationSeconds = 1.0f * durationMultiplier;
 
             await Animator.Play(AnimationSequenceBuilder
                 .Start()
