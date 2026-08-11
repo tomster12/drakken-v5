@@ -8,6 +8,21 @@ using UnityEngine.SceneManagement;
 
 namespace Drakken.Domain.Dice
 {
+    // Result of a Simulate() call: what happened during the ticks it ran, and why it stopped.
+    public readonly struct SimulationResult
+    {
+        public readonly List<int> SettledInstanceIds;
+        public readonly List<string> CompletedDriveIds;
+        public readonly bool TimedOut;
+
+        public SimulationResult(List<int> settledInstanceIds, List<string> completedDriveIds, bool timedOut)
+        {
+            SettledInstanceIds = settledInstanceIds;
+            CompletedDriveIds = completedDriveIds;
+            TimedOut = timedOut;
+        }
+    }
+
     public class DiceSimulationWorld
     {
         private const float fixedTimestep = 1f / 30f;
@@ -20,8 +35,10 @@ namespace Drakken.Domain.Dice
         private readonly PhysicsScene physicsScene;
         private readonly Dictionary<int, DiceBody> diceBodiesByInstanceId = new();
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
+        private readonly List<KinematicDrive> activeDrives = new();
         private int currentTick;
         private int sessionStartTick;
+        private int nextDriveId;
         private bool isInSession;
 
         public bool AllDynamicSettled =>
@@ -162,13 +179,28 @@ namespace Drakken.Domain.Dice
             // Build the trace for the dice before removing
             sessionRemovedTraces.Add(BuildSessionTrace(diceBody, removeTick: currentTick));
 
+            // Destroy() is deferred to the end of the Unity frame, but a session can run many physics ticks
+            // synchronously in one call (e.g. spawning a replacement at this exact spot straight after removing
+            // this one) - disable the collider immediately so it can't overlap anything before the GameObject
+            // actually goes away.
+            foreach (var diceCollider in diceBody.Rigidbody.GetComponentsInChildren<Collider>())
+            {
+                diceCollider.enabled = false;
+            }
+
             GameObject.Destroy(diceBody.Rigidbody.gameObject);
         }
 
-        public int PeekUpFaceValue(int diceInstanceId)
+        public int PeekDiceValue(int diceInstanceId)
         {
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
             return DiceMeshFactory.GetUpFaceValue(diceBody.Rigidbody.transform, diceBody.MeshFaces);
+        }
+
+        public (Vector3 Position, Quaternion Rotation) GetDicePose(int diceInstanceId)
+        {
+            var diceBody = diceBodiesByInstanceId[diceInstanceId];
+            return (diceBody.Rigidbody.position, diceBody.Rigidbody.rotation);
         }
 
         public void FreezeAllDice()
@@ -180,88 +212,158 @@ namespace Drakken.Domain.Dice
             {
                 if (body.Rigidbody.isKinematic) continue;
 
-                body.Instance.Value = PeekUpFaceValue(body.Instance.InstanceId);
+                body.Instance.Value = PeekDiceValue(body.Instance.InstanceId);
                 body.RecordPose(currentTick);
                 body.Rigidbody.isKinematic = true;
             }
         }
 
-        public void SimulateUntilAllSettled(bool freezeOnSettled = true)
+        public string DriveKinematic(
+            int diceInstanceId,
+            float durationSeconds,
+            Func<float, Vector3> positionAtTime,
+            Func<float, Quaternion> rotationAtTime)
         {
-            Assert.True(isInSession, "Cannot simulate outside of a session");
+            Assert.True(isInSession, "Cannot drive dice outside of a session");
 
-            // Run until all dice are settled
-            while (!AllDynamicSettled)
+            // Script a dice to move along a path, returns an identifying drive ID
+            var body = diceBodiesByInstanceId[diceInstanceId];
+            body.Rigidbody.isKinematic = true;
+
+            var drive = new KinematicDrive
             {
-                var settled = SimulateUntilAnySettled();
-
-                // If we do not get the list of settled dice then we hit the tick limit
-                // We log this as an error and continue, everything will go on fine but we
-                // need it to be clearly logged it went wrong
-                if (settled == null)
-                {
-                    Log.Error("DiceSimulationWorld", "Could not finish simulation");
-                    break;
-                }
-            }
-
-            if (freezeOnSettled)
-            {
-                FreezeAllDice();
-            }
+                Id = "drive_" + (++nextDriveId),
+                InstanceId = diceInstanceId,
+                StartTick = currentTick,
+                DurationTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / fixedTimestep)),
+                PositionAtTime = positionAtTime,
+                RotationAtTime = rotationAtTime,
+            };
+            activeDrives.Add(drive);
+            return drive.Id;
         }
 
-        public List<int> SimulateUntilAnySettled()
+        public SimulationResult Simulate(
+            bool untilAllSettled = false,
+            bool untilAnySettled = false,
+            float? forSeconds = null,
+            IEnumerable<string> untilDrivesComplete = null)
         {
             Assert.True(isInSession, "Cannot simulate outside of a session");
 
-            float settleLinSqr = settledLinearVelocity * settledLinearVelocity;
-            float settleAngSqr = settledAngularVelocity * settledAngularVelocity;
+            Assert.True(untilAllSettled || untilAnySettled || forSeconds.HasValue || untilDrivesComplete != null,
+                "Simulate requires at least one stop condition");
 
-            // Track dice that have transitioned (dynamic -> settled)
-            List<int> transitioned = new();
+            var driveIdsToWaitFor = untilDrivesComplete != null
+                ? new HashSet<string>(untilDrivesComplete)
+                : null;
 
+            int? stopTick = forSeconds.HasValue
+                ? currentTick + Mathf.Max(1, Mathf.RoundToInt(forSeconds.Value / fixedTimestep))
+                : null;
+
+            List<int> settledThisCall = new();
+            List<string> completedDrivesThisCall = new();
+
+            // Step tick by tick until we hit a stopping condition
             for (int i = 0; i < tickTimeout; i++)
             {
-                // Step physics
-                physicsScene.Simulate(fixedTimestep);
-                currentTick++;
+                var (settledThisTick, completedDrivesThisTick) = Step();
 
-                // For each dynamic dice body
-                foreach (var (instanceId, body) in diceBodiesByInstanceId)
-                {
-                    if (body.Rigidbody.isKinematic) continue;
+                settledThisCall.AddRange(settledThisTick);
+                completedDrivesThisCall.AddRange(completedDrivesThisTick);
 
-                    // Track current position
-                    body.RecordPose(currentTick);
+                if (untilAllSettled && AllDynamicSettled)
+                    return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
-                    // If we are sufficiently not moving then update settled values
-                    bool isBelowThreshold =
-                        body.Rigidbody.linearVelocity.sqrMagnitude < settleLinSqr &&
-                        body.Rigidbody.angularVelocity.sqrMagnitude < settleAngSqr;
+                if (untilAnySettled && settledThisTick.Count > 0)
+                    return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
-                    if (isBelowThreshold)
-                    {
-                        body.SettledTimer += fixedTimestep;
-                        if (!body.IsSettled && body.SettledTimer >= settledDuration)
-                        {
-                            body.IsSettled = true;
-                            transitioned.Add(instanceId);
-                        }
-                    }
-                    else
-                    {
-                        body.SettledTimer = 0f;
-                        body.IsSettled = false;
-                    }
-                }
+                if (stopTick.HasValue && currentTick >= stopTick.Value)
+                    return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
-                // If any dice settled this tick, or all dice settled, then return
-                if (transitioned.Count > 0) return transitioned;
-                if (AllDynamicSettled) return transitioned;
+                if (driveIdsToWaitFor != null && completedDrivesThisTick.Any(driveIdsToWaitFor.Contains))
+                    return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
             }
 
-            return null;
+            // We have hit tick limit so log and carry on
+            Log.Error("DiceSimulationWorld", "Could not finish simulation");
+            return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: true);
+        }
+
+        private (List<int> SettledInstanceIds, List<string> CompletedDriveIds) Step()
+        {
+            List<string> completedDrives = new();
+            HashSet<int> drivenInstanceIds = null;
+
+            // Advance any active kinematic drives towards their target pose for this tick
+            if (activeDrives.Count > 0)
+            {
+                drivenInstanceIds = new HashSet<int>();
+
+                for (int i = activeDrives.Count - 1; i >= 0; i--)
+                {
+                    var drive = activeDrives[i];
+                    var body = diceBodiesByInstanceId[drive.InstanceId];
+
+                    float t = Mathf.Clamp01((float)(currentTick - drive.StartTick + 1) / drive.DurationTicks);
+                    body.Rigidbody.MovePosition(drive.PositionAtTime(t));
+                    body.Rigidbody.MoveRotation(drive.RotationAtTime(t));
+                    drivenInstanceIds.Add(drive.InstanceId);
+
+                    if (t >= 1f)
+                    {
+                        completedDrives.Add(drive.Id);
+                        activeDrives.RemoveAt(i);
+                    }
+                }
+            }
+
+            // Drive the physics forward
+            physicsScene.Simulate(fixedTimestep);
+            currentTick++;
+
+            // Perform check for dice settled and recording pose
+            float settleLinSqr = settledLinearVelocity * settledLinearVelocity;
+            float settleAngSqr = settledAngularVelocity * settledAngularVelocity;
+            List<int> settled = new();
+
+            foreach (var (instanceId, body) in diceBodiesByInstanceId)
+            {
+                bool isDriven = drivenInstanceIds != null && drivenInstanceIds.Contains(instanceId);
+
+                if (body.Rigidbody.isKinematic)
+                {
+                    // Only record pose of driven kinematic bodies
+                    if (isDriven) body.RecordPose(currentTick);
+                    continue;
+                }
+
+                // Record body for instanceId for this tick
+                body.RecordPose(currentTick);
+
+                // Check if this body is settled
+                bool isBelowThreshold =
+                    body.Rigidbody.linearVelocity.sqrMagnitude < settleLinSqr &&
+                    body.Rigidbody.angularVelocity.sqrMagnitude < settleAngSqr;
+
+                if (isBelowThreshold)
+                {
+                    body.SettledTimer += fixedTimestep;
+                    if (!body.IsSettled && body.SettledTimer >= settledDuration)
+                    {
+                        body.IsSettled = true;
+                        settled.Add(instanceId);
+                    }
+                }
+                else
+                {
+                    body.SettledTimer = 0f;
+                    body.IsSettled = false;
+                }
+            }
+
+            return (settled, completedDrives);
         }
 
         private DiceSessionTrace BuildSessionTrace(DiceBody body, int removeTick)
@@ -286,6 +388,16 @@ namespace Drakken.Domain.Dice
                 PoseTraces = poses,
                 RemoveTick = removeTick < 0 ? -1 : removeTick - sessionStartTick,
             };
+        }
+
+        private class KinematicDrive
+        {
+            public string Id;
+            public int InstanceId;
+            public int StartTick;
+            public int DurationTicks;
+            public Func<float, Vector3> PositionAtTime;
+            public Func<float, Quaternion> RotationAtTime;
         }
 
         private class DiceBody

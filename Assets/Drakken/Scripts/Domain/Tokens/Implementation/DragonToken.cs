@@ -9,6 +9,7 @@ using Drakken.Domain.Dice;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
+using Drakken.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -33,12 +34,17 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenExecutor : TokenExecutor<EmptyTokenIntent, DragonTokenResolution>
     {
-        private const float SpawnY = 1.5f;
-        private const float ThrowY = 5f;
-        private const float DiceThrowImpulseSpeed = 5f;
-        private const float DiceThrowTorque = 30f;
+        private const float LiftHeight = 1.2f;
+        private const float LiftDuration = 0.5f;
+        private const float LiftSpinTurns = 2f;
+        private const float HoverDuration = 1f;
+        private const float HoverSpinTurns = 1.5f;
 
-        protected override DragonTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
+        protected override DragonTokenResolution Execute(
+            GameState gameState,
+            EmptyTokenIntent intent,
+            int sourceClientIndex,
+            DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
 
@@ -52,29 +58,66 @@ namespace Drakken.Domain.Tokens.Implementation
                 .Take(replaceCount)
                 .ToList();
 
-            var trayCenter = GameEntrypoint.Singleton.SceneLayout.Dice.Player(sourceClientIndex).transform.position;
-
             diceWorld.BeginSession();
 
-            // Remove the replaced dice from the physical world and throw in their replacements
+            // Lift each replaced dice into the air with a spin, all at once
+            var liftDriveIds = new List<string>();
+            var liftPositionsByIndex = new Dictionary<int, Vector3>();
+            foreach (var replacedIndex in replacedIndices)
+            {
+                int diceInstanceId = client.Dice[replacedIndex].InstanceId;
+
+                var (startPosition, startRotation) = diceWorld.GetDicePose(diceInstanceId);
+                Vector3 liftedPosition = startPosition + Vector3.up * LiftHeight;
+                Vector3 spinAxis = Random.insideUnitSphere.normalized;
+
+                string driveId = diceWorld.DriveKinematic(
+                    diceInstanceId,
+                    LiftDuration,
+                    t => Vector3.Lerp(startPosition, liftedPosition, Easing.EaseOutCubic(t)),
+                    t => startRotation * Quaternion.AngleAxis(LiftSpinTurns * 360f * t, spinAxis));
+
+                liftDriveIds.Add(driveId);
+                liftPositionsByIndex[replacedIndex] = liftedPosition;
+            }
+
+            diceWorld.Simulate(untilDrivesComplete: liftDriveIds);
+
+            // Swap each lifted dice for a D8, hold it spinning in place so the swap reads clearly, then drop
             var addedDice = new List<DiceInstance>();
+            var hoverDriveIds = new List<string>();
             foreach (var replacedIndex in replacedIndices)
             {
                 diceWorld.RemoveDice(client.Dice[replacedIndex].InstanceId);
 
                 var newDice = DiceInstance.Create(sides: 8);
-
-                Vector3 spawnPos = trayCenter + new Vector3(Random.Range(-0.3f, 0.3f), SpawnY, Random.Range(-0.3f, 0.3f));
+                Vector3 hoverPosition = liftPositionsByIndex[replacedIndex];
                 Quaternion spawnRotation = Random.rotationUniform;
-                Vector3 throwTarget = trayCenter + Vector3.up * ThrowY * Random.Range(0.6f, 1.4f);
-                Vector3 throwVelocity = (throwTarget - spawnPos).normalized * DiceThrowImpulseSpeed;
-                Vector3 throwTorque = Random.insideUnitSphere * DiceThrowTorque;
+                Vector3 spinAxis = Random.insideUnitSphere.normalized;
 
-                diceWorld.SpawnDice(newDice, spawnPos, spawnRotation, throwVelocity, throwTorque);
+                diceWorld.SpawnDice(newDice, hoverPosition, spawnRotation, Vector3.zero, Vector3.zero);
+
+                string hoverDriveId = diceWorld.DriveKinematic(
+                    newDice.InstanceId,
+                    HoverDuration,
+                    _ => hoverPosition,
+                    t => spawnRotation * Quaternion.AngleAxis(HoverSpinTurns * 360f * Easing.EaseOutCubic(t), spinAxis));
+
+                hoverDriveIds.Add(hoverDriveId);
                 addedDice.Add(newDice);
             }
 
-            diceWorld.SimulateUntilAllSettled();
+            diceWorld.Simulate(untilDrivesComplete: hoverDriveIds);
+
+            // Release each D8 to fall as a normal dynamic body - no impulse, no torque, so it drops straight
+            // down without rotating until it actually lands and reacts to the tray/other dice
+            foreach (var newDice in addedDice)
+            {
+                diceWorld.WakeDice(newDice.InstanceId, Vector3.zero, Vector3.zero);
+            }
+
+            diceWorld.Simulate(untilAllSettled: true);
+            diceWorld.FreezeAllDice();
             var trace = diceWorld.EndSession();
 
             return new DragonTokenResolution
@@ -131,18 +174,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             await d4View.AnimateShrinkAndDestroy(ct);
 
-            // Shrink and remove each replaced dice
-            List<Task> removeDiceAnimationTasks = new();
-            foreach (int removedDiceIndex in resolution.ReplacedIndices)
-            {
-                removeDiceAnimationTasks.Add(sourcePlayerObjects.DiceViews[removedDiceIndex].AnimateShrinkAndDestroy(ct));
-                sourcePlayerObjects.DiceViews[removedDiceIndex] = null;
-            }
-            await Task.WhenAll(removeDiceAnimationTasks);
-
-            await Task.Delay(100);
-
-            // Replay dice simulation
+            // Replay full physical animation
             var viewsByInstanceId = await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Assets, resolution.DiceTrace, sourcePlayerObjects, ct);
 

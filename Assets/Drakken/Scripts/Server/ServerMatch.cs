@@ -349,7 +349,8 @@ namespace Drakken.Server
                     }
                 }
 
-                world.SimulateUntilAllSettled();
+                world.Simulate(untilAllSettled: true);
+                world.FreezeAllDice();
             }
 
             return new()
@@ -378,7 +379,8 @@ namespace Drakken.Server
                     world.WakeDice(dice.InstanceId, impulse, torque);
                 }
 
-                world.SimulateUntilAllSettled();
+                world.Simulate(untilAllSettled: true);
+                world.FreezeAllDice();
             }
 
             return new()

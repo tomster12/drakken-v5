@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
-using Drakken.Domain;
 using UnityEngine;
 
 namespace Drakken.Domain.Dice
@@ -13,68 +12,93 @@ namespace Drakken.Domain.Dice
         public Task<Dictionary<int, DiceView>> Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
             => Play(assets, trace, existingViews: null, ct);
 
-        // Reuses whatever view already exists (looked up by dice instance id) for any dice already on
-        // screen for this player - e.g. one the session's physics disturbed without replacing it - rather
-        // than spawning a duplicate. Never writes back to existingViews; placing a freshly-created view
-        // into a specific slot is the caller's responsibility.
         public async Task<Dictionary<int, DiceView>> Play(
             AssetDatabase assets,
             DiceSimulationTraces trace,
             ScenePlayerObjects existingViews,
             CancellationToken ct)
         {
-            List<(DiceSessionTrace Traces, DiceView View)> pairs = new();
-            Dictionary<int, DiceView> viewsByInstanceId = new();
-
-            // For each dice in the simulation trace
-            foreach (var diceTrace in trace.Dice)
-            {
-                if (diceTrace.PoseTraces.Count == 0) continue;
-
-                // If we have not been given a relevant diceView then make a new one
-                var view = existingViews?.FindDiceView(diceTrace.Instance.InstanceId);
-                if (view == null)
-                {
-                    view = DiceView.Create(assets, diceTrace.Instance);
-                    view.transform.SetPositionAndRotation(diceTrace.PoseTraces[0].Position, diceTrace.PoseTraces[0].Rotation);
-                }
-
-                // Now track the trace / view for re-simulating
-                pairs.Add((diceTrace, view));
-                viewsByInstanceId[diceTrace.Instance.InstanceId] = view;
-            }
+            var relevantTraces = trace.Dice.FindAll(diceTrace => diceTrace.PoseTraces.Count > 0);
 
             float maxTimeSeconds = 0f;
-            foreach (var (Traces, _) in pairs)
+            foreach (var diceTrace in relevantTraces)
             {
-                maxTimeSeconds = Mathf.Max(maxTimeSeconds, Traces.PoseTraces[^1].Tick * trace.FixedTimestep);
+                maxTimeSeconds = Mathf.Max(maxTimeSeconds, diceTrace.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
 
-            // Scrub through the simulating with interpolated frames
+            // Views currently on screen for this playback, keyed by dice instance id
+            // Created and destroyed as playback crosses each dice's SpawnTick / RemoveTick
+            Dictionary<int, DiceView> liveViews = new();
+            Dictionary<int, DiceView> resultViews = new();
+
+            // Scrub through the simulation with interpolated frames
             float elapsedSeconds = 0f;
             while (elapsedSeconds < maxTimeSeconds)
             {
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(pairs, trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
 
             if (!ct.IsCancellationRequested)
-                ApplyAtTime(pairs, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, maxTimeSeconds);
 
-            return viewsByInstanceId;
+            return resultViews;
         }
 
-        private void ApplyAtTime(List<(DiceSessionTrace Traces, DiceView View)> pairs, float fixedTimestep, float elapsedSeconds)
+        private void ApplyAtTime(
+            AssetDatabase assets,
+            List<DiceSessionTrace> traces,
+            ScenePlayerObjects existingViews,
+            Dictionary<int, DiceView> liveViews,
+            Dictionary<int, DiceView> resultViews,
+            float fixedTimestep,
+            float elapsedSeconds)
         {
             float rawTick = elapsedSeconds / fixedTimestep;
 
-            foreach (var (Traces, view) in pairs)
+            // For each dice that is being traced
+            foreach (var diceTrace in traces)
             {
-                var (lower, upper, t) = SampleAt(Traces.PoseTraces, rawTick);
+                int instanceId = diceTrace.Instance.InstanceId;
+
+                bool shouldExist =
+                    rawTick >= diceTrace.SpawnTick &&
+                    (diceTrace.RemoveTick < 0 || rawTick < diceTrace.RemoveTick);
+
+                liveViews.TryGetValue(instanceId, out var view);
+
+                // we are not spawned, or removed, ensure we dont have a dice view
+                if (!shouldExist)
+                {
+                    if (view != null)
+                    {
+                        Object.Destroy(view.gameObject);
+                        liveViews.Remove(instanceId);
+                    }
+                    continue;
+                }
+
+                // Otherwise make sure that we have a live view assigned
+                if (view == null)
+                {
+                    // Reuse existing view or create a new one
+                    view = existingViews?.FindDiceView(instanceId);
+                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance);
+                    liveViews[instanceId] = view;
+
+                    // We can only guaranteed add this dice to the result if it is not removed
+                    if (diceTrace.RemoveTick < 0)
+                    {
+                        resultViews[instanceId] = view;
+                    }
+                }
+
+                // Now we have dice views sorted sample and interpolate traces
+                var (lower, upper, t) = SampleAt(diceTrace.PoseTraces, rawTick);
 
                 view.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),
