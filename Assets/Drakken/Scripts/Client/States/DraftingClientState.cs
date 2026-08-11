@@ -49,8 +49,7 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.transform.SetPositionAndRotation(
                 MyDraftingLayout.DraftConfirmButtonPosition.position, MyDraftingLayout.DraftConfirmButtonPosition.rotation);
 
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(
-                MyDraftingLayout.CameraPosition, snap: fromType == ClientStateType.Title);
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(MyDraftingLayout.CameraPosition, snap: true);
 
             SceneLayout.Dice.P1.gameObject.SetActive(true);
             SceneLayout.Dice.P2.gameObject.SetActive(true);
@@ -110,11 +109,11 @@ namespace Drakken.Client.States
 
             async Task AnimateDiceSpawnIn(DiceView view)
             {
-                await view.AnimateGrow(cts.Token);
+                await view.AnimateGrow(cts.Token, 0.5f);
                 await view.AnimateShake(cts.Token);
             }
 
-            // Pre-spawn a view for each dice at the trace's starting pose, and grow + shake it in place
+            // Prepare a dice view based off the simulation trace
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);

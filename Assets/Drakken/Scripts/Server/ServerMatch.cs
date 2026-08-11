@@ -305,9 +305,9 @@ namespace Drakken.Server
                 // Setup constants
                 const float edgeMargin = 0.2f;
                 const float spawnY = 1.5f;
-                const float throwY = 5f;
-                const float diceThrowImpulseSpeed = 5f;
-                const float diceThrowTorque = 30f;
+                const float throwY = 8f;
+                const float diceThrowImpulseSpeed = 2.5f;
+                const float diceThrowTorque = 20f;
 
                 // Setup references
                 var diceInstances = GameState.Clients[p].Dice;
@@ -366,14 +366,14 @@ namespace Drakken.Server
                 var world = DiceWorlds[p];
                 world.BeginSession();
 
-                const float diceThrowImpulseSpeed = 4f;
+                const float diceThrowImpulseSpeed = 6f;
                 const float diceThrowTorque = 20f;
 
                 var diceInstances = GameState.Clients[p].Dice;
 
                 foreach (var dice in diceInstances)
                 {
-                    Vector3 impulse = Vector3.up * diceThrowImpulseSpeed * 0.5f;
+                    Vector3 impulse = Vector3.up * diceThrowImpulseSpeed;
                     Vector3 torque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
                     world.WakeDice(dice.InstanceId, impulse, torque);
                 }

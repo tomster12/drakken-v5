@@ -15,7 +15,7 @@ namespace Drakken.Client.World
 
         private Vector3 targetPosition;
         private Quaternion targetRotation;
-        private Quaternion currentPanRotation;
+        private Quaternion currentPanRotation = Quaternion.identity;
 
         void Awake()
         {
@@ -65,7 +65,7 @@ namespace Drakken.Client.World
 
             if (snap)
             {
-                this.transform.SetPositionAndRotation(targetPosition, targetRotation);
+                this.transform.SetPositionAndRotation(targetPosition, targetRotation * currentPanRotation);
             }
         }
     }

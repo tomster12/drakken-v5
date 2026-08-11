@@ -120,7 +120,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Spawn a D4 next to the token showing how many dice it's about to replace
             var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
-            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 2f);
+            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 1.2f);
 
             var tokenTransform = visualContext.TokenView.transform;
             Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;

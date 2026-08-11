@@ -69,6 +69,7 @@ namespace Drakken.Client.World
             IReadOnlyList<DiceMeshFactory.DiceFacePose> faces,
             float scale = 1.0f)
         {
+
             for (int i = 0; i < faces.Count && i < dice.Faces.Count; i++)
             {
                 DiceMeshFactory.DiceFacePose pose = faces[i];
@@ -79,7 +80,9 @@ namespace Drakken.Client.World
                     {
                         CreateFaceLabel(
                             assets, dice.Faces[spot.ValueFaceIndex].Value,
-                            spot.Position + pose.Direction * FaceLabelSurfaceOffset, spot.Rotation, scale);
+                            spot.Position + pose.Direction * FaceLabelSurfaceOffset, spot.Rotation,
+                            // Use a smaller scale when we have multiple label spots
+                            scale * 0.6f);
                     }
                 }
                 else
@@ -91,7 +94,12 @@ namespace Drakken.Client.World
             }
         }
 
-        private void CreateFaceLabel(AssetDatabase assets, int value, Vector3 localPosition, Quaternion localRotation, float scale)
+        private void CreateFaceLabel(
+            AssetDatabase assets,
+            int value,
+            Vector3 localPosition,
+            Quaternion localRotation,
+            float scale)
         {
             // TextMeshPro requires a RectTransform, so add it before touching the transform.
             GameObject labelGo = new($"Face Label {value}");
@@ -119,54 +127,53 @@ namespace Drakken.Client.World
 
         // ------------------------------ Animation
 
-        public async Task AnimateGrow(CancellationToken ct)
+        public async Task AnimateGrow(CancellationToken ct, float duration = 0.3f)
         {
             await Animator.Play(AnimationSequenceBuilder
                 .Start()
                 .Next(AnimationTracks.LocalScale(
-                    0.3f, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
+                    duration, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
                 .Build(), ct);
         }
 
-        public async Task AnimateShake(CancellationToken ct, float durationSeconds = 1.2f, float positionMagnitude = 0.2f, float rotationMagnitude = 220f)
+        public async Task AnimateShake(CancellationToken ct, float durationSeconds = 0.8f, float positionMagnitude = 0.05f)
         {
             Vector3 basePosition = transform.position;
             Quaternion baseRotation = transform.rotation;
+            transform.rotation = baseRotation;
 
-            const int shakeSteps = 4;
-            float stepDuration = durationSeconds / shakeSteps;
+            // Spin continuously around 2 random axes
+            int firstAxis = Random.Range(0, 3);
+            int secondAxis = (firstAxis + Random.Range(1, 3)) % 3;
 
-            var builder = AnimationSequenceBuilder.Start();
+            Vector3 spinAmount = Vector3.zero;
+            spinAmount[firstAxis] = 1 * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[secondAxis] = 1 * 360f * (Random.value < 0.5f ? -1f : 1f);
+
+            var builder = AnimationSequenceBuilder
+                .Start()
+                .Next(AnimationTracks.LocalEulerRotation(
+                    durationSeconds, transform, baseRotation, spinAmount, Easing.Linear));
+
+            // Jittery positions in parallel with the spin
+            const int jitterSteps = 12;
+            float stepDuration = durationSeconds / jitterSteps;
             Vector3 previousPosition = basePosition;
-            Quaternion previousRotation = baseRotation;
 
-            // Spin continuously in one direction per axis, rather than reversing back and forth.
-            Vector3 spinDirection = new(
-                Random.value < 0.5f ? -1f : 1f,
-                Random.value < 0.5f ? -1f : 1f,
-                Random.value < 0.5f ? -1f : 1f);
-
-            for (int i = 0; i < shakeSteps; i++)
+            for (int i = 0; i < jitterSteps; i++)
             {
-                bool isLastStep = i == shakeSteps - 1;
+                bool isLastStep = i == jitterSteps - 1;
 
                 Vector3 targetPosition = isLastStep
                     ? basePosition
                     : basePosition + new Vector3(
-                        Random.Range(-positionMagnitude, positionMagnitude), 0f,
-                        Random.Range(-positionMagnitude, positionMagnitude));
+                        Random.Range(positionMagnitude * 0.5f, positionMagnitude) * (Random.value < 0.5f ? -1f : 1f), 0f,
+                        Random.Range(positionMagnitude * 0.5f, positionMagnitude) * (Random.value < 0.5f ? -1f : 1f));
 
-                Quaternion targetRotation = previousRotation * Quaternion.Euler(
-                    spinDirection.x * Random.Range(0f, rotationMagnitude),
-                    spinDirection.y * Random.Range(0f, rotationMagnitude),
-                    spinDirection.z * Random.Range(0f, rotationMagnitude));
-
-                builder.Next(
-                    AnimationTracks.Position(stepDuration, transform, previousPosition, targetPosition, Easing.EaseInOutCubic),
-                    AnimationTracks.Rotation(stepDuration, transform, previousRotation, targetRotation, Easing.EaseInOutCubic));
+                builder.At(i * stepDuration, AnimationTracks.Position(
+                    stepDuration, transform, previousPosition, targetPosition, Easing.Linear));
 
                 previousPosition = targetPosition;
-                previousRotation = targetRotation;
             }
 
             await Animator.Play(builder.Build(), ct);
@@ -178,7 +185,6 @@ namespace Drakken.Client.World
             Quaternion targetRotation = DiceMeshFactory.GetRotationForValue(faces, DiceInstance.Value, targetDirection);
             Quaternion startRotation = targetRotation;
             transform.rotation = startRotation;
-
 
             // Spin around 2 random axis in full integer rotations
             int firstAxis = Random.Range(0, 3);
