@@ -7,7 +7,7 @@ namespace Drakken.Domain.Dice
 {
     public static class DiceMeshFactory
     {
-        public const float BaseScale = 0.65f;
+        public const float BaseScale = 0.5f;
 
         public static DiceMesh Create(DiceInstance diceInstance, Material material = null, float scale = 1f)
         {
@@ -32,59 +32,15 @@ namespace Drakken.Domain.Dice
             return diceMesh;
         }
 
-        public static Quaternion GetRotationForValue(IReadOnlyList<DiceFacePose> faces, int value, Vector3? targetDirection = null)
-        {
-            // Calculate rotation to put the UpDetectionDirection along TargetDirection
-            Vector3 target = (targetDirection ?? Vector3.up).normalized;
-            Vector3 source = faces[value - 1].UpDetectionDirection;
-            return Quaternion.FromToRotation(source, target);
-        }
-
-        public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
-        {
-            int bestFaceIndex = 0;
-            float bestDot = float.NegativeInfinity;
-
-            for (int i = 0; i < faces.Count; i++)
-            {
-                float dot = Vector3.Dot(dieTransform.TransformDirection(faces[i].UpDetectionDirection), Vector3.up);
-                if (dot > bestDot)
-                {
-                    bestDot = dot;
-                    bestFaceIndex = i;
-                }
-            }
-
-            return bestFaceIndex + 1;
-        }
-
-        private static Quaternion GetFaceLabelRotation(Vector3 direction)
-        {
-            Vector3 upHint = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
-            return Quaternion.LookRotation(-direction, upHint);
-        }
-
-        private static Quaternion GetCornerLabelRotation(Vector3 faceDirection, Vector3 towardCorner)
-        {
-            // Alternative to GetFaceLabelRotation for corner labels
-            Vector3 upHint = Vector3.ProjectOnPlane(towardCorner, faceDirection);
-            if (upHint.sqrMagnitude < 0.0001f)
-            {
-                upHint = Mathf.Abs(Vector3.Dot(faceDirection, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
-            }
-            return Quaternion.LookRotation(-faceDirection, upHint);
-        }
-
         private static DiceMesh CreateCube(float scale)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "D6 (Generated)";
 
-            // GameObject.CreatePrimitive(Cube) is a unit cube (half-extent 0.5);
-            // scale it up to reach the requested half-extent.
+            // GameObject.CreatePrimitive(Cube) is a unit cube (half-extent 0.5)
             go.transform.localScale = Vector3.one * scale;
 
-            // Opposite faces sum to 7, matching standard D6 convention.
+            // Opposite faces sum to 7 (D6)
             Vector3[] directions =
             {
                 Vector3.up, // 1
@@ -107,7 +63,7 @@ namespace Drakken.Domain.Dice
 
         private static DiceMesh CreateTetrahedron(float scale)
         {
-            // Alternating corners of a cube form a regular tetrahedron centered on the origin.
+            // Alternating corners of a cube form a regular tetrahedron centered on the origin
             float h = 0.5f * scale;
             Vector3[] c =
             {
@@ -117,14 +73,9 @@ namespace Drakken.Domain.Dice
                 new(-h, -h, h)
             };
 
-            // A regular tetrahedron rests on one face with the opposite vertex pointing up, so it's read
-            // from that vertex rather than any face normal (which are all symmetric around that vertex
-            // and would otherwise tie). Each triangle below is opposite vertex c[i], in that order.
-            //
-            // A D4's printed value isn't per-face - each face carries 3 labels (one per corner), and the
-            // value is whichever number appears at all 3 corners touching the vertex that's pointing up.
-            // So the corner of a face nearest vertex c[j] must show vertex c[j]'s own value, not the
-            // value of the face itself. cornerValueIndices below maps each corner to that vertex's index.
+            // For a tetrahedron we use the opposite corner of a face for its value
+            // The up detection direction for each is therefore the opposite direction
+            // And the value for each is also the opposite direction
             ConvexMeshBuilder builder = new();
             builder.AddTriangle(c[1], c[2], c[3], upDetectionDirection: c[0], cornerValueIndices: (1, 2, 3));
             builder.AddTriangle(c[0], c[3], c[2], upDetectionDirection: c[1], cornerValueIndices: (0, 3, 2));
@@ -144,7 +95,7 @@ namespace Drakken.Domain.Dice
             Vector3 posZ = Vector3.forward * scale;
             Vector3 negZ = Vector3.back * scale;
 
-            // Opposite faces sum to 9, matching standard D8 convention.
+            // Opposite faces sum to 9 (D8)
             (Vector3 a, Vector3 b, Vector3 c)[] faceVerts =
             {
                 (posX, posY, posZ), // 1
@@ -172,8 +123,7 @@ namespace Drakken.Domain.Dice
             float phi = (1f + Mathf.Sqrt(5f)) / 2f;
             float inv = 1f / phi;
 
-            // All 20 vertices of a regular dodecahedron sit at the same distance from the
-            // origin; this normalizes that circumradius to 1 before applying the requested scale.
+            // All 20 vertices of a regular dodecahedron sit equidistance from the origin
             float unitScale = 1f / Mathf.Sqrt(3f) * scale;
 
             Vector3[] v =
@@ -200,8 +150,7 @@ namespace Drakken.Domain.Dice
                 new Vector3(-phi, 0, -inv) * unitScale // 19
             };
 
-            // Opposite faces sum to 13, matching standard D12 convention. Each entry lists a
-            // pentagon's vertices in perimeter order.
+            // Opposite faces sum to 13 (D12)
             int[][] faceIndices =
             {
                 new[] { 11, 17, 7, 19, 5 }, // 1
@@ -322,6 +271,53 @@ namespace Drakken.Domain.Dice
             return new DiceMesh(go, builder.Faces);
         }
 
+        // ------------------------------ Utility
+
+        public static Quaternion GetRotationForValue(IReadOnlyList<DiceFacePose> faces, int value, Vector3? targetDirection = null)
+        {
+            // Calculate rotation to put the UpDetectionDirection along TargetDirection
+            Vector3 target = (targetDirection ?? Vector3.up).normalized;
+            Vector3 source = faces[value - 1].UpDetectionDirection;
+            return Quaternion.FromToRotation(source, target);
+        }
+
+        public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
+        {
+            // which which of the faces is most pointing upwards
+            int bestFaceIndex = 0;
+            float bestDot = float.NegativeInfinity;
+
+            for (int i = 0; i < faces.Count; i++)
+            {
+                float dot = Vector3.Dot(dieTransform.TransformDirection(faces[i].UpDetectionDirection), Vector3.up);
+                if (dot > bestDot)
+                {
+                    bestDot = dot;
+                    bestFaceIndex = i;
+                }
+            }
+
+            return bestFaceIndex + 1;
+        }
+
+        private static Quaternion GetFaceLabelRotation(Vector3 direction)
+        {
+            // Orient a label on a face so it is readable
+            Vector3 upHint = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+            return Quaternion.LookRotation(-direction, upHint);
+        }
+
+        private static Quaternion GetCornerLabelRotation(Vector3 faceDirection, Vector3 towardCorner)
+        {
+            // Alternative to GetFaceLabelRotation for corner labels
+            Vector3 upHint = Vector3.ProjectOnPlane(towardCorner, faceDirection);
+            if (upHint.sqrMagnitude < 0.0001f)
+            {
+                upHint = Mathf.Abs(Vector3.Dot(faceDirection, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+            }
+            return Quaternion.LookRotation(-faceDirection, upHint);
+        }
+
         private class ConvexMeshBuilder
         {
             private readonly List<Vector3> vertices = new();
@@ -330,17 +326,15 @@ namespace Drakken.Domain.Dice
 
             public IReadOnlyList<DiceFacePose> Faces => faces;
 
-            // upDetectionDirection overrides what GetUpFaceValue checks against world-up for this face,
-            // for shapes (e.g. tetrahedron) read from a vertex rather than the face's own normal.
-            //
-            // cornerValueIndices, when given, requests one label per corner (a, b, c) instead of the
-            // usual single centered label, with each entry naming which face's value that corner shows
-            // (see the tetrahedron's use of this for why a corner doesn't always show this face's own value).
             public void AddTriangle(
                 Vector3 a, Vector3 b, Vector3 c,
                 Vector3? upDetectionDirection = null,
                 (int a, int b, int c)? cornerValueIndices = null)
             {
+                // upDetectionDirection overrides what GetUpFaceValue checks against world-up for this face
+                // By default the pose will use the outwards direction (e.g. face pointing upwards)
+                // cornerValueIndices sets this triangle to provide a label per corner (a, b, c)
+
                 Vector3 centroid = (a + b + c) / 3f;
                 Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
 
@@ -367,6 +361,8 @@ namespace Drakken.Domain.Dice
                 Vector3 direction = centroid.normalized;
 
                 List<DiceLabelSpot> labelSpots = null;
+
+                // If we were told to have seperate values per corner then setup labels
                 if (cornerValueIndices.HasValue)
                 {
                     var v = cornerValueIndices.Value;
@@ -382,15 +378,13 @@ namespace Drakken.Domain.Dice
                 faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection, labelSpots));
             }
 
-            // Adds a convex planar polygon (e.g. a pentagon) as a single dice face, fan-triangulated
-            // from its centroid. verts must already be ordered around the polygon's perimeter.
             public void AddFace(Vector3[] verts, Vector3? upDetectionDirection = null)
             {
+                // Adds a convex planar polygon (e.g. pentagon) as a single dice face
+                // Add triangles as fan-triangulated from its centroid
+
                 Vector3 centroid = Vector3.zero;
-                foreach (Vector3 vertex in verts)
-                {
-                    centroid += vertex;
-                }
+                foreach (Vector3 vertex in verts) centroid += vertex;
                 centroid /= verts.Length;
 
                 Vector3 normal = Vector3.Cross(verts[1] - verts[0], verts[2] - verts[0]).normalized;
@@ -436,13 +430,12 @@ namespace Drakken.Domain.Dice
             }
         }
 
-        // A single printed-number position on a face. Position/Rotation are local to the die; ValueFaceIndex
-        // names which face's value (0-based, matching DiceMesh.Faces order) is printed at this spot - usually
-        // this face's own index, but a D4 corner prints a different (neighboring) face's value.
         public readonly struct DiceLabelSpot
         {
+            // Position and rotation is local to the dice
             public readonly Vector3 Position;
             public readonly Quaternion Rotation;
+            // The face index this label represents
             public readonly int ValueFaceIndex;
 
             public DiceLabelSpot(Vector3 position, Quaternion rotation, int valueFaceIndex)
@@ -455,19 +448,12 @@ namespace Drakken.Domain.Dice
 
         public readonly struct DiceFacePose
         {
-            // The face's own outward normal direction; used to place/orient a label flush against it.
             public readonly Vector3 Direction;
             public readonly Vector3 Position;
             public readonly Quaternion LabelRotation;
-
-            // Direction checked against world-up to decide whether this face's value is "the" reading
-            // once the die settles. Usually the same as Direction, since the settled face really does
-            // point up (cube, bipyramid). For shapes read from a vertex rather than a face (tetrahedron),
-            // this instead points toward that vertex.
+            // Direction to check for the current side the dice is on
             public readonly Vector3 UpDetectionDirection;
-
-            // Null for the common case of one centered label using this face's own value (Position/LabelRotation
-            // above). Set for faces that print multiple numbers at different spots (e.g. a D4's 3 corners).
+            // Optional override for if the label is standard centred
             public readonly IReadOnlyList<DiceLabelSpot> LabelSpots;
 
             public DiceFacePose(
@@ -485,7 +471,8 @@ namespace Drakken.Domain.Dice
         public readonly struct DiceMesh
         {
             public readonly GameObject GameObject;
-            public readonly IReadOnlyList<DiceFacePose> Faces; // Index i is the pose for face value i+1
+            // Indexed in same order as the dice sides
+            public readonly IReadOnlyList<DiceFacePose> Faces;
             public readonly MeshRenderer Renderer;
 
             public DiceMesh(GameObject gameObject, IReadOnlyList<DiceFacePose> faces)

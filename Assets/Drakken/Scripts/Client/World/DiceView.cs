@@ -23,9 +23,10 @@ namespace Drakken.Client.World
         private Outline outline;
         private Color hoverOutlineColor = Color.white;
         private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
-        private float FaceLabelFontSize = 1.4f;
+        private float FaceLabelFontSize = 2.5f;
         private float FaceLabelSurfaceOffset = 0.01f;
-        private Vector2 FaceLabelSize = new(0.8f, 0.8f);
+        private Vector2 FaceLabelSize = new(1.0f, 1.0f);
+        private Color FaceLabelColor = new(159, 141, 129); // rgb(159, 141, 129)
 
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         public DiceInstance DiceInstance { get; private set; }
@@ -103,6 +104,7 @@ namespace Drakken.Client.World
             label.text = value.ToString();
             label.alignment = TextAlignmentOptions.Center;
             label.fontSize = FaceLabelFontSize * scale;
+            label.color = FaceLabelColor;
 
             if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
             if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
@@ -124,6 +126,50 @@ namespace Drakken.Client.World
                 .Next(AnimationTracks.LocalScale(
                     0.3f, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
                 .Build(), ct);
+        }
+
+        public async Task AnimateShake(CancellationToken ct, float durationSeconds = 1.2f, float positionMagnitude = 0.2f, float rotationMagnitude = 220f)
+        {
+            Vector3 basePosition = transform.position;
+            Quaternion baseRotation = transform.rotation;
+
+            const int shakeSteps = 4;
+            float stepDuration = durationSeconds / shakeSteps;
+
+            var builder = AnimationSequenceBuilder.Start();
+            Vector3 previousPosition = basePosition;
+            Quaternion previousRotation = baseRotation;
+
+            // Spin continuously in one direction per axis, rather than reversing back and forth.
+            Vector3 spinDirection = new(
+                Random.value < 0.5f ? -1f : 1f,
+                Random.value < 0.5f ? -1f : 1f,
+                Random.value < 0.5f ? -1f : 1f);
+
+            for (int i = 0; i < shakeSteps; i++)
+            {
+                bool isLastStep = i == shakeSteps - 1;
+
+                Vector3 targetPosition = isLastStep
+                    ? basePosition
+                    : basePosition + new Vector3(
+                        Random.Range(-positionMagnitude, positionMagnitude), 0f,
+                        Random.Range(-positionMagnitude, positionMagnitude));
+
+                Quaternion targetRotation = previousRotation * Quaternion.Euler(
+                    spinDirection.x * Random.Range(0f, rotationMagnitude),
+                    spinDirection.y * Random.Range(0f, rotationMagnitude),
+                    spinDirection.z * Random.Range(0f, rotationMagnitude));
+
+                builder.Next(
+                    AnimationTracks.Position(stepDuration, transform, previousPosition, targetPosition, Easing.EaseInOutCubic),
+                    AnimationTracks.Rotation(stepDuration, transform, previousRotation, targetRotation, Easing.EaseInOutCubic));
+
+                previousPosition = targetPosition;
+                previousRotation = targetRotation;
+            }
+
+            await Animator.Play(builder.Build(), ct);
         }
 
         public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f, Vector3? targetDirection = null)

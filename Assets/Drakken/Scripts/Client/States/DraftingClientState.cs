@@ -91,10 +91,12 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            // Reset dice views to let the simulation replayer spawn
+            // Reset dice views to let us spawn fresh ones for this roll
             SceneObjects.P1.DestroyAllDice();
             SceneObjects.P2.DestroyAllDice();
 
+            // Spawn dice at their resting position (grow + shake) before replaying the physics throw
+            await SpawnDiceForRoll(Match.LastDiceTraces);
             await SimulateDiceTraces(Match.LastDiceTraces);
 
             // Update UI to match dice totals
@@ -102,16 +104,52 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1);
         }
 
+        private async Task SpawnDiceForRoll(MatchDiceSimulationTraces diceTraces)
+        {
+            List<Task> tasks = new();
+
+            async Task AnimateDiceSpawnIn(DiceView view)
+            {
+                await view.AnimateGrow(cts.Token);
+                await view.AnimateShake(cts.Token);
+            }
+
+            // Pre-spawn a view for each dice at the trace's starting pose, and grow + shake it in place
+            for (int clientIndex = 0; clientIndex < 2; clientIndex++)
+            {
+                var sceneObjects = SceneObjects.Player(clientIndex);
+                var trace = diceTraces.Player(clientIndex);
+
+                List<DiceView> views = new();
+                foreach (var diceTrace in trace.Dice)
+                {
+                    if (diceTrace.PoseTraces.Count == 0) continue;
+
+                    var startPose = diceTrace.PoseTraces[0];
+                    var view = DiceView.Create(client.Assets, diceTrace.Instance);
+                    view.transform.SetPositionAndRotation(startPose.Position, startPose.Rotation);
+                    view.transform.localScale = Vector3.zero;
+
+                    views.Add(view);
+                    tasks.Add(AnimateDiceSpawnIn(view));
+                }
+
+                sceneObjects.DiceViews = views.ToArray();
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
         private async Task SimulateDiceTraces(MatchDiceSimulationTraces diceTraces)
         {
             List<Task<Dictionary<int, DiceView>>> tasks = new();
 
-            // Replay the dice simulation traces for each player
+            // Replay the dice simulation traces for each player, reusing the views we already spawned in
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
-                    client.Assets, diceTraces.Player(clientIndex), cts.Token));
+                    client.Assets, diceTraces.Player(clientIndex), sceneObjects, cts.Token));
             }
 
             // Get the final dice views out and update scene objects

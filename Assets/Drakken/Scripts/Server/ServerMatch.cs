@@ -302,26 +302,31 @@ namespace Drakken.Server
         {
             for (int p = 0; p < 2; p++)
             {
-                var world = DiceWorlds[p];
-                world.BeginSession();
-
+                // Setup constants
                 const float edgeMargin = 0.2f;
                 const float spawnY = 1.5f;
                 const float throwY = 5f;
                 const float diceThrowImpulseSpeed = 5f;
                 const float diceThrowTorque = 30f;
 
+                // Setup references
                 var diceInstances = GameState.Clients[p].Dice;
-                int diceCount = diceInstances.Count;
+                var diceCount = diceInstances.Count;
                 var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
                 var trayCenter = tray.transform.position;
                 var traySize = tray.Size;
+
+                // Calculate row spacing to place dice into rows
+                // Spill over into new Z-axis row
                 float diceSpacing = DiceMeshFactory.BaseScale * 3.0f;
                 float clientSideSignZ = p == 0 ? -1f : 1f;
-                float rowStart = trayCenter.x - traySize.x / 2f + edgeMargin;
                 float rowWidth = traySize.x - edgeMargin * 2f;
                 int maxPerRow = Mathf.Max(1, Mathf.FloorToInt(rowWidth / diceSpacing));
                 int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
+
+                // Now we can start the simulation session
+                var world = DiceWorlds[p];
+                world.BeginSession();
 
                 int diceIndex = 0;
                 for (int row = 0; row < rowCount; row++)
@@ -331,17 +336,15 @@ namespace Drakken.Server
 
                     for (int i = 0; i < rowDiceCount; i++)
                     {
+                        var spawnX = trayCenter.x + (i - (rowDiceCount - 1) / 2f) * diceSpacing;
+                        var spawnPos = new Vector3(spawnX, spawnY, spawnZ);
+                        var spawnRotation = UnityEngine.Random.rotationUniform;
+                        var throwTarget = trayCenter + Vector3.up * throwY * UnityEngine.Random.Range(0.6f, 1.4f);
+                        var throwVelocity = (throwTarget - spawnPos).normalized * diceThrowImpulseSpeed;
+                        var throwTorque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
+
+                        // Spawn a new dice with the calculated position and forces
                         var instance = diceInstances[diceIndex++];
-
-                        float t = (i + 1f) / (rowDiceCount + 1f);
-                        float spawnX = rowStart + t * rowWidth;
-                        Vector3 spawnPos = new(spawnX, spawnY, spawnZ);
-                        Quaternion spawnRotation = UnityEngine.Random.rotationUniform;
-
-                        Vector3 throwTarget = trayCenter + Vector3.up * throwY * UnityEngine.Random.Range(0.6f, 1.4f);
-                        Vector3 throwVelocity = (throwTarget - spawnPos).normalized * diceThrowImpulseSpeed;
-                        Vector3 throwTorque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
-
                         world.SpawnDice(instance, spawnPos, spawnRotation, throwVelocity, throwTorque);
                     }
                 }
