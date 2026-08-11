@@ -16,7 +16,7 @@ namespace Drakken.Networking
     {
         private static readonly ulong myClientId = 20;
         private static readonly ulong opClientId = 30;
-        private static readonly TimeSpan opponentReactionDelay = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan opponentReactionDelay = TimeSpan.FromSeconds(0.5);
 
         private IGameServer Server => GameEntrypoint.Singleton.Server;
         private readonly Dictionary<ulong, IGameClient> clientsById = new();

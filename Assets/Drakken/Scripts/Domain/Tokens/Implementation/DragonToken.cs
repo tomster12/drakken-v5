@@ -16,7 +16,7 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class DragonTokenResolution : TokenResolution
     {
-        public int D3Roll;
+        public int D4Roll;
         public List<int> ReplacedIndices = new();
         public List<DiceInstance> AddedDiceInstances = new();
         public DiceSimulationTraces DiceTrace = new();
@@ -24,7 +24,7 @@ namespace Drakken.Domain.Tokens.Implementation
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeValue(ref D3Roll);
+            serializer.SerializeValue(ref D4Roll);
             serializer.SerializeList(ref ReplacedIndices);
             serializer.SerializeList(ref AddedDiceInstances);
             serializer.SerializeValue(ref DiceTrace);
@@ -42,7 +42,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            // Roll a D3 to determine how many dice to replace
+            // Roll a D4 to determine how many dice to replace
             int replaceCount = Random.Range(1, 4);
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
@@ -79,7 +79,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             return new DragonTokenResolution
             {
-                D3Roll = replaceCount,
+                D4Roll = replaceCount,
                 ReplacedIndices = replacedIndices,
                 AddedDiceInstances = addedDice,
                 DiceTrace = trace,
@@ -89,7 +89,7 @@ namespace Drakken.Domain.Tokens.Implementation
         protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
         {
             Assert.True(resolution.ReplacedIndices.Count == resolution.AddedDiceInstances.Count);
-            Assert.True(resolution.D3Roll == resolution.AddedDiceInstances.Count);
+            Assert.True(resolution.D4Roll == resolution.AddedDiceInstances.Count);
 
             var client = gameState.Clients[sourceClientIndex];
 
@@ -104,7 +104,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
-        private const float D3OffsetDistance = 1.4f;
+        private const float D4OffsetDistance = 1.4f;
 
         protected override async Task Animate(
             ClientMatch match,
@@ -118,19 +118,18 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
 
-            // Spawn a D3 next to the token showing how many dice it's about to replace
-            // TODO: Fix D3 reliance
-            var d3Instance = DiceInstance.Create(sides: 3, value: resolution.D3Roll);
-            var d3View = DiceView.Create(visualContext.Assets, d3Instance);
+            // Spawn a D4 next to the token showing how many dice it's about to replace
+            var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
+            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 3f);
 
             var tokenTransform = visualContext.TokenView.transform;
-            Vector3 d3Pos = tokenTransform.position + tokenTransform.right * D3OffsetDistance;
-            d3View.transform.SetPositionAndRotation(d3Pos, tokenTransform.rotation);
+            Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;
+            d4View.transform.SetPositionAndRotation(d4Pos, tokenTransform.rotation);
 
-            // await d3View.AnimateRoll(ct, durationMultiplier: 0.7f);
-            await Task.Delay(200);
+            await d4View.AnimateRoll(ct, durationMultiplier: 0.7f);
+            await Task.Delay(500);
 
-            await d3View.AnimateShrinkAndDestroy(ct);
+            await d4View.AnimateShrinkAndDestroy(ct);
 
             // Shrink and remove each replaced dice
             List<Task> removeDiceAnimationTasks = new();

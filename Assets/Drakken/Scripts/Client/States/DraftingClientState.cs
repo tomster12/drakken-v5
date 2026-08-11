@@ -60,7 +60,7 @@ namespace Drakken.Client.States
             await Task.Delay(500);
             await RollDice();
 
-            await Task.Delay(2000);
+            await Task.Delay(1000);
             SpawnTokens();
         }
 
@@ -139,7 +139,7 @@ namespace Drakken.Client.States
             {
                 // Start a new task for this token
                 int tokenIndex = i;
-                int taskDelay = (tokenCount - 1 - tokenIndex) * 400;
+                int taskDelay = (tokenCount - 1 - tokenIndex) * 250;
 
                 tasks.Add(AsyncUtility.DelayTask(taskDelay, async () =>
                 {
@@ -160,13 +160,13 @@ namespace Drakken.Client.States
                     await tokenView.Animator.Play(AnimationSequenceBuilder
                         .Start()
                         .At(0.0f, AnimationTracks.LocalScale(
-                            0.8f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
+                            0.5f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
                         .At(0.0f, AnimationTracks.Rotation(
-                            1.2f, tokenView.transform, baseRot, MyDraftingLayout.DraftTokenRow.rotation, Easing.Linear))
+                            0.9f, tokenView.transform, baseRot, MyDraftingLayout.DraftTokenRow.rotation, Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
-                            0.6f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
+                            0.3f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
-                            0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 0.7f, targetPos), Easing.EaseOutCubic))
+                            0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 2.0f, targetPos), Easing.EaseOutCubic))
                         .Build(), cts.Token);
                 }, cts.Token));
             }

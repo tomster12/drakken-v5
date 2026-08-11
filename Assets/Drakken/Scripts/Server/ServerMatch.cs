@@ -15,6 +15,8 @@ namespace Drakken.Server
     public class ServerMatch
     {
         private static ulong nextMatchId = 1;
+        private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(0.5);
+        private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(0.5);
 
         private readonly TokenRegistry tokenRegistry;
         private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
@@ -108,6 +110,9 @@ namespace Drakken.Server
             Assert.True(startReadyCount == 2);
             Log.Info($"ServerMatch-{matchId}", $"Match starting drafting phase");
 
+            // Arbitrary delay before starting
+            await Task.Delay(draftingStartDelay);
+
             GameState.Phase = GamePhase.Drafting;
 
             DealDraftDice();
@@ -200,6 +205,9 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
             Log.Info($"ServerMatch-{matchId}", $"Match starting playing phase");
+
+            // Arbitrary delay before starting
+            await Task.Delay(playingStartDelay);
 
             GameState.Phase = GamePhase.Playing;
 
@@ -308,7 +316,7 @@ namespace Drakken.Server
                 var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
                 var trayCenter = tray.transform.position;
                 var traySize = tray.Size;
-                float diceSpacing = DiceMeshFactory.BaseScale * 2.4f;
+                float diceSpacing = DiceMeshFactory.BaseScale * 3.0f;
                 float clientSideSignZ = p == 0 ? -1f : 1f;
                 float rowStart = trayCenter.x - traySize.x / 2f + edgeMargin;
                 float rowWidth = traySize.x - edgeMargin * 2f;

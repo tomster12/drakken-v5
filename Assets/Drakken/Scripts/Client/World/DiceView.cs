@@ -23,7 +23,7 @@ namespace Drakken.Client.World
         private Outline outline;
         private Color hoverOutlineColor = Color.white;
         private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
-        private float FaceLabelFontSize = 1.3f;
+        private float FaceLabelFontSize = 1.4f;
         private float FaceLabelSurfaceOffset = 0.01f;
         private Vector2 FaceLabelSize = new(0.8f, 0.8f);
 
@@ -38,31 +38,35 @@ namespace Drakken.Client.World
 
         // ------------------------------ Binding
 
-        public static DiceView Create(AssetDatabase assets, DiceInstance instance)
+        public static DiceView Create(AssetDatabase assets, DiceInstance instance, float scale = 1.0f)
         {
             GameObject diceGo = new($"Dice View (D{instance.Sides})");
             var diceView = diceGo.AddComponent<DiceView>();
 
-            diceView.Bind(assets, instance);
+            diceView.Bind(assets, instance, scale);
 
             return diceView;
         }
 
-        private void Bind(AssetDatabase assets, DiceInstance dice)
+        private void Bind(AssetDatabase assets, DiceInstance dice, float scale = 1.0f)
         {
             this.DiceInstance = dice;
 
-            var diceMesh = DiceMeshFactory.Create(dice, assets.DiceMeshMaterial);
+            var diceMesh = DiceMeshFactory.Create(dice, assets.DiceMeshMaterial, scale);
             diceMesh.GameObject.transform.SetParent(transform, false);
             faces = diceMesh.Faces;
 
-            CreateFaceLabels(assets, dice, diceMesh.Faces);
+            CreateFaceLabels(assets, dice, diceMesh.Faces, scale);
 
             outline = gameObject.AddComponent<Outline>();
             outline.Setup();
         }
 
-        private void CreateFaceLabels(AssetDatabase assets, DiceInstance dice, IReadOnlyList<DiceMeshFactory.DiceFacePose> faces)
+        private void CreateFaceLabels(
+            AssetDatabase assets,
+            DiceInstance dice,
+            IReadOnlyList<DiceMeshFactory.DiceFacePose> faces,
+            float scale = 1.0f)
         {
             for (int i = 0; i < faces.Count && i < dice.Faces.Count; i++)
             {
@@ -76,11 +80,11 @@ namespace Drakken.Client.World
                 label.rectTransform.SetLocalPositionAndRotation(
                     pose.Position + pose.Direction * FaceLabelSurfaceOffset,
                     pose.LabelRotation);
-                label.rectTransform.sizeDelta = FaceLabelSize;
+                label.rectTransform.sizeDelta = FaceLabelSize * scale;
 
                 label.text = dice.Faces[i].Value.ToString();
                 label.alignment = TextAlignmentOptions.Center;
-                label.fontSize = FaceLabelFontSize;
+                label.fontSize = FaceLabelFontSize * scale;
 
                 if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
                 if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
@@ -102,6 +106,30 @@ namespace Drakken.Client.World
                 .Start()
                 .Next(AnimationTracks.LocalScale(
                     0.3f, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
+                .Build(), ct);
+        }
+
+        public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f)
+        {
+            // Random starting orientation so the die doesn't always tumble from the same pose
+            Quaternion startRotation = Random.rotationUniform;
+            transform.rotation = startRotation;
+
+            // Tumble around two of the local axes (always distinct, so never opposite/aligned) - one doing
+            // roughly four full spins and the other roughly three, which reads as a natural dice roll
+            int firstAxis = Random.Range(0, 3);
+            int secondAxis = (firstAxis + Random.Range(1, 3)) % 3;
+
+            Vector3 spinAmount = Vector3.zero;
+            spinAmount[firstAxis] = Random.Range(3.5f, 4.5f) * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[secondAxis] = Random.Range(2.5f, 3.5f) * 360f * (Random.value < 0.5f ? -1f : 1f);
+
+            float durationSeconds = 0.9f * durationMultiplier;
+
+            await Animator.Play(AnimationSequenceBuilder
+                .Start()
+                .Next(AnimationTracks.LocalEulerRotation(
+                    durationSeconds, transform, startRotation, spinAmount, Easing.EaseOutCubic))
                 .Build(), ct);
         }
 

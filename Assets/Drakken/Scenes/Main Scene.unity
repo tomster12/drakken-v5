@@ -218,7 +218,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2493999}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: -0.00000004371139}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -286,13 +286,33 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 371267807289048097, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 371267807289048097, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 1214588060724091207, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
       propertyPath: m_Name
       value: P2 Dice Tray
       objectReference: {fileID: 0}
+    - target: {fileID: 1214588060724091207, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2095857070684370467, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
       propertyPath: m_IsActive
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2411887955777331616, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2411887955777331616, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 2572098793517132931, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
       propertyPath: m_IsActive
@@ -301,6 +321,22 @@ PrefabInstance:
     - target: {fileID: 2907753725943006311, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
       propertyPath: m_IsActive
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3984454414467924127, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 3984454414467924127, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5747305891113896591, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 5747305891113896591, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 6416166096869272384, guid: 3f5f4d7727edfd44eb419fb17d253cae, type: 3}
       propertyPath: m_IsActive
