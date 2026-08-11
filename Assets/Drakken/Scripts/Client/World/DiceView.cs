@@ -72,23 +72,40 @@ namespace Drakken.Client.World
             {
                 DiceMeshFactory.DiceFacePose pose = faces[i];
 
-                // TextMeshPro requires a RectTransform, so add it before touching the transform.
-                GameObject labelGo = new($"Face Label {dice.Faces[i].Value}");
-                var label = labelGo.AddComponent<TextMeshPro>();
-
-                label.rectTransform.SetParent(transform, false);
-                label.rectTransform.SetLocalPositionAndRotation(
-                    pose.Position + pose.Direction * FaceLabelSurfaceOffset,
-                    pose.LabelRotation);
-                label.rectTransform.sizeDelta = FaceLabelSize * scale;
-
-                label.text = dice.Faces[i].Value.ToString();
-                label.alignment = TextAlignmentOptions.Center;
-                label.fontSize = FaceLabelFontSize * scale;
-
-                if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
-                if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
+                if (pose.LabelSpots != null)
+                {
+                    foreach (DiceMeshFactory.DiceLabelSpot spot in pose.LabelSpots)
+                    {
+                        CreateFaceLabel(
+                            assets, dice.Faces[spot.ValueFaceIndex].Value,
+                            spot.Position + pose.Direction * FaceLabelSurfaceOffset, spot.Rotation, scale);
+                    }
+                }
+                else
+                {
+                    CreateFaceLabel(
+                        assets, dice.Faces[i].Value,
+                        pose.Position + pose.Direction * FaceLabelSurfaceOffset, pose.LabelRotation, scale);
+                }
             }
+        }
+
+        private void CreateFaceLabel(AssetDatabase assets, int value, Vector3 localPosition, Quaternion localRotation, float scale)
+        {
+            // TextMeshPro requires a RectTransform, so add it before touching the transform.
+            GameObject labelGo = new($"Face Label {value}");
+            var label = labelGo.AddComponent<TextMeshPro>();
+
+            label.rectTransform.SetParent(transform, false);
+            label.rectTransform.SetLocalPositionAndRotation(localPosition, localRotation);
+            label.rectTransform.sizeDelta = FaceLabelSize * scale;
+
+            label.text = value.ToString();
+            label.alignment = TextAlignmentOptions.Center;
+            label.fontSize = FaceLabelFontSize * scale;
+
+            if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
+            if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
         }
 
         public void Rebind(DiceInstance dice)
@@ -109,20 +126,28 @@ namespace Drakken.Client.World
                 .Build(), ct);
         }
 
-        public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f)
+        // targetDirection is the world direction the die's value-reading vertex/face should end up
+        // pointing along (default matches GetUpFaceValue's world-up convention). Pass Vector3.down (or
+        // whatever direction faces the camera) for a die that isn't resting on a surface being read from
+        // above - e.g. a floating preview die where the labels need to face the viewer instead.
+        public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f, Vector3? targetDirection = null)
         {
-            // Random starting orientation so the die doesn't always tumble from the same pose
-            Quaternion startRotation = Random.rotationUniform;
+            // Land exactly on the rotation that reads as this die's current value, instead of an
+            // arbitrary/uncontrolled resting orientation.
+            Quaternion targetRotation = DiceMeshFactory.GetRotationForValue(faces, DiceInstance.Value, targetDirection);
+            Quaternion startRotation = targetRotation;
             transform.rotation = startRotation;
 
             // Tumble around two of the local axes (always distinct, so never opposite/aligned) - one doing
-            // roughly four full spins and the other roughly three, which reads as a natural dice roll
+            // roughly four full spins and the other roughly three, which reads as a natural dice roll.
+            // These must be exact multiples of 360 degrees so the spin cancels out and the die actually
+            // lands back on targetRotation instead of drifting to an unrelated angle.
             int firstAxis = Random.Range(0, 3);
             int secondAxis = (firstAxis + Random.Range(1, 3)) % 3;
 
             Vector3 spinAmount = Vector3.zero;
-            spinAmount[firstAxis] = Random.Range(3.5f, 4.5f) * 360f * (Random.value < 0.5f ? -1f : 1f);
-            spinAmount[secondAxis] = Random.Range(2.5f, 3.5f) * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[firstAxis] = Random.Range(4, 6) * 360f * (Random.value < 0.5f ? -1f : 1f);
+            spinAmount[secondAxis] = Random.Range(3, 5) * 360f * (Random.value < 0.5f ? -1f : 1f);
 
             float durationSeconds = 0.9f * durationMultiplier;
 

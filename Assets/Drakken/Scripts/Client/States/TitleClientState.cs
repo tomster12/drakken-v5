@@ -32,7 +32,8 @@ namespace Drakken.Client.States
             SceneLayout.Title.Clutter.SetActive(true);
 
             // Move camera into position
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(SceneLayout.Title.CameraPosition);
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(
+                SceneLayout.Title.CameraPosition, snap: true);
         }
 
         public override async Task Exit(ClientStateType toStateType)

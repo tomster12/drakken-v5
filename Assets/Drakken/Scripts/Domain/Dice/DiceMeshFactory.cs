@@ -32,6 +32,14 @@ namespace Drakken.Domain.Dice
             return diceMesh;
         }
 
+        public static Quaternion GetRotationForValue(IReadOnlyList<DiceFacePose> faces, int value, Vector3? targetDirection = null)
+        {
+            // Calculate rotation to put the UpDetectionDirection along TargetDirection
+            Vector3 target = (targetDirection ?? Vector3.up).normalized;
+            Vector3 source = faces[value - 1].UpDetectionDirection;
+            return Quaternion.FromToRotation(source, target);
+        }
+
         public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
         {
             int bestFaceIndex = 0;
@@ -54,6 +62,17 @@ namespace Drakken.Domain.Dice
         {
             Vector3 upHint = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
             return Quaternion.LookRotation(-direction, upHint);
+        }
+
+        private static Quaternion GetCornerLabelRotation(Vector3 faceDirection, Vector3 towardCorner)
+        {
+            // Alternative to GetFaceLabelRotation for corner labels
+            Vector3 upHint = Vector3.ProjectOnPlane(towardCorner, faceDirection);
+            if (upHint.sqrMagnitude < 0.0001f)
+            {
+                upHint = Mathf.Abs(Vector3.Dot(faceDirection, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+            }
+            return Quaternion.LookRotation(-faceDirection, upHint);
         }
 
         private static DiceMesh CreateCube(float scale)
@@ -101,11 +120,16 @@ namespace Drakken.Domain.Dice
             // A regular tetrahedron rests on one face with the opposite vertex pointing up, so it's read
             // from that vertex rather than any face normal (which are all symmetric around that vertex
             // and would otherwise tie). Each triangle below is opposite vertex c[i], in that order.
+            //
+            // A D4's printed value isn't per-face - each face carries 3 labels (one per corner), and the
+            // value is whichever number appears at all 3 corners touching the vertex that's pointing up.
+            // So the corner of a face nearest vertex c[j] must show vertex c[j]'s own value, not the
+            // value of the face itself. cornerValueIndices below maps each corner to that vertex's index.
             ConvexMeshBuilder builder = new();
-            builder.AddTriangle(c[1], c[2], c[3], upDetectionDirection: c[0]);
-            builder.AddTriangle(c[0], c[3], c[2], upDetectionDirection: c[1]);
-            builder.AddTriangle(c[0], c[1], c[3], upDetectionDirection: c[2]);
-            builder.AddTriangle(c[0], c[2], c[1], upDetectionDirection: c[3]);
+            builder.AddTriangle(c[1], c[2], c[3], upDetectionDirection: c[0], cornerValueIndices: (1, 2, 3));
+            builder.AddTriangle(c[0], c[3], c[2], upDetectionDirection: c[1], cornerValueIndices: (0, 3, 2));
+            builder.AddTriangle(c[0], c[1], c[3], upDetectionDirection: c[2], cornerValueIndices: (0, 1, 3));
+            builder.AddTriangle(c[0], c[2], c[1], upDetectionDirection: c[3], cornerValueIndices: (0, 2, 1));
 
             GameObject go = builder.Build("D4 (Generated)");
             return new DiceMesh(go, builder.Faces);
@@ -308,7 +332,14 @@ namespace Drakken.Domain.Dice
 
             // upDetectionDirection overrides what GetUpFaceValue checks against world-up for this face,
             // for shapes (e.g. tetrahedron) read from a vertex rather than the face's own normal.
-            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3? upDetectionDirection = null)
+            //
+            // cornerValueIndices, when given, requests one label per corner (a, b, c) instead of the
+            // usual single centered label, with each entry naming which face's value that corner shows
+            // (see the tetrahedron's use of this for why a corner doesn't always show this face's own value).
+            public void AddTriangle(
+                Vector3 a, Vector3 b, Vector3 c,
+                Vector3? upDetectionDirection = null,
+                (int a, int b, int c)? cornerValueIndices = null)
             {
                 Vector3 centroid = (a + b + c) / 3f;
                 Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
@@ -317,6 +348,11 @@ namespace Drakken.Domain.Dice
                 if (Vector3.Dot(normal, centroid) < 0f)
                 {
                     (b, c) = (c, b);
+                    if (cornerValueIndices.HasValue)
+                    {
+                        var v = cornerValueIndices.Value;
+                        cornerValueIndices = (v.a, v.c, v.b);
+                    }
                 }
 
                 int startIndex = vertices.Count;
@@ -329,7 +365,21 @@ namespace Drakken.Domain.Dice
                 triangles.Add(startIndex + 2);
 
                 Vector3 direction = centroid.normalized;
-                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection));
+
+                List<DiceLabelSpot> labelSpots = null;
+                if (cornerValueIndices.HasValue)
+                {
+                    var v = cornerValueIndices.Value;
+                    const float cornerLerp = 0.55f;
+                    labelSpots = new List<DiceLabelSpot>
+                    {
+                        new(Vector3.Lerp(a, centroid, cornerLerp), GetCornerLabelRotation(direction, a - centroid), v.a),
+                        new(Vector3.Lerp(b, centroid, cornerLerp), GetCornerLabelRotation(direction, b - centroid), v.b),
+                        new(Vector3.Lerp(c, centroid, cornerLerp), GetCornerLabelRotation(direction, c - centroid), v.c)
+                    };
+                }
+
+                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection, labelSpots));
             }
 
             // Adds a convex planar polygon (e.g. a pentagon) as a single dice face, fan-triangulated
@@ -386,6 +436,23 @@ namespace Drakken.Domain.Dice
             }
         }
 
+        // A single printed-number position on a face. Position/Rotation are local to the die; ValueFaceIndex
+        // names which face's value (0-based, matching DiceMesh.Faces order) is printed at this spot - usually
+        // this face's own index, but a D4 corner prints a different (neighboring) face's value.
+        public readonly struct DiceLabelSpot
+        {
+            public readonly Vector3 Position;
+            public readonly Quaternion Rotation;
+            public readonly int ValueFaceIndex;
+
+            public DiceLabelSpot(Vector3 position, Quaternion rotation, int valueFaceIndex)
+            {
+                Position = position;
+                Rotation = rotation;
+                ValueFaceIndex = valueFaceIndex;
+            }
+        }
+
         public readonly struct DiceFacePose
         {
             // The face's own outward normal direction; used to place/orient a label flush against it.
@@ -399,12 +466,19 @@ namespace Drakken.Domain.Dice
             // this instead points toward that vertex.
             public readonly Vector3 UpDetectionDirection;
 
-            public DiceFacePose(Vector3 direction, Vector3 position, Quaternion labelRotation, Vector3? upDetectionDirection = null)
+            // Null for the common case of one centered label using this face's own value (Position/LabelRotation
+            // above). Set for faces that print multiple numbers at different spots (e.g. a D4's 3 corners).
+            public readonly IReadOnlyList<DiceLabelSpot> LabelSpots;
+
+            public DiceFacePose(
+                Vector3 direction, Vector3 position, Quaternion labelRotation,
+                Vector3? upDetectionDirection = null, IReadOnlyList<DiceLabelSpot> labelSpots = null)
             {
                 Direction = direction;
                 Position = position;
                 LabelRotation = labelRotation;
                 UpDetectionDirection = (upDetectionDirection ?? direction).normalized;
+                LabelSpots = labelSpots;
             }
         }
 

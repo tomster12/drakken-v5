@@ -43,7 +43,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var client = gameState.Clients[sourceClientIndex];
 
             // Roll a D4 to determine how many dice to replace
-            int replaceCount = Random.Range(1, 4);
+            int replaceCount = Random.Range(1, 5);
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
             // Select random indices to replace
@@ -104,7 +104,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
-        private const float D4OffsetDistance = 1.4f;
+        private const float D4OffsetDistance = 1.5f;
 
         protected override async Task Animate(
             ClientMatch match,
@@ -120,13 +120,13 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Spawn a D4 next to the token showing how many dice it's about to replace
             var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
-            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 3f);
+            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 2f);
 
             var tokenTransform = visualContext.TokenView.transform;
             Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;
             d4View.transform.SetPositionAndRotation(d4Pos, tokenTransform.rotation);
 
-            await d4View.AnimateRoll(ct, durationMultiplier: 0.7f);
+            await d4View.AnimateRoll(ct, durationMultiplier: 1.1f);
             await Task.Delay(500);
 
             await d4View.AnimateShrinkAndDestroy(ct);
