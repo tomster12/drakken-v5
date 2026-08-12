@@ -18,7 +18,7 @@ namespace Drakken.Domain.Tokens.Implementation
     public class DragonTokenResolution : TokenResolution
     {
         public int D4Roll;
-        public List<int> ReplacedIndices = new();
+        public List<int> ReplacedInstanceIds = new();
         public List<DiceInstance> AddedDiceInstances = new();
         public DiceSimulationTraces DiceTrace = new();
 
@@ -26,7 +26,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             base.NetworkSerialize(serializer);
             serializer.SerializeValue(ref D4Roll);
-            serializer.SerializeList(ref ReplacedIndices);
+            serializer.SerializeList(ref ReplacedInstanceIds);
             serializer.SerializeList(ref AddedDiceInstances);
             serializer.SerializeValue(ref DiceTrace);
         }
@@ -56,6 +56,10 @@ namespace Drakken.Domain.Tokens.Implementation
             var replacedIndices = Enumerable.Range(0, client.Dice.Count)
                 .OrderBy(_ => Random.value)
                 .Take(replaceCount)
+                .ToList();
+
+            var replacedInstanceIds = replacedIndices
+                .Select(i => client.Dice[i].InstanceId)
                 .ToList();
 
             diceWorld.BeginSession();
@@ -123,7 +127,7 @@ namespace Drakken.Domain.Tokens.Implementation
             return new DragonTokenResolution
             {
                 D4Roll = replaceCount,
-                ReplacedIndices = replacedIndices,
+                ReplacedInstanceIds = replacedInstanceIds,
                 AddedDiceInstances = addedDice,
                 DiceTrace = trace,
             };
@@ -131,15 +135,15 @@ namespace Drakken.Domain.Tokens.Implementation
 
         protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
         {
-            Assert.True(resolution.ReplacedIndices.Count == resolution.AddedDiceInstances.Count);
+            Assert.True(resolution.ReplacedInstanceIds.Count == resolution.AddedDiceInstances.Count);
             Assert.True(resolution.D4Roll == resolution.AddedDiceInstances.Count);
 
             var client = gameState.Clients[sourceClientIndex];
 
-            for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
+            for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
             {
-                var index = resolution.ReplacedIndices[i];
-                Assert.True(index >= 0 && index < client.Dice.Count);
+                var index = client.Dice.FindIndex(d => d.InstanceId == resolution.ReplacedInstanceIds[i]);
+                Assert.True(index >= 0);
                 client.Dice[index] = resolution.AddedDiceInstances[i];
             }
         }
@@ -178,14 +182,13 @@ namespace Drakken.Domain.Tokens.Implementation
             var viewsByInstanceId = await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Assets, resolution.DiceTrace, sourcePlayerObjects, ct);
 
-            // Slot the newly rolled dice into their replaced positions
-            // Be careful to rebind the dice view to the official dice instance
-            for (int i = 0; i < resolution.ReplacedIndices.Count; i++)
+            // Swap out the replaced dice for the newly rolled ones keyed by instance id
+            for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
             {
                 var addedInstance = resolution.AddedDiceInstances[i];
                 var newDiceView = viewsByInstanceId[addedInstance.InstanceId];
-                newDiceView.Rebind(addedInstance);
-                sourcePlayerObjects.DiceViews[resolution.ReplacedIndices[i]] = newDiceView;
+                sourcePlayerObjects.DiceViews.Remove(resolution.ReplacedInstanceIds[i]);
+                sourcePlayerObjects.DiceViews[addedInstance.InstanceId] = newDiceView;
             }
 
             visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);

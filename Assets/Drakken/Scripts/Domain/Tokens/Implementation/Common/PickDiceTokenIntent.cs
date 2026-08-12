@@ -48,8 +48,8 @@ namespace Drakken.Domain.Tokens.Implementation.Common
         protected override async Task<PickDiceTokenIntent> PickIntent(TokenVisualContext context, int clientIndex)
         {
             var pickableDiceViews = targetOwner == TargetOwner.Opponent
-                ? context.SceneObjects.Player(1 - clientIndex).DiceViews
-                : context.SceneObjects.Player(clientIndex).DiceViews;
+                ? context.SceneObjects.Player(1 - clientIndex).DiceViews.Values
+                : context.SceneObjects.Player(clientIndex).DiceViews.Values;
 
             var selected = new List<DiceView>();
             var selectionCompleteTcs = new TaskCompletionSource<bool>();

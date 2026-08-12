@@ -49,7 +49,8 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.transform.SetPositionAndRotation(
                 MyDraftingLayout.DraftConfirmButtonPosition.position, MyDraftingLayout.DraftConfirmButtonPosition.rotation);
 
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(MyDraftingLayout.CameraPosition, snap: true);
+            GameEntrypoint.Singleton.Client.Camera.SetTarget(
+                MyDraftingLayout.CameraPosition, snap: fromType == ClientStateType.Title);
 
             SceneLayout.Dice.P1.gameObject.SetActive(true);
             SceneLayout.Dice.P2.gameObject.SetActive(true);
@@ -57,7 +58,7 @@ namespace Drakken.Client.States
             UpdateClientUI();
 
             await Task.Delay(500);
-            await RollDice();
+            await RollDice(isReroll: fromType == ClientStateType.Playing);
 
             await Task.Delay(1000);
             SpawnTokens();
@@ -85,18 +86,25 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
         }
 
-        private async Task RollDice()
+        private async Task RollDice(bool isReroll)
         {
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            // Reset dice views to let us spawn fresh ones for this roll
-            SceneObjects.P1.DestroyAllDice();
-            SceneObjects.P2.DestroyAllDice();
+            if (isReroll)
+            {
+                // Coming back from a played round - reuse the existing dice views, just replay the reroll throw
+                await SimulateDiceTraces(Match.LastDiceTraces);
+            }
+            else
+            {
+                // Fresh game - spawn dice at their resting position (grow + shake) before replaying the physics throw
+                SceneObjects.P1.DestroyAllDice();
+                SceneObjects.P2.DestroyAllDice();
 
-            // Spawn dice at their resting position (grow + shake) before replaying the physics throw
-            await SpawnDiceForRoll(Match.LastDiceTraces);
-            await SimulateDiceTraces(Match.LastDiceTraces);
+                await SpawnDiceForRoll(Match.LastDiceTraces);
+                await SimulateDiceTraces(Match.LastDiceTraces);
+            }
 
             // Update UI to match dice totals
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0);
@@ -119,7 +127,7 @@ namespace Drakken.Client.States
                 var sceneObjects = SceneObjects.Player(clientIndex);
                 var trace = diceTraces.Player(clientIndex);
 
-                List<DiceView> views = new();
+                Dictionary<int, DiceView> views = new();
                 foreach (var diceTrace in trace.Dice)
                 {
                     if (diceTrace.PoseTraces.Count == 0) continue;
@@ -129,11 +137,11 @@ namespace Drakken.Client.States
                     view.transform.SetPositionAndRotation(startPose.Position, startPose.Rotation);
                     view.transform.localScale = Vector3.zero;
 
-                    views.Add(view);
+                    views[diceTrace.Instance.InstanceId] = view;
                     tasks.Add(AnimateDiceSpawnIn(view));
                 }
 
-                sceneObjects.DiceViews = views.ToArray();
+                sceneObjects.DiceViews = views;
             }
 
             await Task.WhenAll(tasks);
@@ -143,7 +151,7 @@ namespace Drakken.Client.States
         {
             List<Task<Dictionary<int, DiceView>>> tasks = new();
 
-            // Replay the dice simulation traces for each player, reusing the views we already spawned in
+            // Replay the dice simulation traces for each player
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
@@ -155,7 +163,7 @@ namespace Drakken.Client.States
             var results = await Task.WhenAll(tasks);
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
-                SceneObjects.Player(clientIndex).DiceViews = results[clientIndex].Values.ToArray();
+                SceneObjects.Player(clientIndex).DiceViews = results[clientIndex];
             }
         }
 

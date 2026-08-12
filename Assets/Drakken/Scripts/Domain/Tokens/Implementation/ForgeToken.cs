@@ -16,15 +16,15 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class ForgeTokenResolution : TokenResolution
     {
-        public int FirstIndex;
-        public int SecondIndex;
+        public int FirstInstanceId;
+        public int SecondInstanceId;
         public DiceInstance CombinedDiceInstance;
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeValue(ref FirstIndex);
-            serializer.SerializeValue(ref SecondIndex);
+            serializer.SerializeValue(ref FirstInstanceId);
+            serializer.SerializeValue(ref SecondInstanceId);
             serializer.SerializeValue(ref CombinedDiceInstance);
         }
     }
@@ -39,25 +39,21 @@ namespace Drakken.Domain.Tokens.Implementation
             Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 2);
             Assert.True(intent.TargetDiceInstanceIds[0] != intent.TargetDiceInstanceIds[1]);
 
-            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == intent.TargetDiceInstanceIds[0]);
-            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == intent.TargetDiceInstanceIds[1]);
+            var firstDice = client.Dice.Find(d => d.InstanceId == intent.TargetDiceInstanceIds[0]);
+            var secondDice = client.Dice.Find(d => d.InstanceId == intent.TargetDiceInstanceIds[1]);
 
-            Assert.True(firstIndex >= 0 && secondIndex >= 0);
-
-            if (firstIndex > secondIndex)
-            {
-                (firstIndex, secondIndex) = (secondIndex, firstIndex);
-            }
+            Assert.NotNull(firstDice);
+            Assert.NotNull(secondDice);
 
             // Combine into a single fresh dice with sides equal to the sum of the two values
-            int combinedSides = client.Dice[firstIndex].Value + client.Dice[secondIndex].Value;
+            int combinedSides = firstDice.Value + secondDice.Value;
             var combinedDice = DiceInstance.Create(sides: combinedSides);
             combinedDice.Roll();
 
             return new ForgeTokenResolution
             {
-                FirstIndex = firstIndex,
-                SecondIndex = secondIndex,
+                FirstInstanceId = firstDice.InstanceId,
+                SecondInstanceId = secondDice.InstanceId,
                 CombinedDiceInstance = combinedDice,
             };
         }
@@ -66,12 +62,14 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            Assert.True(resolution.FirstIndex >= 0 && resolution.FirstIndex < resolution.SecondIndex);
-            Assert.True(resolution.SecondIndex < client.Dice.Count);
+            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == resolution.FirstInstanceId);
+            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == resolution.SecondInstanceId);
+            Assert.True(firstIndex >= 0 && secondIndex >= 0);
 
-            client.Dice.RemoveAt(resolution.SecondIndex);
-            client.Dice.RemoveAt(resolution.FirstIndex);
-            client.Dice.Insert(resolution.FirstIndex, resolution.CombinedDiceInstance);
+            // Keep the combined dice at the lower of the two original slots, preserving stable ordering
+            int insertIndex = Mathf.Min(firstIndex, secondIndex);
+            client.Dice.RemoveAll(d => d.InstanceId == resolution.FirstInstanceId || d.InstanceId == resolution.SecondInstanceId);
+            client.Dice.Insert(insertIndex, resolution.CombinedDiceInstance);
         }
     }
 
@@ -91,10 +89,9 @@ namespace Drakken.Domain.Tokens.Implementation
             await Task.Delay(250);
 
             var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
-            var oldDiceViews = sourcePlayerObjects.DiceViews;
 
-            var firstDiceView = oldDiceViews[resolution.FirstIndex];
-            var secondDiceView = oldDiceViews[resolution.SecondIndex];
+            var firstDiceView = sourcePlayerObjects.DiceViews[resolution.FirstInstanceId];
+            var secondDiceView = sourcePlayerObjects.DiceViews[resolution.SecondInstanceId];
 
             // Pull the two dice together to a shared midpoint, arching up and across, shrinking away as they arrive
             Vector3 firstStartPosition = firstDiceView.transform.position;
@@ -126,29 +123,12 @@ namespace Drakken.Domain.Tokens.Implementation
             // Both dice have already shrunk to nothing at the midpoint, so just clean them up
             GameObject.Destroy(firstDiceView.gameObject);
             GameObject.Destroy(secondDiceView.gameObject);
-
-            // Rebuild the dice list without the two merged dice, reserving a slot for the forged dice
-            var newDiceViews = new DiceView[oldDiceViews.Length - 1];
-            int writeIndex = 0;
-            int forgedSlotIndex = -1;
-            for (int i = 0; i < oldDiceViews.Length; i++)
-            {
-                if (i == resolution.FirstIndex)
-                {
-                    forgedSlotIndex = writeIndex;
-                    writeIndex++;
-                    continue;
-                }
-                if (i == resolution.SecondIndex) continue;
-
-                newDiceViews[writeIndex] = oldDiceViews[i];
-                writeIndex++;
-            }
-            sourcePlayerObjects.DiceViews = newDiceViews;
+            sourcePlayerObjects.DiceViews.Remove(resolution.FirstInstanceId);
+            sourcePlayerObjects.DiceViews.Remove(resolution.SecondInstanceId);
 
             // Spawn the forged dice at the merge point and roll it
             Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
-            var forgedDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.CombinedDiceInstance, forgedSlotIndex, midpoint, targetRot);
+            var forgedDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.CombinedDiceInstance, midpoint, targetRot);
             await forgedDiceView.AnimateGrow(ct);
 
             visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Domain.Animation;
@@ -34,7 +35,7 @@ namespace Drakken.Client.World
     public class ScenePlayerObjects
     {
         public TokenView[] TokenViews { get; set; } = new TokenView[0];
-        public DiceView[] DiceViews { get; set; } = new DiceView[0];
+        public Dictionary<int, DiceView> DiceViews { get; set; } = new();
         public DiceSimulationReplayer DiceSimReplayer { get; } = new();
 
         private SceneLayout sceneLayout;
@@ -60,37 +61,33 @@ namespace Drakken.Client.World
 
         // ------------------------------ Dice
 
-        public DiceView SpawnDiceAt(DiceInstance instance, int diceIndex, Vector3 position, Quaternion rotation)
+        public DiceView SpawnDiceAt(DiceInstance instance, Vector3 position, Quaternion rotation)
         {
             var diceView = DiceView.Create(assets, instance);
             diceView.transform.SetPositionAndRotation(position, rotation);
-            DiceViews[diceIndex] = diceView;
+            DiceViews[instance.InstanceId] = diceView;
             return diceView;
         }
 
-        public void DestroyDiceAtIndex(int diceIndex)
+        public void DestroyDice(int diceInstanceId)
         {
-            GameObject.Destroy(DiceViews[diceIndex].gameObject);
-            DiceViews[diceIndex] = null;
+            GameObject.Destroy(DiceViews[diceInstanceId].gameObject);
+            DiceViews.Remove(diceInstanceId);
         }
 
         public DiceView FindDiceView(int diceInstanceId)
         {
-            foreach (var diceView in DiceViews)
-            {
-                if (diceView != null && diceView.DiceInstance.InstanceId == diceInstanceId)
-                    return diceView;
-            }
-            return null;
+            DiceViews.TryGetValue(diceInstanceId, out var diceView);
+            return diceView;
         }
 
         public void DestroyAllDice()
         {
-            foreach (var diceView in DiceViews)
+            foreach (var diceView in DiceViews.Values)
             {
                 GameObject.Destroy(diceView.gameObject);
             }
-            DiceViews = new DiceView[0];
+            DiceViews = new();
         }
 
         // ------------------------------ Tokens

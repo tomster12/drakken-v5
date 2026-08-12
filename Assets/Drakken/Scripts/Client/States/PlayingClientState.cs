@@ -176,11 +176,11 @@ namespace Drakken.Client.States
 
         private void SetAllDiceInteractionLocked(bool interactionLocked)
         {
-            foreach (var diceView in SceneObjects.P1.DiceViews)
+            foreach (var diceView in SceneObjects.P1.DiceViews.Values)
             {
                 diceView.SetInteractionLocked(interactionLocked);
             }
-            foreach (var diceView in SceneObjects.P2.DiceViews)
+            foreach (var diceView in SceneObjects.P2.DiceViews.Values)
             {
                 diceView.SetInteractionLocked(interactionLocked);
             }
