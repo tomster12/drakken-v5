@@ -1,12 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Drakken.Domain.Animation;
 using Drakken.Domain;
 using Drakken.Domain.Dice;
 using Drakken.Domain.Tokens;
-using Drakken.Utility;
 using UnityEngine;
 
 namespace Drakken.Client.World
@@ -19,10 +15,10 @@ namespace Drakken.Client.World
 
         public ScenePlayerObjects Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
 
-        public void Init(SceneLayout sceneLayout, AssetDatabase assets)
+        public void Init(SceneLayout sceneLayout, AssetDatabase assets, TokenRegistry tokenRegistry, IGameStateProvider gameStateProvider)
         {
-            P1.Init(sceneLayout, assets, clientIndex: 0);
-            P2.Init(sceneLayout, assets, clientIndex: 1);
+            P1.Init(sceneLayout, assets, tokenRegistry, gameStateProvider, clientIndex: 0);
+            P2.Init(sceneLayout, assets, tokenRegistry, gameStateProvider, clientIndex: 1);
         }
 
         public void OnDisconnect()
@@ -40,16 +36,22 @@ namespace Drakken.Client.World
 
         private SceneLayout sceneLayout;
         private AssetDatabase assets;
+        private TokenRegistry tokenRegistry;
+        private IGameStateProvider gameStateProvider;
         private int clientIndex;
 
         private GamePlayerLayout GameLayout => sceneLayout.Game.Player(clientIndex);
         private DraftingPlayerLayout DraftingLayout => sceneLayout.Drafting.Player(clientIndex);
         public Vector3 BagPosition => GameLayout.Bag.transform.position;
 
-        public void Init(SceneLayout sceneLayout, AssetDatabase assets, int clientIndex)
+        public void Init(
+            SceneLayout sceneLayout, AssetDatabase assets, TokenRegistry tokenRegistry,
+            IGameStateProvider gameStateProvider, int clientIndex)
         {
             this.sceneLayout = sceneLayout;
             this.assets = assets;
+            this.tokenRegistry = tokenRegistry;
+            this.gameStateProvider = gameStateProvider;
             this.clientIndex = clientIndex;
         }
 
@@ -63,7 +65,7 @@ namespace Drakken.Client.World
 
         public DiceView SpawnDiceAt(DiceInstance instance, Vector3 position, Quaternion rotation)
         {
-            var diceView = DiceView.Create(assets, instance);
+            var diceView = DiceView.Create(assets, instance, gameStateProvider);
             diceView.transform.SetPositionAndRotation(position, rotation);
             DiceViews[instance.InstanceId] = diceView;
             return diceView;
@@ -108,7 +110,7 @@ namespace Drakken.Client.World
 
         public TokenView SpawnTokenAtIndex(TokenInstance instance, int tokenIndex, bool hidden = false)
         {
-            var tokenView = TokenView.Create(assets, GameEntrypoint.Singleton.TokenRegistry, instance, hidden);
+            var tokenView = TokenView.Create(assets, tokenRegistry, instance, hidden);
             TokenViews[tokenIndex] = tokenView;
             return tokenView;
         }

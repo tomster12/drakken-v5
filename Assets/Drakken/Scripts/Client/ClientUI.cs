@@ -30,8 +30,11 @@ namespace Drakken.Client
         [SerializeField] private Color AvatarVisibleColor;
         [SerializeField] private Color AvatarReadyColor;
 
-        private void Awake()
+        private GameClient client;
+
+        public void Init(GameClient client)
         {
+            this.client = client;
             SetInitialState();
         }
 
@@ -126,7 +129,7 @@ namespace Drakken.Client
             }
             else
             {
-                var match = GameEntrypoint.Singleton.Client.Match;
+                var match = client.Match;
                 var total = match.GameState.Clients[clientIndex].GetDiceTotal();
                 diceTotal.text = total.ToString();
             }

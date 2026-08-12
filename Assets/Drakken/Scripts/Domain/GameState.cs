@@ -2,6 +2,11 @@ using Unity.Netcode;
 
 namespace Drakken.Domain
 {
+    public interface IGameStateProvider
+    {
+        GameState GameState { get; }
+    }
+
     public class GameState : INetworkSerializable
     {
         public GameStateClient[] Clients { get; set; } = new GameStateClient[2] { new(), new() };
@@ -30,6 +35,16 @@ namespace Drakken.Domain
                 Turn = Turn,
                 Round = Round,
             };
+        }
+
+        public DiceInstance GetDiceInstance(int instanceId)
+        {
+            foreach (var client in Clients)
+            {
+                var instance = client.Dice.Find(d => d.InstanceId == instanceId);
+                if (instance != null) return instance;
+            }
+            return null;
         }
     }
 

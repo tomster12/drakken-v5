@@ -9,13 +9,15 @@ namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
-        public Task<Dictionary<int, DiceView>> Play(AssetDatabase assets, DiceSimulationTraces trace, CancellationToken ct)
-            => Play(assets, trace, existingViews: null, ct);
+        public Task<Dictionary<int, DiceView>> Play(
+            AssetDatabase assets, DiceSimulationTraces trace, IGameStateProvider gameStateProvider, CancellationToken ct)
+            => Play(assets, trace, existingViews: null, gameStateProvider, ct);
 
         public async Task<Dictionary<int, DiceView>> Play(
             AssetDatabase assets,
             DiceSimulationTraces trace,
             ScenePlayerObjects existingViews,
+            IGameStateProvider gameStateProvider,
             CancellationToken ct)
         {
             var relevantTraces = trace.Dice.FindAll(diceTrace => diceTrace.PoseTraces.Count > 0);
@@ -38,13 +40,13 @@ namespace Drakken.Domain.Dice
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, gameStateProvider, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
 
             if (!ct.IsCancellationRequested)
-                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, gameStateProvider, trace.FixedTimestep, maxTimeSeconds);
 
             return resultViews;
         }
@@ -55,6 +57,7 @@ namespace Drakken.Domain.Dice
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
             Dictionary<int, DiceView> resultViews,
+            IGameStateProvider gameStateProvider,
             float fixedTimestep,
             float elapsedSeconds)
         {
@@ -87,7 +90,7 @@ namespace Drakken.Domain.Dice
                 {
                     // Reuse existing view or create a new one
                     view = existingViews?.FindDiceView(instanceId);
-                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance);
+                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance, gameStateProvider);
                     liveViews[instanceId] = view;
 
                     // We can only guaranteed add this dice to the result if it is not removed

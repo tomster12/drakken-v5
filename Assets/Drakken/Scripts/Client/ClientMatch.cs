@@ -21,7 +21,7 @@ namespace Drakken.Client
         public Action OnRoundEnded = delegate { };
 
         private readonly TokenRegistry tokenRegistry;
-
+        private readonly IGameConnection connection;
         public GameState GameState { get; private set; }
         public MatchDiceSimulationTraces LastDiceTraces { get; private set; }
         public ulong MatchId { get; private set; }
@@ -35,9 +35,10 @@ namespace Drakken.Client
 
         // -------------------------------- Setup
 
-        public ClientMatch(TokenRegistry tokenRegistry, ulong matchId, int clientIndex)
+        public ClientMatch(TokenRegistry tokenRegistry, IGameConnection connection, ulong matchId, int clientIndex)
         {
             this.tokenRegistry = tokenRegistry;
+            this.connection = connection;
             MatchId = matchId;
             ClientIndex = clientIndex;
             GameState = new();
@@ -54,7 +55,7 @@ namespace Drakken.Client
             Log.Info($"ClientMatch-{MatchId}", $"Ready up");
 
             IsReady = true;
-            GameEntrypoint.Singleton.Connection.Client_MessageMatchClientReady(MatchId);
+            connection.Client_MessageMatchClientReady(MatchId);
         }
 
         public void OnServerOtherPlayerJoined()
@@ -97,7 +98,7 @@ namespace Drakken.Client
             Assert.True(GameState.Phase == GamePhase.Drafting);
             Log.Info($"ClientMatch-{MatchId}", $"Sending draft discard");
 
-            var response = await GameEntrypoint.Singleton.Connection.Client_RequestMatchDraftDiscard(MatchId, message);
+            var response = await connection.Client_RequestMatchDraftDiscard(MatchId, message);
 
             // Update game state with removed tokens
             GameState.Clients[ClientIndex].Tokens = GameState.Clients[ClientIndex].Tokens
@@ -136,7 +137,7 @@ namespace Drakken.Client
             Assert.True(GameState.Phase == GamePhase.Playing);
             Log.Info($"ClientMatch-{MatchId}", $"Sending token intent");
 
-            var response = await GameEntrypoint.Singleton.Connection.Client_RequestMatchPlayToken(MatchId, message);
+            var response = await connection.Client_RequestMatchPlayToken(MatchId, message);
 
             return response;
         }
@@ -159,7 +160,7 @@ namespace Drakken.Client
             Assert.True(GameState.Phase == GamePhase.Playing);
             Log.Info($"ClientMatch-{MatchId}", $"Sending token animated");
 
-            await GameEntrypoint.Singleton.Connection.Client_MessageMatchAnimatedTokenResolved(MatchId);
+            await connection.Client_MessageMatchAnimatedTokenResolved(MatchId);
         }
 
         public void OnServerNextTurn(GameState gameState)

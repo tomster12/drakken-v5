@@ -2,6 +2,7 @@ using Drakken.Client.States;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
 using Drakken.Config;
+using Drakken.Domain;
 using Drakken.Domain.Tokens;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace Drakken.Client
         public ClientMatch Match { get; }
     }
 
-    public class GameClient : MonoBehaviour, IGameClient
+    public class GameClient : MonoBehaviour, IGameClient, IGameStateProvider
     {
         [Header("References")]
         [SerializeField] private AssetDatabase assets;
@@ -24,11 +25,14 @@ namespace Drakken.Client
 
         public ClientMatch Match { get; private set; }
         public SceneObjects SceneObjects { get; private set; } = new();
-        public SceneLayout SceneLayout => GameEntrypoint.Singleton.SceneLayout;
+        public SceneLayout SceneLayout => entrypoint.SceneLayout;
+        public TokenRegistry TokenRegistry => entrypoint.TokenRegistry;
+        public GameState GameState => Match?.GameState;
         public AssetDatabase Assets => assets;
         public CameraController Camera => camera;
         public ClientUI UI => ui;
 
+        private GameEntrypoint entrypoint;
         private readonly TitleClientState titleState = new();
         private readonly DraftingClientState draftingState = new();
         private readonly PlayingClientState playingState = new();
@@ -38,15 +42,23 @@ namespace Drakken.Client
         public bool IsConnected { get; private set; }
         public bool IsInMatch => Match != null;
 
-        private void Awake()
+        public void Init(GameEntrypoint entrypoint)
         {
-            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenMeshPrefabById);
+            this.entrypoint = entrypoint;
 
-            SceneObjects.Init(SceneLayout, assets);
+            entrypoint.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenMeshPrefabById);
+
+            SceneObjects.Init(SceneLayout, assets, entrypoint.TokenRegistry, this);
+            ui.Init(this);
 
             titleState.Init(this);
             draftingState.Init(this);
             playingState.Init(this);
+        }
+
+        public void Quit()
+        {
+            entrypoint.Quit();
         }
 
         void OnDestroy()
@@ -105,15 +117,15 @@ namespace Drakken.Client
             void OnDisconnected(ulong clientId)
             {
                 Log.Info("Client", $"Disconnected as clientId={clientId}");
-                GameEntrypoint.Singleton.Connection.RemoveClientListeners(OnConnected, OnDisconnected);
+                entrypoint.Connection.RemoveClientListeners(OnConnected, OnDisconnected);
                 IsConnecting = false;
                 IsConnected = false;
                 tcs.TrySetResult(false);
             }
 
             // Start networking client
-            GameEntrypoint.Singleton.Connection.AddClientListeners(OnConnected, OnDisconnected);
-            GameEntrypoint.Singleton.Connection.StartClient(config.address, config.port);
+            entrypoint.Connection.AddClientListeners(OnConnected, OnDisconnected);
+            entrypoint.Connection.StartClient(config.address, config.port);
 
             return tcs.Task;
         }
@@ -124,12 +136,13 @@ namespace Drakken.Client
 
             Log.Info("Client", "Requesting to join match...");
 
-            var response = await GameEntrypoint.Singleton.Connection.Client_RequestJoinMatch();
+            var response = await entrypoint.Connection.Client_RequestJoinMatch();
 
             if (response.Success)
             {
                 Match = new ClientMatch(
-                    GameEntrypoint.Singleton.TokenRegistry,
+                    entrypoint.TokenRegistry,
+                    entrypoint.Connection,
                     response.MatchId,
                     (int)response.ClientIndex);
                 return true;

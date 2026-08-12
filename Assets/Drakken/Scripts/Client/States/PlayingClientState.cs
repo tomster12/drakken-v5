@@ -16,8 +16,8 @@ namespace Drakken.Client.States
 {
     public class PlayingClientState : ClientState
     {
-        private SceneLayout SceneLayout => GameEntrypoint.Singleton.Client.SceneLayout;
-        private SceneObjects SceneObjects => GameEntrypoint.Singleton.Client.SceneObjects;
+        private SceneLayout SceneLayout => client.SceneLayout;
+        private SceneObjects SceneObjects => client.SceneObjects;
         private GamePlayerLayout MyGameLayout => SceneLayout.Game.Player(Match.ClientIndex);
         private ScenePlayerObjects MySceneObjects => SceneObjects.Player(Match.ClientIndex);
 
@@ -31,7 +31,7 @@ namespace Drakken.Client.States
             Match.OnNextTurnStarted += OnNextTurnStarted;
             Match.OnRoundEnded += OnRoundEnded;
 
-            GameEntrypoint.Singleton.Client.Camera
+            client.Camera
                 .SetTarget(MyGameLayout.PlayingCameraPosition);
 
             StartRound();
@@ -264,7 +264,7 @@ namespace Drakken.Client.States
 
             // Now setup the intent for the token
             var visualContext = GetVisualContext(tokenView);
-            var tokenRegistry = GameEntrypoint.Singleton.TokenRegistry;
+            var tokenRegistry = client.TokenRegistry;
             var tokenRegistryEntry = tokenRegistry.GetEntryOrThrow(tokenView.TokenDefinition.TokenId);
 
             var tokenIntent = await tokenRegistryEntry.Visuals.IntentPicker.PickIntent(visualContext, Match.ClientIndex);
@@ -331,7 +331,7 @@ namespace Drakken.Client.States
 
             // Now hand it over to the token to finish the animation
             var visualContext = GetVisualContext(tokenView);
-            var tokenRegistry = GameEntrypoint.Singleton.TokenRegistry;
+            var tokenRegistry = client.TokenRegistry;
             var tokenRegistryEntry = tokenRegistry.GetEntryOrThrow(message.TokenId);
 
             await tokenRegistryEntry.Visuals.Animator.Animate(
@@ -355,10 +355,7 @@ namespace Drakken.Client.States
 
         public TokenVisualContext GetVisualContext(TokenView tokenView) => new()
         {
-            Assets = client.Assets,
-            SceneLayout = SceneLayout,
-            SceneObjects = SceneObjects,
-            ClientUI = client.UI,
+            Client = client,
             TokenView = tokenView
         };
     }

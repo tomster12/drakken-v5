@@ -19,8 +19,8 @@ namespace Drakken.Client.States
 {
     public class DraftingClientState : ClientState
     {
-        private SceneLayout SceneLayout => GameEntrypoint.Singleton.Client.SceneLayout;
-        private SceneObjects SceneObjects => GameEntrypoint.Singleton.Client.SceneObjects;
+        private SceneLayout SceneLayout => client.SceneLayout;
+        private SceneObjects SceneObjects => client.SceneObjects;
         private DraftingPlayerLayout MyDraftingLayout => SceneLayout.Drafting.Player(Match.ClientIndex);
         private ScenePlayerObjects MySceneObjects => SceneObjects.Player(Match.ClientIndex);
         private int CountToDiscard => GameConstants.DraftingTokenCount - GameConstants.StandardTokenCount;
@@ -49,7 +49,7 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.transform.SetPositionAndRotation(
                 MyDraftingLayout.DraftConfirmButtonPosition.position, MyDraftingLayout.DraftConfirmButtonPosition.rotation);
 
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(
+            client.Camera.SetTarget(
                 MyDraftingLayout.CameraPosition, snap: fromType == ClientStateType.Title);
 
             SceneLayout.Dice.P1.gameObject.SetActive(true);
@@ -133,7 +133,7 @@ namespace Drakken.Client.States
                     if (diceTrace.PoseTraces.Count == 0) continue;
 
                     var startPose = diceTrace.PoseTraces[0];
-                    var view = DiceView.Create(client.Assets, diceTrace.Instance);
+                    var view = DiceView.Create(client.Assets, diceTrace.Instance, client);
                     view.transform.SetPositionAndRotation(startPose.Position, startPose.Rotation);
                     view.transform.localScale = Vector3.zero;
 
@@ -156,7 +156,7 @@ namespace Drakken.Client.States
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
-                    client.Assets, diceTraces.Player(clientIndex), sceneObjects, cts.Token));
+                    client.Assets, diceTraces.Player(clientIndex), sceneObjects, client, cts.Token));
             }
 
             // Get the final dice views out and update scene objects

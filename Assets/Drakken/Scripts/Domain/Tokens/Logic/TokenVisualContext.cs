@@ -5,10 +5,7 @@ namespace Drakken.Domain.Tokens.Logic
 {
     public class TokenVisualContext
     {
-        public AssetDatabase Assets { get; set; }
+        public GameClient Client { get; set; }
         public TokenView TokenView { get; set; }
-        public SceneLayout SceneLayout { get; set; }
-        public SceneObjects SceneObjects { get; set; }
-        public ClientUI ClientUI { get; set; }
     }
 }

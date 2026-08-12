@@ -20,7 +20,8 @@ namespace Drakken.Server
         private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(0.5);
 
         private readonly TokenRegistry tokenRegistry;
-        private IGameConnection Connection => GameEntrypoint.Singleton.Connection;
+        private readonly IGameConnection connection;
+        private readonly DiceTrayLayout diceLayout;
 
         public GameState GameState { get; private set; }
         public DiceSimulationWorld[] DiceWorlds { get; }
@@ -40,13 +41,13 @@ namespace Drakken.Server
 
         // -------------------------------- Setup
 
-        public ServerMatch(TokenRegistry tokenRegistry)
+        public ServerMatch(TokenRegistry tokenRegistry, IGameConnection connection, DiceTrayLayout diceLayout)
         {
             this.tokenRegistry = tokenRegistry;
+            this.connection = connection;
+            this.diceLayout = diceLayout;
             matchId = nextMatchId++;
             GameState = new();
-
-            var diceLayout = GameEntrypoint.Singleton.SceneLayout.Dice;
 
             DiceWorlds = new DiceSimulationWorld[2]
             {
@@ -75,7 +76,7 @@ namespace Drakken.Server
 
             if (connectedCount == 2)
             {
-                Connection.Server_MessageMatchOtherPlayerJoined(clientIds[0]);
+                connection.Server_MessageMatchOtherPlayerJoined(clientIds[0]);
             }
 
             return new()
@@ -94,7 +95,7 @@ namespace Drakken.Server
             startReadyCount++;
 
             // Let other player know they have readied up
-            Connection.Server_MessageMatchOtherPlayerReady(GetOtherClientId(clientId));
+            connection.Server_MessageMatchOtherPlayerReady(GetOtherClientId(clientId));
 
             // When both readied up start drafting phase
             if (startReadyCount == 2)
@@ -121,7 +122,7 @@ namespace Drakken.Server
 
             var diceTraces = SimulateRollDice();
 
-            Connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
+            connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
         }
 
         private void DealGameDice()
@@ -190,7 +191,7 @@ namespace Drakken.Server
             respond(true);
 
             // Let other player know they have discard
-            Connection.Server_MessageMatchOtherPlayerDiscarded(GetOtherClientId(clientId));
+            connection.Server_MessageMatchOtherPlayerDiscarded(GetOtherClientId(clientId));
 
             // Start playing phase once everyone has readied up
             discardReadyCount++;
@@ -212,7 +213,7 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Playing;
 
-            Connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
+            connection.Server_BroadcastMatchStartPlayingPhase(clientIds, GameState);
         }
 
         public void OnClientRequestPlayToken(ulong clientId, TokenIntentMessage message, Action<bool> respond)
@@ -233,7 +234,7 @@ namespace Drakken.Server
 
             respond(true);
 
-            Connection.Server_BroadcastMatchTokenResolved(clientIds, new TokenResolutionMessage
+            connection.Server_BroadcastMatchTokenResolved(clientIds, new TokenResolutionMessage
             {
                 TokenId = message.TokenId,
                 TokenInstanceId = message.InstanceId,
@@ -273,7 +274,7 @@ namespace Drakken.Server
             GameState.TurnClientIndex = 1 - GameState.TurnClientIndex;
             Log.Info($"ServerMatch-{matchId}", $"Advancing turn, next clientIndex={GameState.TurnClientIndex}");
 
-            Connection.Server_BroadcastMatchNextTurn(clientIds, GameState);
+            connection.Server_BroadcastMatchNextTurn(clientIds, GameState);
         }
 
         private void EndRound()
@@ -294,7 +295,7 @@ namespace Drakken.Server
             DealDraftTokens();
 
             var diceTraces = SimulateRerollDice();
-            Connection.Server_BroadcastMatchNextRound(clientIds, GameState, diceTraces);
+            connection.Server_BroadcastMatchNextRound(clientIds, GameState, diceTraces);
         }
 
         // -------------------------------- Dice Simulation
@@ -361,7 +362,7 @@ namespace Drakken.Server
             for (int p = 0; p < 2; p++)
             {
                 var diceInstances = GameState.Clients[p].Dice;
-                var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
+                var tray = diceLayout.Player(p);
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
 
@@ -393,7 +394,7 @@ namespace Drakken.Server
             for (int p = 0; p < 2; p++)
             {
                 var diceInstances = GameState.Clients[p].Dice;
-                var tray = GameEntrypoint.Singleton.SceneLayout.Dice.Player(p);
+                var tray = diceLayout.Player(p);
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
 

@@ -10,7 +10,7 @@ using Drakken.Domain.Tokens;
 
 namespace Drakken
 {
-    internal class GameEntrypoint : MonoBehaviour
+    public class GameEntrypoint : MonoBehaviour
     {
         public static GameEntrypoint Singleton { get; private set; }
 
@@ -42,6 +42,8 @@ namespace Drakken
         private void Awake()
         {
             Singleton = this;
+            server.Init(this);
+            client.Init(this);
         }
 
         private async void Start()
@@ -50,7 +52,7 @@ namespace Drakken
 
             if (debugUseFakeConnection)
             {
-                debugConnection = new();
+                debugConnection = new(this);
                 Destroy(UnityGameConnection.Singleton.gameObject);
             }
 

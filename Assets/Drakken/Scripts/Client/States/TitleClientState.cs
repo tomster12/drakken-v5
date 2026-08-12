@@ -7,7 +7,7 @@ namespace Drakken.Client.States
 {
     public class TitleClientState : ClientState
     {
-        private SceneLayout SceneLayout => GameEntrypoint.Singleton.Client.SceneLayout;
+        private SceneLayout SceneLayout => client.SceneLayout;
 
         public override async Task Enter(ClientStateType fromStateType)
         {
@@ -32,7 +32,7 @@ namespace Drakken.Client.States
             SceneLayout.Title.Clutter.SetActive(true);
 
             // Move camera into position
-            GameEntrypoint.Singleton.Client.Camera.SetTarget(
+            client.Camera.SetTarget(
                 SceneLayout.Title.CameraPosition, snap: true);
         }
 
@@ -134,7 +134,7 @@ namespace Drakken.Client.States
 
         private void OnExitClicked()
         {
-            GameEntrypoint.Singleton.Quit();
+            client.Quit();
         }
 
         private async void OnDraftingPhaseStarted()

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Common;
 using Drakken.Domain;
-using Drakken.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
 using Drakken.Server;
@@ -18,11 +17,17 @@ namespace Drakken.Networking
         private static readonly ulong opClientId = 30;
         private static readonly TimeSpan opponentReactionDelay = TimeSpan.FromSeconds(0.5);
 
-        private IGameServer Server => GameEntrypoint.Singleton.Server;
+        private readonly GameEntrypoint entrypoint;
+        private IGameServer Server => entrypoint.Server;
         private readonly Dictionary<ulong, IGameClient> clientsById = new();
         private Action<ulong> onClientConnectedCallback;
         private DebugGameClient opClient;
         private readonly TaskManager tasks = new();
+
+        public DebugGameConnection(GameEntrypoint entrypoint)
+        {
+            this.entrypoint = entrypoint;
+        }
 
         public void StartServer(string address, ushort port)
         {
@@ -32,7 +37,7 @@ namespace Drakken.Networking
         {
             // Setup opponent debug client
             opClient = new DebugGameClient();
-            clientsById[myClientId] = GameEntrypoint.Singleton.Client;
+            clientsById[myClientId] = entrypoint.Client;
             clientsById[opClientId] = opClient;
 
             // Imediately tell the client to execute
@@ -56,7 +61,8 @@ namespace Drakken.Networking
             // make debug opponent join match first
             var opJoinResponse = Server.OnRequestJoinMatch(opClientId);
             opClient.SetMatch(new ClientMatch(
-                GameEntrypoint.Singleton.TokenRegistry,
+                entrypoint.TokenRegistry,
+                this,
                 opJoinResponse.MatchId,
                 (int)opJoinResponse.ClientIndex));
 

@@ -88,7 +88,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             await Task.Delay(250);
 
-            var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
+            var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
             var firstDiceView = sourcePlayerObjects.DiceViews[resolution.FirstInstanceId];
             var secondDiceView = sourcePlayerObjects.DiceViews[resolution.SecondInstanceId];
@@ -131,7 +131,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var forgedDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.CombinedDiceInstance, midpoint, targetRot);
             await forgedDiceView.AnimateGrow(ct);
 
-            visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
+            visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 
             await Task.Delay(100);
         }

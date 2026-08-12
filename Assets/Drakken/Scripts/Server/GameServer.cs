@@ -19,10 +19,12 @@ namespace Drakken.Server
         [SerializeField] private UnityTransport transport;
 
         private ServerMatch currentMatch;
+        private GameEntrypoint entrypoint;
 
-        private void Awake()
+        public void Init(GameEntrypoint entrypoint)
         {
-            GameEntrypoint.Singleton.TokenRegistry = TokenRegistryBuilder.BuildServerRegistry();
+            this.entrypoint = entrypoint;
+            entrypoint.TokenRegistry = TokenRegistryBuilder.BuildServerRegistry();
         }
 
         public void StartApplication()
@@ -31,12 +33,12 @@ namespace Drakken.Server
 
             Log.Info("Server", $"Starting game server at {config.address}:{config.port}");
 
-            GameEntrypoint.Singleton.Connection.StartServer(config.address, config.port);
+            entrypoint.Connection.StartServer(config.address, config.port);
         }
 
         public JoinMatchResponse OnRequestJoinMatch(ulong clientId)
         {
-            currentMatch ??= new ServerMatch(GameEntrypoint.Singleton.TokenRegistry);
+            currentMatch ??= new ServerMatch(entrypoint.TokenRegistry, entrypoint.Connection, entrypoint.SceneLayout.Dice);
 
             return currentMatch.OnClientRequestJoin(clientId);
         }

@@ -28,35 +28,36 @@ namespace Drakken.Client.World
         private Vector2 FaceLabelSize = new(1.0f, 1.0f);
         private Color FaceLabelColor = new(159, 141, 129); // rgb(159, 141, 129)
 
+        private IGameStateProvider gameStateProvider;
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         private DiceInstance detachedInstance; // fallback for dice not tracked in GameState, e.g. preview dice
-
         public int InstanceId { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
         public bool IsHovered { get; private set; } = false;
         public bool IsSelected { get; private set; } = false;
         public bool IsPickable { get; private set; } = false;
         private bool isInteractionLocked = false;
-
         public bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
         // Use GameState dice instance whenever possible to prevent splitting
-        public DiceInstance DiceInstance => FindInGameState(InstanceId) ?? detachedInstance;
+        public DiceInstance DiceInstance => gameStateProvider?.GameState?.GetDiceInstance(InstanceId) ?? detachedInstance;
 
         // ------------------------------ Binding
 
-        public static DiceView Create(AssetDatabase assets, DiceInstance instance, float scale = 1.0f)
+        public static DiceView Create(
+            AssetDatabase assets, DiceInstance instance, IGameStateProvider gameStateProvider = null, float scale = 1.0f)
         {
             GameObject diceGo = new($"Dice View (D{instance.Sides})");
             var diceView = diceGo.AddComponent<DiceView>();
 
-            diceView.Bind(assets, instance, scale);
+            diceView.Bind(assets, instance, gameStateProvider, scale);
 
             return diceView;
         }
 
-        private void Bind(AssetDatabase assets, DiceInstance instance, float scale = 1.0f)
+        private void Bind(AssetDatabase assets, DiceInstance instance, IGameStateProvider gameStateProvider, float scale = 1.0f)
         {
             this.InstanceId = instance.InstanceId;
+            this.gameStateProvider = gameStateProvider;
 
             // Keep track of this incase we need it
             this.detachedInstance = instance;
@@ -124,16 +125,6 @@ namespace Drakken.Client.World
 
             if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
             if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
-        }
-
-        private static DiceInstance FindInGameState(int instanceId)
-        {
-            foreach (var client in GameEntrypoint.Singleton.Client.Match.GameState.Clients)
-            {
-                var instance = client.Dice.Find(d => d.InstanceId == instanceId);
-                if (instance != null) return instance;
-            }
-            return null;
         }
 
         // ------------------------------ Animation

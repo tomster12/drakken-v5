@@ -163,11 +163,11 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             await Task.Delay(250);
 
-            var sourcePlayerObjects = visualContext.SceneObjects.Player(sourceClientIndex);
+            var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
             // Spawn a D4 next to the token showing how many dice it's about to replace
             var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
-            var d4View = DiceView.Create(visualContext.Assets, d4Instance, scale: 1.2f);
+            var d4View = DiceView.Create(visualContext.Client.Assets, d4Instance, scale: 1.2f);
 
             var tokenTransform = visualContext.TokenView.transform;
             Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;
@@ -180,7 +180,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay full physical animation
             var viewsByInstanceId = await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Assets, resolution.DiceTrace, sourcePlayerObjects, ct);
+                visualContext.Client.Assets, resolution.DiceTrace, sourcePlayerObjects, visualContext.Client, ct);
 
             // Swap out the replaced dice for the newly rolled ones keyed by instance id
             for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
@@ -191,7 +191,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 sourcePlayerObjects.DiceViews[addedInstance.InstanceId] = newDiceView;
             }
 
-            visualContext.ClientUI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
+            visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 
             await Task.Delay(100);
         }
