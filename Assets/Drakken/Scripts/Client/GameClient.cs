@@ -46,11 +46,13 @@ namespace Drakken.Client
         {
             this.entrypoint = entrypoint;
 
+            // Initialize the global token registry
+            // It is held globally so serialized messages can get to it (e.g. token intent)
             entrypoint.TokenRegistry = TokenRegistryBuilder.BuildClientRegistry(assets.GetTokenMeshPrefabById);
 
+            // Initialize states and components
             SceneObjects.Init(SceneLayout, assets, entrypoint.TokenRegistry, this);
             ui.Init(this);
-
             titleState.Init(this);
             draftingState.Init(this);
             playingState.Init(this);

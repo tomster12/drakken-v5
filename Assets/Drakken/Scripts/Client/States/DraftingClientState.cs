@@ -93,12 +93,14 @@ namespace Drakken.Client.States
 
             if (isReroll)
             {
-                // Coming back from a played round - reuse the existing dice views, just replay the reroll throw
+                // Coming back from a played round
+                // Directly simulate the servers physics on the current dice views
                 await SimulateDiceTraces(Match.LastDiceTraces);
             }
             else
             {
-                // Fresh game - spawn dice at their resting position (grow + shake) before replaying the physics throw
+                // Start of a new game
+                // Spawn dice views ready for the simulation
                 SceneObjects.P1.DestroyAllDice();
                 SceneObjects.P2.DestroyAllDice();
 
@@ -121,7 +123,7 @@ namespace Drakken.Client.States
                 await view.AnimateShake(cts.Token);
             }
 
-            // Prepare a dice view based off the simulation trace
+            // Prepare dice views based off the first simulation trace
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
@@ -155,11 +157,13 @@ namespace Drakken.Client.States
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
+
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
                     client.Assets, diceTraces.Player(clientIndex), sceneObjects, client, cts.Token));
             }
 
             // Get the final dice views out and update scene objects
+            // The results of the replayer is the final list of relevant dice views
             var results = await Task.WhenAll(tasks);
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
@@ -182,7 +186,7 @@ namespace Drakken.Client.States
 
             for (int i = 0; i < tokenCount; i++)
             {
-                // Start a new task for this token
+                // Start a new task for the token drafting animation
                 int tokenIndex = i;
                 int taskDelay = (tokenCount - 1 - tokenIndex) * 250;
 
@@ -202,8 +206,7 @@ namespace Drakken.Client.States
                     Vector3 bagAbovePos = bagStartPos + Vector3.up * 1.5f;
                     Vector3 targetPos = MySceneObjects.GetDraftTokenRowIndexPosition(tokenIndex, tokenCount);
 
-                    await tokenView.Animator.Play(AnimationSequenceBuilder
-                        .Start()
+                    await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                         .At(0.0f, AnimationTracks.LocalScale(
                             0.5f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
                         .At(0.0f, AnimationTracks.Rotation(
@@ -331,8 +334,7 @@ namespace Drakken.Client.States
                 Vector3 targetPos = MySceneObjects.GetDraftTokenRowIndexPosition(i, MySceneObjects.TokenViews.Length);
 
                 // Animate directly into the row
-                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
+                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                     .Next(tokenView.CreateCurrentPositionAnimationTrack(
                         0.6f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
                     .Build(), cts.Token));

@@ -72,17 +72,17 @@ namespace Drakken.Domain.Tokens.Implementation
                 int diceInstanceId = client.Dice[replacedIndex].InstanceId;
 
                 var (startPosition, startRotation) = diceWorld.GetDicePose(diceInstanceId);
-                Vector3 liftedPosition = startPosition + Vector3.up * LiftHeight;
+                Vector3 liftPosition = startPosition + Vector3.up * LiftHeight;
                 Vector3 spinAxis = Random.insideUnitSphere.normalized;
 
-                string driveId = diceWorld.DriveKinematic(
+                string liftDriveId = diceWorld.DriveKinematic(
                     diceInstanceId,
                     LiftDuration,
-                    t => Vector3.Lerp(startPosition, liftedPosition, Easing.EaseOutCubic(t)),
+                    t => Vector3.Lerp(startPosition, liftPosition, Easing.EaseOutCubic(t)),
                     t => startRotation * Quaternion.AngleAxis(LiftSpinTurns * 360f * t, spinAxis));
 
-                liftDriveIds.Add(driveId);
-                liftPositionsByIndex[replacedIndex] = liftedPosition;
+                liftDriveIds.Add(liftDriveId);
+                liftPositionsByIndex[replacedIndex] = liftPosition;
             }
 
             diceWorld.Simulate(untilDrivesComplete: liftDriveIds);
@@ -121,6 +121,7 @@ namespace Drakken.Domain.Tokens.Implementation
             }
 
             diceWorld.Simulate(untilAllSettled: true);
+
             diceWorld.FreezeAllDice();
             var trace = diceWorld.EndSession();
 

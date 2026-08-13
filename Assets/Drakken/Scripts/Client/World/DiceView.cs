@@ -131,8 +131,7 @@ namespace Drakken.Client.World
 
         public async Task AnimateGrow(CancellationToken ct, float duration = 0.3f)
         {
-            await Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(AnimationTracks.LocalScale(
                     duration, transform, transform.localScale, Vector3.one, Easing.EaseOutCubic))
                 .Build(), ct);
@@ -152,8 +151,7 @@ namespace Drakken.Client.World
             spinAmount[firstAxis] = 1 * 360f * (Random.value < 0.5f ? -1f : 1f);
             spinAmount[secondAxis] = 1 * 360f * (Random.value < 0.5f ? -1f : 1f);
 
-            var builder = AnimationSequenceBuilder
-                .Start()
+            var builder = AnimationSequenceBuilder.Start()
                 .Next(AnimationTracks.LocalEulerRotation(
                     durationSeconds, transform, baseRotation, spinAmount, Easing.Linear));
 
@@ -198,8 +196,7 @@ namespace Drakken.Client.World
 
             float durationSeconds = 1.0f * durationMultiplier;
 
-            await Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(AnimationTracks.LocalEulerRotation(
                     durationSeconds, transform, startRotation, spinAmount, Easing.EaseOutCubic))
                 .Build(), ct);
@@ -207,8 +204,7 @@ namespace Drakken.Client.World
 
         public async Task AnimateShrinkAndDestroy(CancellationToken ct)
         {
-            await Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(AnimationTracks.LocalScale(
                     0.3f, transform, transform.localScale, Vector3.zero, Easing.EaseInCubic))
                 .Build(), ct);

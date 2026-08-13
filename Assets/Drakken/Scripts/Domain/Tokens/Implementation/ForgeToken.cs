@@ -105,14 +105,12 @@ namespace Drakken.Domain.Tokens.Implementation
             var secondArc = AnimationCurves.QuadraticBezier(secondStartPosition, secondControlPosition, midpoint);
 
             await Task.WhenAll(
-                firstDiceView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
+                firstDiceView.Animator.Play(AnimationSequenceBuilder.Start()
                     .Next(
                         AnimationTracks.PositionFunc(PullTogetherDuration, firstDiceView.transform, firstArc, Easing.EaseInOutQuad),
                         AnimationTracks.LocalScale(PullTogetherDuration, firstDiceView.transform, firstDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
                     .Build(), ct),
-                secondDiceView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
+                secondDiceView.Animator.Play(AnimationSequenceBuilder.Start()
                     .Next(
                         AnimationTracks.PositionFunc(PullTogetherDuration, secondDiceView.transform, secondArc, Easing.EaseInOutQuad),
                         AnimationTracks.LocalScale(PullTogetherDuration, secondDiceView.transform, secondDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))

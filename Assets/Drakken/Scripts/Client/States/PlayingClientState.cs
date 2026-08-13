@@ -31,8 +31,8 @@ namespace Drakken.Client.States
             Match.OnNextTurnStarted += OnNextTurnStarted;
             Match.OnRoundEnded += OnRoundEnded;
 
-            client.Camera
-                .SetTarget(MyGameLayout.PlayingCameraPosition);
+            client.Camera.SetTarget(
+                MyGameLayout.PlayingCameraPosition);
 
             StartRound();
         }
@@ -65,9 +65,9 @@ namespace Drakken.Client.States
                 tokenView.SetInteractionMode(TokenView.InteractionModeType.None);
 
                 var targetPos = MySceneObjects.GetTokenRowIndexPosition(i);
+
                 tasks.Add(tokenView.Animator.Play(
-                    AnimationSequenceBuilder
-                    .Start()
+                    AnimationSequenceBuilder.Start()
                     .Next(
                         tokenView.CreateCurrentPositionAnimationTrack(
                             0.6f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic),
@@ -114,8 +114,7 @@ namespace Drakken.Client.States
                 var tokenView = MySceneObjects.TokenViews[i];
                 var targetPos = MySceneObjects.GetTokenRowIndexPosition(i);
 
-                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
+                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                     .Next(tokenView.CreateCurrentPositionAnimationTrack(
                         0.3f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
                     .Build(), cts.Token));
@@ -128,8 +127,7 @@ namespace Drakken.Client.States
                 var tokenView = opPlayerObjects.TokenViews[i];
                 var targetPos = opPlayerObjects.GetTokenRowIndexPosition(i);
 
-                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder
-                    .Start()
+                tasks.Add(tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                     .Next(tokenView.CreateCurrentPositionAnimationTrack(
                         0.3f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
                     .Build(), cts.Token));
@@ -140,15 +138,16 @@ namespace Drakken.Client.States
 
         private void StartTurn()
         {
-            // Interaction is locked while a token is resolving/animating, release it for the new turn
+            // Interaction is locked while a token is resolving / animating
+            // so release it for the new turn
             SetAllTokensInteractionLocked(false);
             SetAllDiceInteractionLocked(false);
 
             UpdateStatusUI();
 
+            // Enable all tokens to be playable on your turn
             if (Match.ClientIndex == GameState.TurnClientIndex)
             {
-                // Enable all tokens to be playable
                 foreach (var tokenView in SceneObjects.Player(Match.ClientIndex).TokenViews)
                 {
                     tokenView.SetInteractionMode(TokenView.InteractionModeType.Play);
@@ -165,7 +164,7 @@ namespace Drakken.Client.States
             await client.GotoState(ClientStateType.Drafting);
         }
 
-        // ------------------------------ Main
+        // ------------------------------ Utility
 
         private void UpdateStatusUI()
         {
@@ -237,8 +236,7 @@ namespace Drakken.Client.States
             int tokenIndex = Array.IndexOf(MySceneObjects.TokenViews, tokenView);
             var targetPos = MySceneObjects.GetTokenRowIndexPosition(tokenIndex);
 
-            await tokenView.Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(tokenView.CreateCurrentPositionAnimationTrack(
                     0.3f, AnimationCurves.Lerp(tokenView.transform.position, targetPos), Easing.EaseOutCubic))
                 .Build(), cts.Token);
@@ -256,8 +254,7 @@ namespace Drakken.Client.States
             }
 
             // Settle the token into the centre before resolving its intent
-            await tokenView.Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(tokenView.CreateCurrentPositionAnimationTrack(
                     0.3f, AnimationCurves.Lerp(tokenView.transform.position, SceneLayout.Game.CentrePos.position), Easing.EaseOutCubic))
                 .Build(), cts.Token);
@@ -320,8 +317,7 @@ namespace Drakken.Client.States
             var centreTargetPos = SceneLayout.Game.CentrePos.position;
             var centreTargetRot = Quaternion.Euler(-55f, Match.ClientIndex * 180f, 0);
 
-            await tokenView.Animator.Play(AnimationSequenceBuilder
-                .Start()
+            await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                 .Next(
                     tokenView.CreateCurrentPositionAnimationTrack(
                         0.6f, AnimationCurves.Lerp(tokenView.transform.position, centreTargetPos), Easing.EaseInOutCubic),

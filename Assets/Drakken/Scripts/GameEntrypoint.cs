@@ -42,13 +42,17 @@ namespace Drakken
         private void Awake()
         {
             Singleton = this;
-            server.Init(this);
-            client.Init(this);
         }
 
         private async void Start()
         {
             if (debugPreventApplication) return;
+
+            var isServer =
+                UnityEngine.Application.isBatchMode ||
+                Unity.Multiplayer.PlayMode.CurrentPlayer.Tags.Contains("Server");
+
+            Assert.False(debugUseFakeConnection && isServer);
 
             if (debugUseFakeConnection)
             {
@@ -59,21 +63,20 @@ namespace Drakken
             if (debugUseFakeConnection)
             {
                 Log.Info("Application", "Starting game server due to debugPreventConnection");
+                server.Init(this);
                 server.StartApplication();
             }
-
-            var isServer =
-                UnityEngine.Application.isBatchMode ||
-                Unity.Multiplayer.PlayMode.CurrentPlayer.Tags.Contains("Server");
 
             if (isServer)
             {
                 Log.Info("Application", "Starting game server application");
+                server.Init(this);
                 server.StartApplication();
             }
             else
             {
                 Log.Info("Application", "Starting game client application");
+                client.Init(this);
                 await client.StartApplication();
             }
         }

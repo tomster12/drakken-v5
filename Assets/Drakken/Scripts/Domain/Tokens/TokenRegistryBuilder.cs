@@ -30,7 +30,7 @@ namespace Drakken.Domain.Tokens
                 {
                     TokenId = "dragon",
                     DisplayName = "Dragon",
-                    Description = "Roll a D3. Replace that many of your dice with freshly rolled D8s.",
+                    Description = "Roll a D4, replace that many dice randomly with new D8s.",
                     Rarity = TokenRarity.Rare,
                     Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos }
                 },
@@ -44,13 +44,12 @@ namespace Drakken.Domain.Tokens
                 )
             );
 
-            /*
             registry.Register(
                 new TokenDefinition
                 {
                     TokenId = "forge",
                     DisplayName = "Forge",
-                    Description = "Combine 2 dice into 1 with total sides equal to the sum of the values.",
+                    Description = "Combine 2 dice, new dice sides has (D1 value + D2 value) rounded up.",
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
@@ -63,7 +62,6 @@ namespace Drakken.Domain.Tokens
                     prefabFactory?.Invoke("forge")
                 )
             );
-            */
         }
     }
 }
