@@ -309,21 +309,22 @@ namespace Drakken.Client.States
                 .Player(message.SourceClientIndex).TokenViews
                 .First(tv => tv.TokenInstance.InstanceId == message.TokenInstanceId);
 
-            // If it is the opponents token then reveal now
-            if (message.SourceClientIndex != Match.ClientIndex)
-                tokenView.Reveal();
-
             // Animate to the centre and show what token was played
             var centreTargetPos = SceneLayout.Game.CentrePos.position;
             var centreTargetRot = Quaternion.Euler(-55f, Match.ClientIndex * 180f, 0);
 
-            await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
+            var builder = AnimationSequenceBuilder.Start()
                 .Next(
                     tokenView.CreateCurrentPositionAnimationTrack(
                         0.6f, AnimationCurves.Lerp(tokenView.transform.position, centreTargetPos), Easing.EaseInOutCubic),
                     AnimationTracks.Rotation(
-                        0.6f, tokenView.transform, tokenView.transform.rotation, centreTargetRot, Easing.EaseInOutCubic))
-                .Build(), cts.Token);
+                        0.6f, tokenView.transform, tokenView.transform.rotation, centreTargetRot, Easing.EaseInOutCubic));
+
+            // If it an opponent token then reveal when it is almost in the middle
+            if (message.SourceClientIndex != Match.ClientIndex)
+                builder.At(0.4f, () => tokenView.Reveal());
+
+            await tokenView.Animator.Play(builder.Build(), cts.Token);
 
             // Now hand it over to the token to finish the animation
             var visualContext = GetVisualContext(tokenView);

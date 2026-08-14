@@ -19,6 +19,8 @@ namespace Drakken.Domain.Tokens.Implementation
         public int FirstInstanceId;
         public int SecondInstanceId;
         public DiceInstance CombinedDiceInstance;
+        public DiceSimulationTraces FlightTrace;
+        public DiceSimulationTraces ForgeTrace;
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
@@ -26,11 +28,21 @@ namespace Drakken.Domain.Tokens.Implementation
             serializer.SerializeValue(ref FirstInstanceId);
             serializer.SerializeValue(ref SecondInstanceId);
             serializer.SerializeValue(ref CombinedDiceInstance);
+            serializer.SerializeValue(ref FlightTrace);
+            serializer.SerializeValue(ref ForgeTrace);
         }
     }
 
     public class ForgeTokenExecutor : TokenExecutor<PickDiceTokenIntent, ForgeTokenResolution>
     {
+        private const float FlightDuration = 0.5f;
+        private const float FlightLiftHeight = 1.3f;
+        private const float FlightSideGap = 0.9f;
+        private const float FlightArchHeight = 0.6f;
+        private const float ForgePopUpwardSpeed = 1.2f;
+        private const float ForgePopHorizontalSpeed = 0.3f;
+        private const float ForgePopTorque = 4f;
+
         protected override ForgeTokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
@@ -45,16 +57,76 @@ namespace Drakken.Domain.Tokens.Implementation
             Assert.NotNull(firstDice);
             Assert.NotNull(secondDice);
 
-            // Combine into a single fresh dice with sides equal to the sum of the two values
+            // Combine into a new dice, with sides = (v1 + v2) rounded up, minimum 4
             int combinedSides = firstDice.Value + secondDice.Value;
+            if (combinedSides % 2 == 1) combinedSides++;
+            combinedSides = Mathf.Max(combinedSides, 4);
             var combinedDice = DiceInstance.Create(sides: combinedSides);
             combinedDice.Roll();
+
+            // First drive the 2 dice up next to each other
+            diceWorld.BeginSession();
+
+            var (firstStartPos, firstStartRot) = diceWorld.GetDicePose(firstDice.InstanceId);
+            var (secondStartPos, secondStartRot) = diceWorld.GetDicePose(secondDice.InstanceId);
+
+            Vector3 liftedMidpoint = (firstStartPos + secondStartPos) / 2f + Vector3.up * FlightLiftHeight;
+            Vector3 sideDirection = secondStartPos - firstStartPos;
+            sideDirection = sideDirection.sqrMagnitude > 0.0001f ? sideDirection.normalized : Vector3.right;
+
+            Vector3 firstTarget = liftedMidpoint - sideDirection * (FlightSideGap / 2f);
+            Vector3 secondTarget = liftedMidpoint + sideDirection * (FlightSideGap / 2f);
+
+            Vector3 firstControlPosition = Vector3.Lerp(firstStartPos, firstTarget, 0.5f) + Vector3.up * FlightArchHeight;
+            Vector3 secondControlPosition = Vector3.Lerp(secondStartPos, secondTarget, 0.5f) + Vector3.up * FlightArchHeight;
+
+            var firstArc = AnimationCurves.QuadraticBezier(firstStartPos, firstControlPosition, firstTarget);
+            var secondArc = AnimationCurves.QuadraticBezier(secondStartPos, secondControlPosition, secondTarget);
+
+            var flightDriveIds = new List<string>
+            {
+                diceWorld.DriveDice(
+                    firstDice.InstanceId, FlightDuration,
+                    t => firstArc(Easing.EaseOutCubic(t)),
+                    _ => firstStartRot),
+                diceWorld.DriveDice(
+                    secondDice.InstanceId, FlightDuration,
+                    t => secondArc(Easing.EaseOutCubic(t)),
+                    _ => secondStartRot),
+            };
+
+            diceWorld.Simulate(untilDrivesComplete: flightDriveIds);
+
+            var flightTrace = diceWorld.EndSession();
+
+            // Session 2: remove the two source dice (the client destroys their views itself once its combine
+            // animation finishes) and forge the combined dice in their place, letting it hover before it drops
+            diceWorld.BeginSession();
+
+            diceWorld.RemoveDice(firstDice.InstanceId);
+            diceWorld.RemoveDice(secondDice.InstanceId);
+
+            Quaternion combinedRotation = Random.rotationUniform;
+
+            // Pop the forged dice straight up with a small random horizontal drift and spin, then let it fall
+            Vector3 popImpulse = Vector3.up * ForgePopUpwardSpeed
+                + new Vector3(Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed), 0f, Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed));
+            Vector3 popTorque = Random.insideUnitSphere * ForgePopTorque;
+
+            diceWorld.SpawnDice(combinedDice, liftedMidpoint, combinedRotation, popImpulse, popTorque);
+
+            diceWorld.Simulate(untilAllSettled: true);
+
+            diceWorld.FreezeAllDice();
+            var forgeTrace = diceWorld.EndSession();
 
             return new ForgeTokenResolution
             {
                 FirstInstanceId = firstDice.InstanceId,
                 SecondInstanceId = secondDice.InstanceId,
                 CombinedDiceInstance = combinedDice,
+                FlightTrace = flightTrace,
+                ForgeTrace = forgeTrace,
             };
         }
 
@@ -76,7 +148,7 @@ namespace Drakken.Domain.Tokens.Implementation
     public class ForgeTokenAnimator : TokenAnimator<ForgeTokenResolution>
     {
         private const float PullTogetherDuration = 0.35f;
-        private const float PullTogetherArchHeight = 1.5f;
+        private const float PullTogetherArchHeight = 0.5f;
 
         protected override async Task Animate(
             ClientMatch match,
@@ -88,15 +160,23 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             await Task.Delay(250);
 
+            // Give players a moment to read the token before it shrinks out of the way
+            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(1f, ct);
+
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
+
+            // Physically fly the two source dice up beside each other, matching the server's simulation
+            await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Client.Assets, resolution.FlightTrace, sourcePlayerObjects, visualContext.Client, ct);
 
             var firstDiceView = sourcePlayerObjects.DiceViews[resolution.FirstInstanceId];
             var secondDiceView = sourcePlayerObjects.DiceViews[resolution.SecondInstanceId];
 
-            // Pull the two dice together to a shared midpoint, arching up and across, shrinking away as they arrive
+            // Pull the two dice together to a shared midpoint, arching up and across, shrinking away as they arrive.
+            // This part is purely a client-side visual flourish - it isn't driven by any physics on the server.
             Vector3 firstStartPosition = firstDiceView.transform.position;
             Vector3 secondStartPosition = secondDiceView.transform.position;
-            Vector3 midpoint = (firstStartPosition + secondStartPosition) / 2f + Vector3.up * 1.0f;
+            Vector3 midpoint = (firstStartPosition + secondStartPosition) / 2f;
 
             Vector3 firstControlPosition = Vector3.Lerp(firstStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
             Vector3 secondControlPosition = Vector3.Lerp(secondStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
@@ -116,18 +196,19 @@ namespace Drakken.Domain.Tokens.Implementation
                         AnimationTracks.LocalScale(PullTogetherDuration, secondDiceView.transform, secondDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
                     .Build(), ct));
 
-            await Task.Delay(100);
-
             // Both dice have already shrunk to nothing at the midpoint, so just clean them up
             GameObject.Destroy(firstDiceView.gameObject);
             GameObject.Destroy(secondDiceView.gameObject);
             sourcePlayerObjects.DiceViews.Remove(resolution.FirstInstanceId);
             sourcePlayerObjects.DiceViews.Remove(resolution.SecondInstanceId);
 
-            // Spawn the forged dice at the merge point and roll it
-            Quaternion targetRot = Quaternion.Euler(0, match.ClientIndex * 180f, 0);
-            var forgedDiceView = sourcePlayerObjects.SpawnDiceAt(resolution.CombinedDiceInstance, midpoint, targetRot);
-            await forgedDiceView.AnimateGrow(ct);
+            // Physically spawn the forged dice at the merge point, let it hover, then drop it - matching the server
+            var forgedDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Client.Assets, resolution.ForgeTrace, sourcePlayerObjects, visualContext.Client, ct);
+
+            sourcePlayerObjects.DiceViews[resolution.CombinedDiceInstance.InstanceId] = forgedDiceViews[resolution.CombinedDiceInstance.InstanceId];
+
+            await shrinkTokenTask;
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 

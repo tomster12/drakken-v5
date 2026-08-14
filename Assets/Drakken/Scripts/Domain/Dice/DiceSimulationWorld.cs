@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -29,7 +30,7 @@ namespace Drakken.Domain.Dice
         private const int tickTimeout = 2000;
         private const float settledLinearVelocity = 0.001f;
         private const float settledAngularVelocity = 0.001f;
-        private const float settledDuration = 0.5f;
+        private const float settledDuration = 0.25f;
 
         private readonly Scene scene;
         private readonly PhysicsScene physicsScene;
@@ -117,14 +118,38 @@ namespace Drakken.Domain.Dice
             return traces;
         }
 
+        private DiceSessionTrace BuildSessionTrace(DiceBody body, int removeTick)
+        {
+            // Build a trace of a dice over this session, rebased to 0 at session start
+            List<DicePoseTrace> poses = new(body.SessionPoses.Count);
+
+            foreach (var pose in body.SessionPoses)
+            {
+                poses.Add(new DicePoseTrace
+                {
+                    Tick = pose.Tick - sessionStartTick,
+                    Position = pose.Position,
+                    Rotation = pose.Rotation,
+                });
+            }
+
+            return new DiceSessionTrace
+            {
+                Instance = body.Instance.Clone(),
+                SpawnTick = Mathf.Max(0, body.SpawnTick - sessionStartTick),
+                PoseTraces = poses,
+                RemoveTick = removeTick < 0 ? -1 : removeTick - sessionStartTick,
+            };
+        }
+
         // ------------------------------ Dice
 
         public int SpawnDice(
             DiceInstance instance,
             Vector3 position,
             Quaternion rotation,
-            Vector3 linearImpulse,
-            Vector3 angularImpulse)
+            Vector3? linearImpulse = null,
+            Vector3? angularImpulse = null)
         {
             Assert.True(isInSession, "Cannot spawn dice outside of a session");
 
@@ -136,8 +161,9 @@ namespace Drakken.Domain.Dice
 
             var diceRB = diceMesh.GameObject.AddComponent<Rigidbody>();
             diceRB.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            diceRB.AddForce(linearImpulse, ForceMode.VelocityChange);
-            diceRB.AddTorque(angularImpulse, ForceMode.VelocityChange);
+
+            if (linearImpulse.HasValue) diceRB.AddForce(linearImpulse.Value, ForceMode.VelocityChange);
+            if (angularImpulse.HasValue) diceRB.AddTorque(angularImpulse.Value, ForceMode.VelocityChange);
 
             var diceBody = new DiceBody
             {
@@ -153,7 +179,10 @@ namespace Drakken.Domain.Dice
             return instance.InstanceId;
         }
 
-        public void WakeDice(int diceInstanceId, Vector3 linearImpulse, Vector3 angularImpulse)
+        public void WakeDice(
+            int diceInstanceId,
+            Vector3 linearImpulse,
+            Vector3 angularImpulse)
         {
             Assert.True(isInSession, "Cannot wake dice outside of a session");
 
@@ -191,18 +220,6 @@ namespace Drakken.Domain.Dice
             GameObject.Destroy(diceBody.Rigidbody.gameObject);
         }
 
-        public int PeekDiceValue(int diceInstanceId)
-        {
-            var diceBody = diceBodiesByInstanceId[diceInstanceId];
-            return DiceMeshFactory.GetUpFaceValue(diceBody.Rigidbody.transform, diceBody.MeshFaces);
-        }
-
-        public (Vector3 Position, Quaternion Rotation) GetDicePose(int diceInstanceId)
-        {
-            var diceBody = diceBodiesByInstanceId[diceInstanceId];
-            return (diceBody.Rigidbody.position, diceBody.Rigidbody.rotation);
-        }
-
         public void FreezeAllDice()
         {
             Assert.True(isInSession, "Cannot freeze dice outside of a session");
@@ -218,7 +235,7 @@ namespace Drakken.Domain.Dice
             }
         }
 
-        public string DriveKinematic(
+        public string DriveDice(
             int diceInstanceId,
             float durationSeconds,
             Func<float, Vector3> positionAtTime,
@@ -268,7 +285,7 @@ namespace Drakken.Domain.Dice
             // Step tick by tick until we hit a stopping condition
             for (int i = 0; i < tickTimeout; i++)
             {
-                var (settledThisTick, completedDrivesThisTick) = Step();
+                var (settledThisTick, completedDrivesThisTick) = StepSimulation();
 
                 settledThisCall.AddRange(settledThisTick);
                 completedDrivesThisCall.AddRange(completedDrivesThisTick);
@@ -291,7 +308,7 @@ namespace Drakken.Domain.Dice
             return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: true);
         }
 
-        private (List<int> SettledInstanceIds, List<string> CompletedDriveIds) Step()
+        private (List<int> SettledInstanceIds, List<string> CompletedDriveIds) StepSimulation()
         {
             List<string> completedDrives = new();
             HashSet<int> drivenInstanceIds = null;
@@ -366,29 +383,19 @@ namespace Drakken.Domain.Dice
             return (settled, completedDrives);
         }
 
-        private DiceSessionTrace BuildSessionTrace(DiceBody body, int removeTick)
+        public int PeekDiceValue(int diceInstanceId)
         {
-            // Build a trace of a dice over this session, rebased to 0 at session start
-            List<DicePoseTrace> poses = new(body.SessionPoses.Count);
-
-            foreach (var pose in body.SessionPoses)
-            {
-                poses.Add(new DicePoseTrace
-                {
-                    Tick = pose.Tick - sessionStartTick,
-                    Position = pose.Position,
-                    Rotation = pose.Rotation,
-                });
-            }
-
-            return new DiceSessionTrace
-            {
-                Instance = body.Instance.Clone(),
-                SpawnTick = Mathf.Max(0, body.SpawnTick - sessionStartTick),
-                PoseTraces = poses,
-                RemoveTick = removeTick < 0 ? -1 : removeTick - sessionStartTick,
-            };
+            var diceBody = diceBodiesByInstanceId[diceInstanceId];
+            return DiceMeshFactory.GetUpFaceValue(diceBody.Rigidbody.transform, diceBody.MeshFaces);
         }
+
+        public (Vector3 Position, Quaternion Rotation) GetDicePose(int diceInstanceId)
+        {
+            var diceBody = diceBodiesByInstanceId[diceInstanceId];
+            return (diceBody.Rigidbody.position, diceBody.Rigidbody.rotation);
+        }
+
+        // ------------------------------ Data
 
         private class KinematicDrive
         {

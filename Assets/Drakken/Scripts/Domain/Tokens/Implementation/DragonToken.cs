@@ -52,7 +52,7 @@ namespace Drakken.Domain.Tokens.Implementation
             int replaceCount = Random.Range(1, 5);
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
-            // Select random indices to replace
+            // Select random dice to replace
             var replacedIndices = Enumerable.Range(0, client.Dice.Count)
                 .OrderBy(_ => Random.value)
                 .Take(replaceCount)
@@ -64,30 +64,27 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.BeginSession();
 
-            // Lift each replaced dice into the air with a spin, all at once
+            // Lift each replaced dice into the air with a spin
             var liftDriveIds = new List<string>();
-            var liftPositionsByIndex = new Dictionary<int, Vector3>();
-            foreach (var replacedIndex in replacedIndices)
+            var liftPositions = new Dictionary<int, Vector3>();
+            foreach (var index in replacedIndices)
             {
-                int diceInstanceId = client.Dice[replacedIndex].InstanceId;
+                int diceInstanceId = client.Dice[index].InstanceId;
 
                 var (startPosition, startRotation) = diceWorld.GetDicePose(diceInstanceId);
-                Vector3 liftPosition = startPosition + Vector3.up * LiftHeight;
+                liftPositions[index] = startPosition + Vector3.up * LiftHeight;
                 Vector3 spinAxis = Random.insideUnitSphere.normalized;
 
-                string liftDriveId = diceWorld.DriveKinematic(
+                liftDriveIds.Add(diceWorld.DriveDice(
                     diceInstanceId,
                     LiftDuration,
-                    t => Vector3.Lerp(startPosition, liftPosition, Easing.EaseOutCubic(t)),
-                    t => startRotation * Quaternion.AngleAxis(LiftSpinTurns * 360f * t, spinAxis));
-
-                liftDriveIds.Add(liftDriveId);
-                liftPositionsByIndex[replacedIndex] = liftPosition;
+                    t => Vector3.Lerp(startPosition, liftPositions[index], Easing.EaseOutCubic(t)),
+                    t => startRotation * Quaternion.AngleAxis(LiftSpinTurns * 360f * t, spinAxis)));
             }
 
             diceWorld.Simulate(untilDrivesComplete: liftDriveIds);
 
-            // Swap each lifted dice for a D8, hold it spinning in place so the swap reads clearly, then drop
+            // Swap each lifted dice for a D8, spin it place, then drop
             var addedDice = new List<DiceInstance>();
             var hoverDriveIds = new List<string>();
             foreach (var replacedIndex in replacedIndices)
@@ -95,26 +92,23 @@ namespace Drakken.Domain.Tokens.Implementation
                 diceWorld.RemoveDice(client.Dice[replacedIndex].InstanceId);
 
                 var newDice = DiceInstance.Create(sides: 8);
-                Vector3 hoverPosition = liftPositionsByIndex[replacedIndex];
+                addedDice.Add(newDice);
+
+                Vector3 hoverPosition = liftPositions[replacedIndex];
                 Quaternion spawnRotation = Random.rotationUniform;
                 Vector3 spinAxis = Random.insideUnitSphere.normalized;
 
-                diceWorld.SpawnDice(newDice, hoverPosition, spawnRotation, Vector3.zero, Vector3.zero);
+                diceWorld.SpawnDice(newDice, hoverPosition, spawnRotation);
 
-                string hoverDriveId = diceWorld.DriveKinematic(
+                hoverDriveIds.Add(diceWorld.DriveDice(
                     newDice.InstanceId,
                     HoverDuration,
                     _ => hoverPosition,
-                    t => spawnRotation * Quaternion.AngleAxis(HoverSpinTurns * 360f * Easing.EaseOutCubic(t), spinAxis));
-
-                hoverDriveIds.Add(hoverDriveId);
-                addedDice.Add(newDice);
+                    t => spawnRotation * Quaternion.AngleAxis(HoverSpinTurns * 360f * Easing.EaseOutCubic(t), spinAxis)));
             }
 
             diceWorld.Simulate(untilDrivesComplete: hoverDriveIds);
 
-            // Release each D8 to fall as a normal dynamic body - no impulse, no torque, so it drops straight
-            // down without rotating until it actually lands and reacts to the tray/other dice
             foreach (var newDice in addedDice)
             {
                 diceWorld.WakeDice(newDice.InstanceId, Vector3.zero, Vector3.zero);
@@ -170,24 +164,29 @@ namespace Drakken.Domain.Tokens.Implementation
             var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
             var d4View = DiceView.Create(visualContext.Client.Assets, d4Instance, scale: 1.2f);
 
-            var tokenTransform = visualContext.TokenView.transform;
-            Vector3 d4Pos = tokenTransform.position + tokenTransform.right * D4OffsetDistance;
-            d4View.transform.SetPositionAndRotation(d4Pos, tokenTransform.rotation);
+            var token = visualContext.TokenView.transform;
+            Vector3 d4Pos = token.position + token.right * D4OffsetDistance;
+            d4View.transform.SetPositionAndRotation(d4Pos, token.rotation);
 
             await d4View.AnimateRoll(ct, durationMultiplier: 1.4f);
-            await Task.Delay(500);
 
+            // Immediately shrink token out of the way after the roll
+            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(0f, ct);
+
+            await Task.Delay(500);
             await d4View.AnimateShrinkAndDestroy(ct);
 
             // Replay full physical animation
-            var viewsByInstanceId = await sourcePlayerObjects.DiceSimReplayer.Play(
+            var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, resolution.DiceTrace, sourcePlayerObjects, visualContext.Client, ct);
+
+            await shrinkTokenTask;
 
             // Swap out the replaced dice for the newly rolled ones keyed by instance id
             for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
             {
                 var addedInstance = resolution.AddedDiceInstances[i];
-                var newDiceView = viewsByInstanceId[addedInstance.InstanceId];
+                var newDiceView = newDiceViews[addedInstance.InstanceId];
                 sourcePlayerObjects.DiceViews.Remove(resolution.ReplacedInstanceIds[i]);
                 sourcePlayerObjects.DiceViews[addedInstance.InstanceId] = newDiceView;
             }

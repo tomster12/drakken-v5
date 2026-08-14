@@ -306,6 +306,7 @@ namespace Drakken.Server
         private const float diceThrowImpulseSpeed = 2.5f;
         private const float diceThrowTorque = 20f;
         private const float diceRiseIntoRowDuration = 0.35f;
+        private const float diceGridlessRiseY = 1.2f;
 
         private readonly struct DiceRowSlot
         {
@@ -319,22 +320,34 @@ namespace Drakken.Server
             }
         }
 
-        // Lay out where each dice in a set should sit in a row, spilling into new rows as needed
         private static List<DiceRowSlot> CalculateDiceRowLayout(int diceCount, DiceTray tray, int clientIndex)
         {
             var trayCenter = tray.transform.position;
             var traySize = tray.Size;
 
-            float diceSpacing = DiceMeshFactory.BaseScale * 3.0f;
             float clientSideSignZ = clientIndex == 0 ? -1f : 1f;
+            float diceSpacing = DiceMeshFactory.BaseScale * 2.5f;
+
+            // Calculate maximum capacity of the tray as a grid of rows/columns
             float rowWidth = traySize.x - diceRowEdgeMargin * 2f;
+            float rowDepth = traySize.z - diceRowEdgeMargin * 2f;
             int maxPerRow = Mathf.Max(1, Mathf.FloorToInt(rowWidth / diceSpacing));
-            int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
+            int maxRows = Mathf.Max(1, Mathf.FloorToInt(rowDepth / diceSpacing));
+
+            // Early exit if we absolutely cannot fit the dice in the grid pattern
+            if (diceCount > maxPerRow * maxRows)
+                return null;
 
             List<DiceRowSlot> slots = new(diceCount);
+            int rowCount = Mathf.Max(1, Mathf.CeilToInt((float)diceCount / maxPerRow));
             for (int row = 0; row < rowCount; row++)
             {
-                int rowDiceCount = diceCount / rowCount + (row < diceCount % rowCount ? 1 : 0);
+                // Evenly distribute dice across rows
+                // First calculate an amount we absolutely need per row
+                // Then give 1 extra to each row until we have used them all
+                int requiredPerRow = diceCount / rowCount;
+                int extraForThisRow = row < diceCount % rowCount ? 1 : 0;
+                int rowDiceCount = requiredPerRow + extraForThisRow;
                 float slotZ = trayCenter.z + clientSideSignZ * (traySize.z / 2f - diceRowEdgeMargin - row * diceSpacing);
 
                 for (int i = 0; i < rowDiceCount; i++)
@@ -348,9 +361,9 @@ namespace Drakken.Server
             return slots;
         }
 
-        // Calculate the impulse/torque to throw a dice from a row slot up into the tray
         private static (Vector3 Velocity, Vector3 Torque) CalculateDiceThrow(Vector3 fromPos, Vector3 trayCenter)
         {
+            // Calculate the impulse / torque to throw a dice from a row slot up into the tray
             var throwTarget = trayCenter + Vector3.up * diceThrowHeight * UnityEngine.Random.Range(0.6f, 1.4f);
             var velocity = (throwTarget - fromPos).normalized * diceThrowImpulseSpeed;
             var torque = UnityEngine.Random.insideUnitSphere * diceThrowTorque;
@@ -366,16 +379,19 @@ namespace Drakken.Server
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
 
+                if (slots == null)
+                    throw new InvalidOperationException("Cannot simulate initial roll with null grid");
+
                 var world = DiceWorlds[p];
                 world.BeginSession();
 
                 for (int i = 0; i < diceInstances.Count; i++)
                 {
-                    var slot = slots[i];
-                    var (throwVelocity, throwTorque) = CalculateDiceThrow(slot.Position, trayCenter);
+                    var slotPos = slots[i].Position;
+                    var slotRot = slots[i].Rotation;
 
-                    // Spawn a new dice at its row slot, then throw it in
-                    world.SpawnDice(diceInstances[i], slot.Position, slot.Rotation, throwVelocity, throwTorque);
+                    var (throwVelocity, throwTorque) = CalculateDiceThrow(slotPos, trayCenter);
+                    world.SpawnDice(diceInstances[i], slotPos, slotRot, throwVelocity, throwTorque);
                 }
 
                 world.Simulate(untilAllSettled: true);
@@ -401,29 +417,32 @@ namespace Drakken.Server
                 var world = DiceWorlds[p];
                 world.BeginSession();
 
-                // Rise the existing dice up into the same row layout a fresh roll would start from
+                // Rise the existing dice into the row layout, or if too many to fit a grid, rise each
+                // dice straight up from wherever it currently is
                 List<string> riseDriveIds = new(diceInstances.Count);
+                List<Vector3> risenPositions = new(diceInstances.Count);
                 for (int i = 0; i < diceInstances.Count; i++)
                 {
-                    var dice = diceInstances[i];
-                    var slot = slots[i];
-                    var (startPos, startRot) = world.GetDicePose(dice.InstanceId);
+                    var diceInstance = diceInstances[i];
+                    var (startPos, startRot) = world.GetDicePose(diceInstance.InstanceId);
+                    var targetPos = slots != null ? slots[i].Position : startPos + Vector3.up * diceGridlessRiseY;
+                    var targetRot = slots != null ? slots[i].Rotation : startRot;
+                    risenPositions.Add(targetPos);
 
-                    riseDriveIds.Add(world.DriveKinematic(
-                        dice.InstanceId,
+                    riseDriveIds.Add(world.DriveDice(
+                        diceInstance.InstanceId,
                         diceRiseIntoRowDuration,
-                        t => Vector3.Lerp(startPos, slot.Position, t),
-                        t => Quaternion.Slerp(startRot, slot.Rotation, t)));
+                        t => Vector3.Lerp(startPos, targetPos, t),
+                        t => Quaternion.Slerp(startRot, targetRot, t)));
                 }
 
                 world.Simulate(untilDrivesComplete: riseDriveIds);
 
-                // Now throw them the same way a fresh roll would
+                // Now throw them same as a standard roll
                 for (int i = 0; i < diceInstances.Count; i++)
                 {
                     var dice = diceInstances[i];
-                    var slot = slots[i];
-                    var (throwVelocity, throwTorque) = CalculateDiceThrow(slot.Position, trayCenter);
+                    var (throwVelocity, throwTorque) = CalculateDiceThrow(risenPositions[i], trayCenter);
                     world.WakeDice(dice.InstanceId, throwVelocity, throwTorque);
                 }
 

@@ -62,6 +62,26 @@ namespace Drakken.Domain.Tokens
                     prefabFactory?.Invoke("forge")
                 )
             );
+
+            registry.Register(
+                new TokenDefinition
+                {
+                    TokenId = "mitosis",
+                    DisplayName = "Mitosis",
+                    Description = "Reroll all dice. Any that land high (top third) split into 2 dice with half the sides (min 4), which also roll and can split again.",
+                    Rarity = TokenRarity.Common,
+                    Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos }
+                },
+                new MitosisTokenExecutor(),
+                typeof(EmptyTokenIntent),
+                typeof(MitosisTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new MitosisTokenAnimator(),
+                    new EmptyTokenIntentPicker(),
+                    // Re-use assets for now
+                    prefabFactory?.Invoke("forge")
+                )
+            );
         }
     }
 }

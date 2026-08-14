@@ -203,18 +203,18 @@ namespace Drakken.Client.States
                     tokenView.transform.localScale = Vector3.zero;
 
                     // Animate up and then across
-                    Vector3 bagAbovePos = bagStartPos + Vector3.up * 1.5f;
+                    Vector3 bagAbovePos = bagStartPos + Vector3.up * 1.0f;
                     Vector3 targetPos = MySceneObjects.GetDraftTokenRowIndexPosition(tokenIndex, tokenCount);
 
                     await tokenView.Animator.Play(AnimationSequenceBuilder.Start()
                         .At(0.0f, AnimationTracks.LocalScale(
-                            0.5f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
+                            0.8f, tokenView.transform, Vector3.zero, Vector3.one, Easing.EaseInCubic))
                         .At(0.0f, AnimationTracks.Rotation(
-                            0.9f, tokenView.transform, baseRot, MyDraftingLayout.DraftTokenRow.rotation, Easing.Linear))
+                            1.0f, tokenView.transform, baseRot, MyDraftingLayout.DraftTokenRow.rotation, Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
-                            0.3f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
+                            0.5f, AnimationCurves.Lerp(bagStartPos, bagAbovePos), Easing.Linear))
                         .Next(tokenView.CreateCurrentPositionAnimationTrack(
-                            0.8f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 2.0f, targetPos), Easing.EaseOutCubic))
+                            0.9f, AnimationCurves.QuadraticBezier(bagAbovePos, bagAbovePos + Vector3.up * 1.0f, targetPos), Easing.EaseOutCubic))
                         .Build(), cts.Token);
                 }, cts.Token));
             }

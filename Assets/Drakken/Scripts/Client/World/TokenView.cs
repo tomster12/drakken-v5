@@ -4,6 +4,8 @@ using Drakken.Domain.Tokens;
 using Drakken.Utility;
 using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -196,6 +198,17 @@ namespace Drakken.Client.World
                 position => currentPosition = position);
         }
 
+        public async Task AnimateShrink(float delaySeconds, CancellationToken ct)
+        {
+            if (delaySeconds > 0f)
+                await Task.Delay((int)(delaySeconds * 1000f));
+
+            await Animator.Play(AnimationSequenceBuilder.Start()
+                .Next(AnimationTracks.LocalScale(
+                    0.3f, transform, transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                .Build(), ct);
+        }
+
         // ------------------------------ Interaction
 
         private void UpdateInteraction()
@@ -238,7 +251,7 @@ namespace Drakken.Client.World
                 currentPosition.y + currentLiftOffsetY,
                 currentPosition.z);
         }
-        
+
         public void SetInteractionLocked(bool interactionLocked)
         {
             isInteractionLocked = interactionLocked;
