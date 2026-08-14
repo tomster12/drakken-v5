@@ -16,7 +16,7 @@ namespace Drakken.Client
         public ClientMatch Match { get; }
     }
 
-    public class GameClient : MonoBehaviour, IGameClient, IGameStateProvider
+    public class GameClient : MonoBehaviour, IGameClient
     {
         [Header("References")]
         [SerializeField] private AssetDatabase assets;

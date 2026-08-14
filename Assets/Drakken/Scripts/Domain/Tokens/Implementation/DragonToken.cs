@@ -190,7 +190,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay full physical animation
             var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, resolution.DiceTrace, sourcePlayerObjects, visualContext.Client, ct);
+                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
             await shrinkTokenTask;
 

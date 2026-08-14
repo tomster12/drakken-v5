@@ -2,11 +2,6 @@ using Unity.Netcode;
 
 namespace Drakken.Domain
 {
-    public interface IGameStateProvider
-    {
-        GameState GameState { get; }
-    }
-
     public class GameState : INetworkSerializable
     {
         public GameStateClient[] Clients { get; set; } = new GameStateClient[2] { new(), new() };

@@ -20,12 +20,16 @@ namespace Drakken.Client.World
     {
         public UnityEvent<DiceView> OnClicked = new();
 
+        private GameClient gameClient;
         public int InstanceId { get; private set; }
         // fallback for dice not tracked in GameState, e.g. preview dice
-        private DiceInstance detachedInstance;
+        private DiceInstance detachedDiceInstance;
+        // Use GameState dice instance whenever possible to prevent splitting
+        public DiceInstance DiceInstance =>
+            gameClient?.GameState?.GetDiceInstance(InstanceId)
+            ?? detachedDiceInstance;
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         private readonly List<(TextMeshPro Label, int FaceIndex)> faceLabels = new();
-        private IGameStateProvider gameStateProvider;
         public AnimationPlayer Animator { get; private set; } = new();
         private readonly AnimationPlayer settledFaceHighlightAnimator = new();
         private Outline outline;
@@ -36,8 +40,7 @@ namespace Drakken.Client.World
         public bool IsPickable { get; private set; } = false;
         private bool isInteractionLocked = false;
         public bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
-        // Use GameState dice instance whenever possible to prevent splitting
-        public DiceInstance DiceInstance => gameStateProvider?.GameState?.GetDiceInstance(InstanceId) ?? detachedInstance;
+        public bool IsSettled => settledFaceHighlightIndex.HasValue;
 
         private Color hoverOutlineColor = Color.white;
         private Color selectedOutlineColor = Colors.Hex("#a1e0ff");
@@ -49,32 +52,43 @@ namespace Drakken.Client.World
         private Color SettledFaceLabelColor = Colors.Hex("#c8bbb2");
         private int? settledFaceHighlightIndex;
 
+        private GameObject inspectLabelGo;
+        private TextMeshPro inspectLabelText;
+        private float inspectLabelRotationY;
+        private float currentInspectAlpha;
+        private readonly float InspectLabelRiseHeight = 1f;
+        private readonly float InspectLabelFontSize = 1.35f;
+        private readonly float InspectLabelFadeLerp = 18f;
+
         // ------------------------------ Binding
 
         public static DiceView Create(
-            AssetDatabase assets, DiceInstance instance, IGameStateProvider gameStateProvider = null, float scale = 1.0f)
+            AssetDatabase assets, DiceInstance instance, GameClient gameClient = null, float scale = 1.0f)
         {
             GameObject diceGo = new($"Dice View (D{instance.Sides})");
             var diceView = diceGo.AddComponent<DiceView>();
 
-            diceView.Bind(assets, instance, gameStateProvider, scale);
+            diceView.Bind(assets, instance, gameClient, scale);
 
             return diceView;
         }
 
-        private void Bind(AssetDatabase assets, DiceInstance instance, IGameStateProvider gameStateProvider, float scale = 1.0f)
+        private void Bind(AssetDatabase assets, DiceInstance instance, GameClient gameClient, float scale = 1.0f)
         {
             this.InstanceId = instance.InstanceId;
-            this.gameStateProvider = gameStateProvider;
+            this.gameClient = gameClient;
 
             // Keep track of this incase we need it
-            this.detachedInstance = instance;
+            this.detachedDiceInstance = instance;
 
             var diceMesh = DiceMeshFactory.Create(instance, assets.DiceMeshMaterial, scale);
             diceMesh.GameObject.transform.SetParent(transform, false);
             faces = diceMesh.Faces;
 
             CreateFaceLabels(assets, instance, diceMesh.Faces, scale);
+
+            inspectLabelRotationY = gameClient?.Match?.ClientIndex == 1 ? 180f : 0f;
+            CreateInspectLabel(assets);
 
             outline = gameObject.AddComponent<Outline>();
             outline.Setup();
@@ -166,6 +180,32 @@ namespace Drakken.Client.World
                 if (faceIndex < 0 || faceIndex >= dice.Faces.Count) continue;
                 label.text = dice.Faces[faceIndex].Value.ToString();
             }
+        }
+
+        private void CreateInspectLabel(AssetDatabase assets)
+        {
+            // TextMeshPro requires a RectTransform, so add it before touching the transform.
+            inspectLabelGo = new GameObject("Inspect Label");
+            inspectLabelText = inspectLabelGo.AddComponent<TextMeshPro>();
+
+            inspectLabelText.rectTransform.SetParent(transform, false);
+            inspectLabelText.alignment = TextAlignmentOptions.Center;
+            inspectLabelText.fontSize = InspectLabelFontSize;
+            inspectLabelText.alpha = 0f;
+
+            if (assets.DiceFaceLabelFont != null) inspectLabelText.font = assets.DiceFaceLabelFont;
+            if (assets.DiceFaceLabelMaterial != null) inspectLabelText.material = assets.DiceFaceLabelMaterial;
+
+            inspectLabelGo.SetActive(false);
+        }
+
+        private void RefreshInspectLabelText()
+        {
+            var dice = DiceInstance;
+            if (dice == null) return;
+
+            // Value reads bigger and whiter than the smaller, greyer sides suffix
+            inspectLabelText.text = $"<size=135%><color=#FFFFFF>{dice.Value}</color></size> <color=#9F8D81>d{dice.Sides}</color>";
         }
 
         // ------------------------------ Animation
@@ -280,7 +320,7 @@ namespace Drakken.Client.World
                     .Where(fl => fl.FaceIndex == settledFaceHighlightIndex.Value)
                     .Select(fl => fl.Label)
                     .ToList();
-                    
+
                 foreach (var label in labels)
                 {
                     label.color = FaceLabelColor;
@@ -326,6 +366,26 @@ namespace Drakken.Client.World
                     ? selectedOutlineColor
                     : isHighlighted ? currentHighlightOutlineColor : hoverOutlineColor;
             }
+
+            UpdateInspectLabel();
+        }
+
+        private void UpdateInspectLabel()
+        {
+            // Only offer the value/sides readout once the dice has settled on a result - hovering mid-roll wouldn't show anything meaningful
+            bool wantsVisible = IsHovered && IsSettled && !Animator.IsAnimating;
+            currentInspectAlpha = Mathf.Lerp(currentInspectAlpha, wantsVisible ? 1f : 0f, InspectLabelFadeLerp * Time.deltaTime);
+
+            bool shouldBeActive = wantsVisible || currentInspectAlpha > 0.01f;
+            if (inspectLabelGo.activeSelf != shouldBeActive) inspectLabelGo.SetActive(shouldBeActive);
+            if (!shouldBeActive) return;
+
+            if (wantsVisible) RefreshInspectLabelText();
+            inspectLabelText.alpha = currentInspectAlpha;
+
+            inspectLabelText.transform.SetPositionAndRotation(
+                transform.position + Vector3.up * InspectLabelRiseHeight,
+                Quaternion.Euler(45f, inspectLabelRotationY, 0f));
         }
 
         public void SetInteractionLocked(bool interactionLocked)

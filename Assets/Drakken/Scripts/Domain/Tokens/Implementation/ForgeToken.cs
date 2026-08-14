@@ -167,7 +167,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Physically fly the two source dice up beside each other, matching the server's simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, resolution.FlightTrace, sourcePlayerObjects, visualContext.Client, ct);
+                visualContext.Client.Assets, visualContext.Client, resolution.FlightTrace, sourcePlayerObjects, ct);
 
             var firstDiceView = sourcePlayerObjects.DiceViews[resolution.FirstInstanceId];
             var secondDiceView = sourcePlayerObjects.DiceViews[resolution.SecondInstanceId];
@@ -204,7 +204,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Physically spawn the forged dice at the merge point, let it hover, then drop it - matching the server
             var forgedDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, resolution.ForgeTrace, sourcePlayerObjects, visualContext.Client, ct);
+                visualContext.Client.Assets, visualContext.Client, resolution.ForgeTrace, sourcePlayerObjects, ct);
 
             sourcePlayerObjects.DiceViews[resolution.CombinedDiceInstance.InstanceId] = forgedDiceViews[resolution.CombinedDiceInstance.InstanceId];
 

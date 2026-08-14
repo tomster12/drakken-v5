@@ -159,7 +159,7 @@ namespace Drakken.Client.States
                 var sceneObjects = SceneObjects.Player(clientIndex);
 
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
-                    client.Assets, diceTraces.Player(clientIndex), sceneObjects, client, cts.Token));
+                    client.Assets, client, diceTraces.Player(clientIndex), sceneObjects, cts.Token));
             }
 
             // Get the final dice views out and update scene objects

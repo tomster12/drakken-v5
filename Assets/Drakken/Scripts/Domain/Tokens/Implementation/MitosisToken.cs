@@ -196,7 +196,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay simulation
             var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, resolution.DiceTrace, sourcePlayerObjects, visualContext.Client, ct);
+                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
             // All original IDs are replaced by new dice views
             foreach (var originalId in resolution.OriginalInstanceIds)

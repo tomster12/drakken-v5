@@ -15,10 +15,10 @@ namespace Drakken.Client.World
 
         public ScenePlayerObjects Player(int clientIndex) => clientIndex == 0 ? P1 : P2;
 
-        public void Init(SceneLayout sceneLayout, AssetDatabase assets, TokenRegistry tokenRegistry, IGameStateProvider gameStateProvider)
+        public void Init(SceneLayout sceneLayout, AssetDatabase assets, TokenRegistry tokenRegistry, GameClient gameClient)
         {
-            P1.Init(sceneLayout, assets, tokenRegistry, gameStateProvider, clientIndex: 0);
-            P2.Init(sceneLayout, assets, tokenRegistry, gameStateProvider, clientIndex: 1);
+            P1.Init(sceneLayout, assets, tokenRegistry, gameClient, clientIndex: 0);
+            P2.Init(sceneLayout, assets, tokenRegistry, gameClient, clientIndex: 1);
         }
 
         public void OnDisconnect()
@@ -37,7 +37,7 @@ namespace Drakken.Client.World
         private SceneLayout sceneLayout;
         private AssetDatabase assets;
         private TokenRegistry tokenRegistry;
-        private IGameStateProvider gameStateProvider;
+        private GameClient gameClient;
         private int clientIndex;
 
         private GamePlayerLayout GameLayout => sceneLayout.Game.Player(clientIndex);
@@ -46,12 +46,12 @@ namespace Drakken.Client.World
 
         public void Init(
             SceneLayout sceneLayout, AssetDatabase assets, TokenRegistry tokenRegistry,
-            IGameStateProvider gameStateProvider, int clientIndex)
+            GameClient gameClient, int clientIndex)
         {
             this.sceneLayout = sceneLayout;
             this.assets = assets;
             this.tokenRegistry = tokenRegistry;
-            this.gameStateProvider = gameStateProvider;
+            this.gameClient = gameClient;
             this.clientIndex = clientIndex;
         }
 
@@ -65,7 +65,7 @@ namespace Drakken.Client.World
 
         public DiceView SpawnDiceAt(DiceInstance instance, Vector3 position, Quaternion rotation)
         {
-            var diceView = DiceView.Create(assets, instance, gameStateProvider);
+            var diceView = DiceView.Create(assets, instance, gameClient);
             diceView.transform.SetPositionAndRotation(position, rotation);
             DiceViews[instance.InstanceId] = diceView;
             return diceView;

@@ -10,14 +10,14 @@ namespace Drakken.Domain.Dice
     public class DiceSimulationReplayer
     {
         public Task<Dictionary<int, DiceView>> Play(
-            AssetDatabase assets, DiceSimulationTraces trace, IGameStateProvider gameStateProvider, CancellationToken ct)
-            => Play(assets, trace, existingViews: null, gameStateProvider, ct);
+            AssetDatabase assets, GameClient gameClient, DiceSimulationTraces trace, CancellationToken ct)
+            => Play(assets, gameClient, trace, existingViews: null, ct);
 
         public async Task<Dictionary<int, DiceView>> Play(
             AssetDatabase assets,
+            GameClient gameClient,
             DiceSimulationTraces trace,
             ScenePlayerObjects existingViews,
-            IGameStateProvider gameStateProvider,
             CancellationToken ct)
         {
             var relevantTraces = trace.Dice.FindAll(diceTrace => diceTrace.PoseTraces.Count > 0);
@@ -40,13 +40,13 @@ namespace Drakken.Domain.Dice
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, gameStateProvider, trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
 
             if (!ct.IsCancellationRequested)
-                ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, gameStateProvider, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, maxTimeSeconds);
 
             // Once the whole roll has come to rest, reveal every dice's settled face together
             if (!ct.IsCancellationRequested)
@@ -65,11 +65,11 @@ namespace Drakken.Domain.Dice
 
         private void ApplyAtTime(
             AssetDatabase assets,
+            GameClient gameClient,
             List<DiceSessionTrace> traces,
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
             Dictionary<int, DiceView> resultViews,
-            IGameStateProvider gameStateProvider,
             float fixedTimestep,
             float elapsedSeconds)
         {
@@ -102,7 +102,7 @@ namespace Drakken.Domain.Dice
                 {
                     // Reuse existing view or create a new one
                     view = existingViews?.FindDiceView(instanceId);
-                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance, gameStateProvider);
+                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance, gameClient);
                     else view.ClearSettledFaceHighlight();
                     liveViews[instanceId] = view;
 
