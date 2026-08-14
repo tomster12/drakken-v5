@@ -81,7 +81,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class BolsterTokenAnimator : TokenAnimator<BolsterTokenResolution>
     {
-        private static readonly Color HighlightColor = new(1f, 0.82f, 0.3f);
+        private static readonly Color HighlightColor = Colors.Hex("#9cec92");
         private const float HighlightDuration = 0.9f;
         private const float LabelRiseHeight = 0.6f;
 
@@ -104,8 +104,7 @@ namespace Drakken.Domain.Tokens.Implementation
             for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
             {
                 int instanceId = resolution.BolsteredInstanceIds[i];
-
-                if (!sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView)) continue;
+                Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
 
                 // Bump the printed value shown on the dice's current face and flag it as
                 // picked, without moving the dice at all.

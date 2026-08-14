@@ -1638,6 +1638,7 @@ GameObject:
   - component: {fileID: 865993105}
   - component: {fileID: 865993107}
   - component: {fileID: 865993108}
+  - component: {fileID: 865993109}
   m_Layer: 0
   m_Name: Game Entrypoint
   m_TagString: Untagged
@@ -1705,6 +1706,7 @@ MonoBehaviour:
   assets: {fileID: 11400000, guid: 1cfafc4164265a844a555f0622fd6ea4, type: 2}
   camera: {fileID: 330585549}
   ui: {fileID: 865993108}
+  vfx: {fileID: 865993109}
 --- !u!114 &865993107
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1774,6 +1776,18 @@ MonoBehaviour:
   OpScoreText: {fileID: 886005657}
   AvatarVisibleColor: {r: 0.105882354, g: 0.105882354, b: 0.105882354, a: 1}
   AvatarReadyColor: {r: 0.34901962, g: 0.6313726, b: 0.39607844, a: 1}
+--- !u!114 &865993109
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 865993102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e0516524e3ad914eba077cb0f0a55bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Drakken.Client.ClientVfx
 --- !u!1 &886005655
 GameObject:
   m_ObjectHideFlags: 0

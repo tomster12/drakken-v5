@@ -36,13 +36,13 @@ namespace Drakken.Client.World
         [Header("Config")]
         [SerializeField] private float hoverLiftY = 0.15f;
         [SerializeField] private float selectedLiftY = 0.30f;
-        [SerializeField] private Color discardHoverOutlineColor = new(232, 171, 168); // #e8aba8
-        [SerializeField] private Color discardSelectedOutlineColor = new(158, 48, 43); // #9e302b
-        [SerializeField] private Color discardHoverSelectedOutlineColor = new(228, 69, 61); // #e4453d
-        [SerializeField] private Color playingHoverOutlineColor = new(212, 205, 203); // #d4cdcb
-        [SerializeField] private Color playingSelectedOutlineColor = new(236, 233, 232); // #ece9e8
-        [SerializeField] private Color playingHoverSelectedOutlineColor = new(252, 249, 248); // #fcf9f8
-        [SerializeField] private Color playingPrimedOutlineColor = new(161, 245, 124); // #a1f57c
+        [SerializeField] private Color discardHoverOutlineColor = Colors.Hex("#e8aba8");
+        [SerializeField] private Color discardSelectedOutlineColor = Colors.Hex("#9e302b");
+        [SerializeField] private Color discardHoverSelectedOutlineColor = Colors.Hex("#e4453d");
+        [SerializeField] private Color playingHoverOutlineColor = Colors.Hex("#d4cdcb");
+        [SerializeField] private Color playingSelectedOutlineColor = Colors.Hex("#ece9e8");
+        [SerializeField] private Color playingHoverSelectedOutlineColor = Colors.Hex("#fcf9f8");
+        [SerializeField] private Color playingPrimedOutlineColor = Colors.Hex("#a1f57c");
 
         [Header("Movement")]
         [SerializeField] private float moveLerp = 10f;

@@ -146,6 +146,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
     {
+        private static readonly Color HighlightColor = Colors.Hex("#f8827e");
+        private const float HighlightDuration = 0.9f;
         private const float D4OffsetDistance = 1.5f;
 
         protected override async Task Animate(
@@ -173,8 +175,18 @@ namespace Drakken.Domain.Tokens.Implementation
             // Immediately shrink token out of the way after the roll
             var shrinkTokenTask = visualContext.TokenView.AnimateShrink(0f, ct);
 
+            // Highlight each of the dice views
+            List<Task> flashTasks = new();
+            foreach (var instanceId in resolution.ReplacedInstanceIds)
+            {
+                Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
+                flashTasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
+            }
+
             await Task.Delay(500);
             await d4View.AnimateShrinkAndDestroy(ct);
+
+            await Task.WhenAll(flashTasks);
 
             // Replay full physical animation
             var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(

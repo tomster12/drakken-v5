@@ -19,21 +19,21 @@ namespace Drakken.Client.World
     {
         public UnityEvent<DiceView> OnClicked = new();
 
-
         private Outline outline;
         private Color hoverOutlineColor = Color.white;
-        private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
-        private Color highlightOutlineColor = Color.white;
+        private Color selectedOutlineColor = Colors.Hex("#a1e0ff");
+        private Color currentHighlightOutlineColor = Color.white;
         private bool isHighlighted = false;
-        private float FaceLabelFontSize = 2.5f;
-        private float FaceLabelSurfaceOffset = 0.01f;
+        private readonly float FaceLabelFontSize = 2.5f;
+        private readonly float FaceLabelSurfaceOffset = 0.01f;
         private Vector2 FaceLabelSize = new(1.0f, 1.0f);
-        private Color FaceLabelColor = new(159, 141, 129); // rgb(159, 141, 129)
+        private Color FaceLabelColor = Colors.Hex("#9f8d81");
 
         private IGameStateProvider gameStateProvider;
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
         private readonly List<(TextMeshPro Label, int FaceIndex)> faceLabels = new();
-        private DiceInstance detachedInstance; // fallback for dice not tracked in GameState, e.g. preview dice
+        // fallback for dice not tracked in GameState, e.g. preview dice
+        private DiceInstance detachedInstance;
         public int InstanceId { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
         public bool IsHovered { get; private set; } = false;
@@ -109,22 +109,6 @@ namespace Drakken.Client.World
             }
         }
 
-        private static float GetFaceLabelScaleMultiplier(int sides)
-        {
-            // For bypyramids we have to shrink the labels to fit on the triangles
-            bool isBipyramid =
-                sides >= 10 &&
-                sides != 12 &&
-                sides != 20;
-
-            if (!isBipyramid) return 1f;
-
-            if (sides >= 20) return 0.4f;
-            if (sides >= 14) return 0.5f;
-            if (sides >= 10) return 0.6f;
-            return 0.7f;
-        }
-
         private TextMeshPro CreateFaceLabel(
             AssetDatabase assets,
             int value,
@@ -149,6 +133,22 @@ namespace Drakken.Client.World
             if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
 
             return label;
+        }
+
+        private static float GetFaceLabelScaleMultiplier(int sides)
+        {
+            // For bypyramids we have to shrink the labels to fit on the triangles
+            bool isBipyramid =
+                sides >= 10 &&
+                sides != 12 &&
+                sides != 20;
+
+            if (!isBipyramid) return 1f;
+
+            if (sides >= 20) return 0.4f;
+            if (sides >= 14) return 0.5f;
+            if (sides >= 10) return 0.6f;
+            return 0.7f;
         }
 
         public void RefreshFaceLabels()
@@ -250,7 +250,7 @@ namespace Drakken.Client.World
 
         public async Task FlashHighlight(Color color, float durationSeconds, CancellationToken ct)
         {
-            highlightOutlineColor = color;
+            currentHighlightOutlineColor = color;
             isHighlighted = true;
 
             try
@@ -275,7 +275,7 @@ namespace Drakken.Client.World
             {
                 outline.OutlineColor = IsSelected
                     ? selectedOutlineColor
-                    : isHighlighted ? highlightOutlineColor : hoverOutlineColor;
+                    : isHighlighted ? currentHighlightOutlineColor : hoverOutlineColor;
             }
         }
 
