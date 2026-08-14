@@ -23,6 +23,8 @@ namespace Drakken.Client.World
         private Outline outline;
         private Color hoverOutlineColor = Color.white;
         private Color selectedOutlineColor = new(0.63f, 0.88f, 1f);
+        private Color highlightOutlineColor = Color.white;
+        private bool isHighlighted = false;
         private float FaceLabelFontSize = 2.5f;
         private float FaceLabelSurfaceOffset = 0.01f;
         private Vector2 FaceLabelSize = new(1.0f, 1.0f);
@@ -30,6 +32,7 @@ namespace Drakken.Client.World
 
         private IGameStateProvider gameStateProvider;
         private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
+        private readonly List<(TextMeshPro Label, int FaceIndex)> faceLabels = new();
         private DiceInstance detachedInstance; // fallback for dice not tracked in GameState, e.g. preview dice
         public int InstanceId { get; private set; }
         public AnimationPlayer Animator { get; private set; } = new();
@@ -87,23 +90,42 @@ namespace Drakken.Client.World
                 {
                     foreach (DiceMeshFactory.DiceLabelSpot spot in pose.LabelSpots)
                     {
-                        CreateFaceLabel(
+                        var label = CreateFaceLabel(
                             assets, dice.Faces[spot.ValueFaceIndex].Value,
                             spot.Position + pose.Direction * FaceLabelSurfaceOffset, spot.Rotation,
                             // Use a smaller scale when we have multiple label spots
                             scale * 0.6f);
+                        faceLabels.Add((label, spot.ValueFaceIndex));
                     }
                 }
                 else
                 {
-                    CreateFaceLabel(
+                    var label = CreateFaceLabel(
                         assets, dice.Faces[i].Value,
-                        pose.Position + pose.Direction * FaceLabelSurfaceOffset, pose.LabelRotation, scale);
+                        pose.Position + pose.Direction * FaceLabelSurfaceOffset, pose.LabelRotation,
+                        scale * GetFaceLabelScaleMultiplier(dice.Sides));
+                    faceLabels.Add((label, i));
                 }
             }
         }
 
-        private void CreateFaceLabel(
+        private static float GetFaceLabelScaleMultiplier(int sides)
+        {
+            // For bypyramids we have to shrink the labels to fit on the triangles
+            bool isBipyramid =
+                sides >= 10 &&
+                sides != 12 &&
+                sides != 20;
+
+            if (!isBipyramid) return 1f;
+
+            if (sides >= 20) return 0.4f;
+            if (sides >= 14) return 0.5f;
+            if (sides >= 10) return 0.6f;
+            return 0.7f;
+        }
+
+        private TextMeshPro CreateFaceLabel(
             AssetDatabase assets,
             int value,
             Vector3 localPosition,
@@ -125,6 +147,20 @@ namespace Drakken.Client.World
 
             if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
             if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
+
+            return label;
+        }
+
+        public void RefreshFaceLabels()
+        {
+            var dice = DiceInstance;
+            if (dice == null) return;
+
+            foreach (var (label, faceIndex) in faceLabels)
+            {
+                if (faceIndex < 0 || faceIndex >= dice.Faces.Count) continue;
+                label.text = dice.Faces[faceIndex].Value.ToString();
+            }
         }
 
         // ------------------------------ Animation
@@ -182,7 +218,7 @@ namespace Drakken.Client.World
         public async Task AnimateRoll(CancellationToken ct, float durationMultiplier = 1f, Vector3? targetDirection = null)
         {
             // Start and end at targetRotation, with value facing towards targetDirection
-            Quaternion targetRotation = DiceMeshFactory.GetRotationForValue(faces, DiceInstance.Value, targetDirection);
+            Quaternion targetRotation = DiceMeshFactory.GetRotationForSide(faces, DiceInstance.CurrentSide, targetDirection);
             Quaternion startRotation = targetRotation;
             transform.rotation = startRotation;
 
@@ -212,14 +248,35 @@ namespace Drakken.Client.World
             GameObject.Destroy(gameObject);
         }
 
+        public async Task FlashHighlight(Color color, float durationSeconds, CancellationToken ct)
+        {
+            highlightOutlineColor = color;
+            isHighlighted = true;
+
+            try
+            {
+                await Task.Delay((int)(durationSeconds * 1000f), ct);
+            }
+            catch (TaskCanceledException) { }
+            finally
+            {
+                isHighlighted = false;
+            }
+        }
+
         // ------------------------------ Interaction
 
         private void Update()
         {
-            // Enable / disable outline, preferring the selected color over the hover color
-            bool showOutline = IsSelected || (IsHovered && IsInteractable);
+            // Enable / disable outline, preferring the selected color, then highlight, then hover
+            bool showOutline = IsSelected || isHighlighted || (IsHovered && IsInteractable);
             outline.SetEnabled(showOutline);
-            if (showOutline) outline.OutlineColor = IsSelected ? selectedOutlineColor : hoverOutlineColor;
+            if (showOutline)
+            {
+                outline.OutlineColor = IsSelected
+                    ? selectedOutlineColor
+                    : isHighlighted ? highlightOutlineColor : hoverOutlineColor;
+            }
         }
 
         public void SetInteractionLocked(bool interactionLocked)

@@ -95,17 +95,17 @@ namespace Drakken.Domain.Tokens.Implementation
                 {
                     if (!pendingInstanceIds.Remove(settledId)) continue;
 
-                    int value = diceWorld.PeekDiceValue(settledId);
+                    int side = diceWorld.PeekDiceSide(settledId);
                     int sides = liveInstances[settledId].Sides;
 
                     // Check if it is a "high roll" e.g. top 1/3rd
                     int topThirdCount = Mathf.Max(1, Mathf.RoundToInt(sides / 3f));
-                    bool isHighRoll = value > sides - topThirdCount;
+                    bool isHighRoll = (side + 1) > sides - topThirdCount;
 
                     // Settled without splitting, lock in its final value and leave it alive
                     if (!isHighRoll || totalDiceCount + 2 > MaxTotalDice)
                     {
-                        liveInstances[settledId].Value = value;
+                        liveInstances[settledId].CurrentSide = side;
                         continue;
                     }
 

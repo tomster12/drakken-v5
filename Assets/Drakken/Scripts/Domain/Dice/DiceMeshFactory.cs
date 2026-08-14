@@ -273,15 +273,15 @@ namespace Drakken.Domain.Dice
 
         // ------------------------------ Utility
 
-        public static Quaternion GetRotationForValue(IReadOnlyList<DiceFacePose> faces, int value, Vector3? targetDirection = null)
+        public static Quaternion GetRotationForSide(IReadOnlyList<DiceFacePose> faces, int side, Vector3? targetDirection = null)
         {
             // Calculate rotation to put the UpDetectionDirection along TargetDirection
             Vector3 target = (targetDirection ?? Vector3.up).normalized;
-            Vector3 source = faces[value - 1].UpDetectionDirection;
+            Vector3 source = faces[side].UpDetectionDirection;
             return Quaternion.FromToRotation(source, target);
         }
 
-        public static int GetUpFaceValue(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
+        public static int GetFaceUpSide(Transform dieTransform, IReadOnlyList<DiceFacePose> faces)
         {
             // which which of the faces is most pointing upwards
             int bestFaceIndex = 0;
@@ -297,7 +297,7 @@ namespace Drakken.Domain.Dice
                 }
             }
 
-            return bestFaceIndex + 1;
+            return bestFaceIndex;
         }
 
         private static Quaternion GetFaceLabelRotation(Vector3 direction)
@@ -342,6 +342,7 @@ namespace Drakken.Domain.Dice
                 if (Vector3.Dot(normal, centroid) < 0f)
                 {
                     (b, c) = (c, b);
+                    normal = -normal;
                     if (cornerValueIndices.HasValue)
                     {
                         var v = cornerValueIndices.Value;
@@ -358,8 +359,6 @@ namespace Drakken.Domain.Dice
                 triangles.Add(startIndex + 1);
                 triangles.Add(startIndex + 2);
 
-                Vector3 direction = centroid.normalized;
-
                 List<DiceLabelSpot> labelSpots = null;
 
                 // If we were told to have seperate values per corner then setup labels
@@ -369,13 +368,13 @@ namespace Drakken.Domain.Dice
                     const float cornerLerp = 0.55f;
                     labelSpots = new List<DiceLabelSpot>
                     {
-                        new(Vector3.Lerp(a, centroid, cornerLerp), GetCornerLabelRotation(direction, a - centroid), v.a),
-                        new(Vector3.Lerp(b, centroid, cornerLerp), GetCornerLabelRotation(direction, b - centroid), v.b),
-                        new(Vector3.Lerp(c, centroid, cornerLerp), GetCornerLabelRotation(direction, c - centroid), v.c)
+                        new(Vector3.Lerp(a, centroid, cornerLerp), GetCornerLabelRotation(normal, a - centroid), v.a),
+                        new(Vector3.Lerp(b, centroid, cornerLerp), GetCornerLabelRotation(normal, b - centroid), v.b),
+                        new(Vector3.Lerp(c, centroid, cornerLerp), GetCornerLabelRotation(normal, c - centroid), v.c)
                     };
                 }
 
-                faces.Add(new DiceFacePose(direction, centroid, GetFaceLabelRotation(direction), upDetectionDirection, labelSpots));
+                faces.Add(new DiceFacePose(normal, centroid, GetFaceLabelRotation(normal), upDetectionDirection, labelSpots));
             }
 
             public void AddFace(Vector3[] verts, Vector3? upDetectionDirection = null)

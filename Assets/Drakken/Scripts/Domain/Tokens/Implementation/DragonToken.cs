@@ -17,7 +17,7 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class DragonTokenResolution : TokenResolution
     {
-        public int D4Roll;
+        public int ReplaceCount;
         public List<int> ReplacedInstanceIds = new();
         public List<DiceInstance> AddedDiceInstances = new();
         public DiceSimulationTraces DiceTrace = new();
@@ -25,7 +25,7 @@ namespace Drakken.Domain.Tokens.Implementation
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeValue(ref D4Roll);
+            serializer.SerializeValue(ref ReplaceCount);
             serializer.SerializeList(ref ReplacedInstanceIds);
             serializer.SerializeList(ref AddedDiceInstances);
             serializer.SerializeValue(ref DiceTrace);
@@ -49,7 +49,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var client = gameState.Clients[sourceClientIndex];
 
             // Roll a D4 to determine how many dice to replace
-            int replaceCount = Random.Range(1, 5);
+            int replaceCount = Random.Range(1, Mathf.Min(5, client.Dice.Count + 1));
             replaceCount = Mathf.Min(replaceCount, client.Dice.Count);
 
             // Select random dice to replace
@@ -121,7 +121,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             return new DragonTokenResolution
             {
-                D4Roll = replaceCount,
+                ReplaceCount = replaceCount,
                 ReplacedInstanceIds = replacedInstanceIds,
                 AddedDiceInstances = addedDice,
                 DiceTrace = trace,
@@ -131,7 +131,7 @@ namespace Drakken.Domain.Tokens.Implementation
         protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
         {
             Assert.True(resolution.ReplacedInstanceIds.Count == resolution.AddedDiceInstances.Count);
-            Assert.True(resolution.D4Roll == resolution.AddedDiceInstances.Count);
+            Assert.True(resolution.ReplaceCount == resolution.AddedDiceInstances.Count);
 
             var client = gameState.Clients[sourceClientIndex];
 
@@ -161,7 +161,7 @@ namespace Drakken.Domain.Tokens.Implementation
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
             // Spawn a D4 next to the token showing how many dice it's about to replace
-            var d4Instance = DiceInstance.Create(sides: 4, value: resolution.D4Roll);
+            var d4Instance = DiceInstance.Create(sides: 4, currentSide: resolution.ReplaceCount - 1);
             var d4View = DiceView.Create(visualContext.Client.Assets, d4Instance, scale: 1.2f);
 
             var token = visualContext.TokenView.transform;

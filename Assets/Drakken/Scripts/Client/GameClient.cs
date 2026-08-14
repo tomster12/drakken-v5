@@ -22,6 +22,7 @@ namespace Drakken.Client
         [SerializeField] private AssetDatabase assets;
         [SerializeField] private new CameraController camera;
         [SerializeField] private ClientUI ui;
+        [SerializeField] private ClientVfx vfx;
 
         public ClientMatch Match { get; private set; }
         public SceneObjects SceneObjects { get; private set; } = new();
@@ -31,6 +32,7 @@ namespace Drakken.Client
         public AssetDatabase Assets => assets;
         public CameraController Camera => camera;
         public ClientUI UI => ui;
+        public ClientVfx Vfx => vfx;
 
         private GameEntrypoint entrypoint;
         private readonly TitleClientState titleState = new();
@@ -53,6 +55,7 @@ namespace Drakken.Client
             // Initialize states and components
             SceneObjects.Init(SceneLayout, assets, entrypoint.TokenRegistry, this);
             ui.Init(this);
+            vfx.Init(this);
             titleState.Init(this);
             draftingState.Init(this);
             playingState.Init(this);

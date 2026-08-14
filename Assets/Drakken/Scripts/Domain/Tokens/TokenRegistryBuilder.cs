@@ -32,7 +32,7 @@ namespace Drakken.Domain.Tokens
                     DisplayName = "Dragon",
                     Description = "Roll a D4, replace that many dice randomly with new D8s.",
                     Rarity = TokenRarity.Rare,
-                    Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos }
+                    Categories = new[] { TokenCategory.Transformation }
                 },
                 new DragonTokenExecutor(),
                 typeof(EmptyTokenIntent),
@@ -77,6 +77,26 @@ namespace Drakken.Domain.Tokens
                 typeof(MitosisTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
                     new MitosisTokenAnimator(),
+                    new EmptyTokenIntentPicker(),
+                    // Re-use assets for now
+                    prefabFactory?.Invoke("forge")
+                )
+            );
+
+            registry.Register(
+                new TokenDefinition
+                {
+                    TokenId = "bolster",
+                    DisplayName = "Bolster",
+                    Description = "Give 3 random dices current faces +1.",
+                    Rarity = TokenRarity.Common,
+                    Categories = new[] { TokenCategory.DiceGrowth }
+                },
+                new BolsterTokenExecutor(),
+                typeof(EmptyTokenIntent),
+                typeof(BolsterTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new BolsterTokenAnimator(),
                     new EmptyTokenIntentPicker(),
                     // Re-use assets for now
                     prefabFactory?.Invoke("forge")

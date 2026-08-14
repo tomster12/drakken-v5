@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Drakken.Domain.Dice
 {
-    // Result of a Simulate() call: what happened during the ticks it ran, and why it stopped.
     public readonly struct SimulationResult
     {
         public readonly List<int> SettledInstanceIds;
@@ -202,22 +200,18 @@ namespace Drakken.Domain.Dice
         {
             Assert.True(isInSession, "Cannot remove dice outside of a session");
 
+            // Remove body from simulation
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
             diceBodiesByInstanceId.Remove(diceInstanceId);
 
-            // Build the trace for the dice before removing
+            // Add a "removed trace" for this dice with correct removeTick
             sessionRemovedTraces.Add(BuildSessionTrace(diceBody, removeTick: currentTick));
 
-            // Destroy() is deferred to the end of the Unity frame, but a session can run many physics ticks
-            // synchronously in one call (e.g. spawning a replacement at this exact spot straight after removing
-            // this one) - disable the collider immediately so it can't overlap anything before the GameObject
-            // actually goes away.
-            foreach (var diceCollider in diceBody.Rigidbody.GetComponentsInChildren<Collider>())
-            {
-                diceCollider.enabled = false;
-            }
-
+            // Disable colliders as well because Destroy() is deferred until end of tick
             GameObject.Destroy(diceBody.Rigidbody.gameObject);
+
+            foreach (var diceCollider in diceBody.Rigidbody.GetComponentsInChildren<Collider>())
+                diceCollider.enabled = false;
         }
 
         public void FreezeAllDice()
@@ -229,7 +223,7 @@ namespace Drakken.Domain.Dice
             {
                 if (body.Rigidbody.isKinematic) continue;
 
-                body.Instance.Value = PeekDiceValue(body.Instance.InstanceId);
+                body.Instance.CurrentSide = PeekDiceSide(body.Instance.InstanceId);
                 body.RecordPose(currentTick);
                 body.Rigidbody.isKinematic = true;
             }
@@ -383,10 +377,10 @@ namespace Drakken.Domain.Dice
             return (settled, completedDrives);
         }
 
-        public int PeekDiceValue(int diceInstanceId)
+        public int PeekDiceSide(int diceInstanceId)
         {
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
-            return DiceMeshFactory.GetUpFaceValue(diceBody.Rigidbody.transform, diceBody.MeshFaces);
+            return DiceMeshFactory.GetFaceUpSide(diceBody.Rigidbody.transform, diceBody.MeshFaces);
         }
 
         public (Vector3 Position, Quaternion Rotation) GetDicePose(int diceInstanceId)
