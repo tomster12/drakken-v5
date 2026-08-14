@@ -9,6 +9,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using System.Linq;
 
 namespace Drakken.Client.World
 {
@@ -19,23 +20,17 @@ namespace Drakken.Client.World
     {
         public UnityEvent<DiceView> OnClicked = new();
 
-        private Outline outline;
-        private Color hoverOutlineColor = Color.white;
-        private Color selectedOutlineColor = Colors.Hex("#a1e0ff");
-        private Color currentHighlightOutlineColor = Color.white;
-        private bool isHighlighted = false;
-        private readonly float FaceLabelFontSize = 2.5f;
-        private readonly float FaceLabelSurfaceOffset = 0.01f;
-        private Vector2 FaceLabelSize = new(1.0f, 1.0f);
-        private Color FaceLabelColor = Colors.Hex("#9f8d81");
-
-        private IGameStateProvider gameStateProvider;
-        private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
-        private readonly List<(TextMeshPro Label, int FaceIndex)> faceLabels = new();
+        public int InstanceId { get; private set; }
         // fallback for dice not tracked in GameState, e.g. preview dice
         private DiceInstance detachedInstance;
-        public int InstanceId { get; private set; }
+        private IReadOnlyList<DiceMeshFactory.DiceFacePose> faces;
+        private readonly List<(TextMeshPro Label, int FaceIndex)> faceLabels = new();
+        private IGameStateProvider gameStateProvider;
         public AnimationPlayer Animator { get; private set; } = new();
+        private readonly AnimationPlayer settledFaceHighlightAnimator = new();
+        private Outline outline;
+
+        private bool isHighlighted = false;
         public bool IsHovered { get; private set; } = false;
         public bool IsSelected { get; private set; } = false;
         public bool IsPickable { get; private set; } = false;
@@ -43,6 +38,16 @@ namespace Drakken.Client.World
         public bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
         // Use GameState dice instance whenever possible to prevent splitting
         public DiceInstance DiceInstance => gameStateProvider?.GameState?.GetDiceInstance(InstanceId) ?? detachedInstance;
+
+        private Color hoverOutlineColor = Color.white;
+        private Color selectedOutlineColor = Colors.Hex("#a1e0ff");
+        private Color currentHighlightOutlineColor = Color.white;
+        private readonly float FaceLabelFontSize = 2.5f;
+        private readonly float FaceLabelSurfaceOffset = 0.01f;
+        private Vector2 FaceLabelSize = new(1.0f, 1.0f);
+        private Color FaceLabelColor = Colors.Hex("#9f8d81");
+        private Color SettledFaceLabelColor = Colors.Hex("#c8bbb2");
+        private int? settledFaceHighlightIndex;
 
         // ------------------------------ Binding
 
@@ -264,12 +269,56 @@ namespace Drakken.Client.World
             }
         }
 
+        public void ClearSettledFaceHighlight()
+        {
+            // Instantly clears any settled face highlight animation
+            settledFaceHighlightAnimator.Stop();
+
+            if (settledFaceHighlightIndex.HasValue)
+            {
+                List<TextMeshPro> labels = faceLabels
+                    .Where(fl => fl.FaceIndex == settledFaceHighlightIndex.Value)
+                    .Select(fl => fl.Label)
+                    .ToList();
+                    
+                foreach (var label in labels)
+                {
+                    label.color = FaceLabelColor;
+                }
+            }
+
+            settledFaceHighlightIndex = null;
+        }
+
+        public async Task PlaySettledFaceHighlight(int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
+        {
+            // Lerps the labels for the given face index to the highlight colour
+            settledFaceHighlightIndex = faceIndex;
+
+            List<TextMeshPro> labels = faceLabels
+                .Where(fl => fl.FaceIndex == faceIndex)
+                .Select(fl => fl.Label)
+                .ToList();
+
+            if (labels.Count == 0) return;
+
+            await settledFaceHighlightAnimator.Play(
+                AnimationSequenceBuilder.Start()
+                .Next(new AnimationTrack<Color>(
+                    durationSeconds,
+                    t => Color.Lerp(FaceLabelColor, SettledFaceLabelColor, t),
+                    color => { foreach (var label in labels) label.color = color; }))
+                .Build(), ct);
+        }
+
         // ------------------------------ Interaction
 
         private void Update()
         {
             // Enable / disable outline, preferring the selected color, then highlight, then hover
-            bool showOutline = IsSelected || isHighlighted || (IsHovered && IsInteractable);
+            // Hovering to inspect a dice is allowed even while interaction is locked (e.g. mid-turn)
+            // Only suppress it while the dice is actively animating, since it isn't meaningfully inspectable then
+            bool showOutline = IsSelected || isHighlighted || (IsHovered && !Animator.IsAnimating);
             outline.SetEnabled(showOutline);
             if (showOutline)
             {

@@ -48,6 +48,18 @@ namespace Drakken.Domain.Dice
             if (!ct.IsCancellationRequested)
                 ApplyAtTime(assets, relevantTraces, existingViews, liveViews, resultViews, gameStateProvider, trace.FixedTimestep, maxTimeSeconds);
 
+            // Once the whole roll has come to rest, reveal every dice's settled face together
+            if (!ct.IsCancellationRequested)
+            {
+                foreach (var diceTrace in relevantTraces)
+                {
+                    if (resultViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
+                    {
+                        _ = view.PlaySettledFaceHighlight(diceTrace.Instance.CurrentSide, ct);
+                    }
+                }
+            }
+
             return resultViews;
         }
 
@@ -91,6 +103,7 @@ namespace Drakken.Domain.Dice
                     // Reuse existing view or create a new one
                     view = existingViews?.FindDiceView(instanceId);
                     if (view == null) view = DiceView.Create(assets, diceTrace.Instance, gameStateProvider);
+                    else view.ClearSettledFaceHighlight();
                     liveViews[instanceId] = view;
 
                     // We can only guaranteed add this dice to the result if it is not removed
