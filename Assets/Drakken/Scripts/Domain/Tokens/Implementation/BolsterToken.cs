@@ -115,7 +115,7 @@ namespace Drakken.Domain.Tokens.Implementation
                     "+1",
                     HighlightColor,
                     diceView.transform.position + Vector3.up * LabelRiseHeight,
-                    Quaternion.Euler(90f, 0f, 0f),
+                    Quaternion.Euler(45f, visualContext.Client.Match.ClientIndex == 1 ? 180f : 0f, 0f),
                     ct));
             }
 

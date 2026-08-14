@@ -8,20 +8,6 @@ using UnityEngine.SceneManagement;
 
 namespace Drakken.Domain.Dice
 {
-    public readonly struct SimulationResult
-    {
-        public readonly List<int> SettledInstanceIds;
-        public readonly List<string> CompletedDriveIds;
-        public readonly bool TimedOut;
-
-        public SimulationResult(List<int> settledInstanceIds, List<string> completedDriveIds, bool timedOut)
-        {
-            SettledInstanceIds = settledInstanceIds;
-            CompletedDriveIds = completedDriveIds;
-            TimedOut = timedOut;
-        }
-    }
-
     public class DiceSimulationWorld
     {
         private const float fixedTimestep = 1f / 30f;
@@ -279,21 +265,21 @@ namespace Drakken.Domain.Dice
             // Step tick by tick until we hit a stopping condition
             for (int i = 0; i < tickTimeout; i++)
             {
-                var (settledThisTick, completedDrivesThisTick) = StepSimulation();
+                var stepResult = Step();
 
-                settledThisCall.AddRange(settledThisTick);
-                completedDrivesThisCall.AddRange(completedDrivesThisTick);
+                settledThisCall.AddRange(stepResult.SettledInstanceIds);
+                completedDrivesThisCall.AddRange(stepResult.CompletedDriveIds);
 
                 if (untilAllSettled && AllDynamicSettled)
                     return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
-                if (untilAnySettled && settledThisTick.Count > 0)
+                if (untilAnySettled && stepResult.SettledInstanceIds.Count > 0)
                     return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
                 if (stopTick.HasValue && currentTick >= stopTick.Value)
                     return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
 
-                if (driveIdsToWaitFor != null && completedDrivesThisTick.Any(driveIdsToWaitFor.Contains))
+                if (driveIdsToWaitFor != null && stepResult.CompletedDriveIds.Any(driveIdsToWaitFor.Contains))
                     return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: false);
             }
 
@@ -302,7 +288,7 @@ namespace Drakken.Domain.Dice
             return new SimulationResult(settledThisCall, completedDrivesThisCall, timedOut: true);
         }
 
-        private (List<int> SettledInstanceIds, List<string> CompletedDriveIds) StepSimulation()
+        private StepResult Step()
         {
             List<string> completedDrives = new();
             HashSet<int> drivenInstanceIds = null;
@@ -374,7 +360,7 @@ namespace Drakken.Domain.Dice
                 }
             }
 
-            return (settled, completedDrives);
+            return new(settled, completedDrives);
         }
 
         public int PeekDiceSide(int diceInstanceId)
@@ -390,6 +376,32 @@ namespace Drakken.Domain.Dice
         }
 
         // ------------------------------ Data
+
+        public readonly struct SimulationResult
+        {
+            public readonly List<int> SettledInstanceIds;
+            public readonly List<string> CompletedDriveIds;
+            public readonly bool TimedOut;
+
+            public SimulationResult(List<int> settledInstanceIds, List<string> completedDriveIds, bool timedOut)
+            {
+                SettledInstanceIds = settledInstanceIds;
+                CompletedDriveIds = completedDriveIds;
+                TimedOut = timedOut;
+            }
+        }
+
+        public readonly struct StepResult
+        {
+            public readonly List<int> SettledInstanceIds;
+            public readonly List<string> CompletedDriveIds;
+
+            public StepResult(List<int> settledInstanceIds, List<string> completedDriveIds)
+            {
+                SettledInstanceIds = settledInstanceIds;
+                CompletedDriveIds = completedDriveIds;
+            }
+        }
 
         private class KinematicDrive
         {

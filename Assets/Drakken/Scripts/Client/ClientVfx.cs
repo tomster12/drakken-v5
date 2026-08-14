@@ -5,9 +5,6 @@ using UnityEngine;
 
 namespace Drakken.Client
 {
-    // Home for simple, hardcoded VFX that tokens can trigger as part of their animations,
-    // e.g. Bolster's "+1" popup. Add new effects here as methods, alongside whatever
-    // prefab/asset references they need, rather than scattering ad-hoc VFX code per-token.
     public class ClientVfx : MonoBehaviour
     {
         private GameClient client;

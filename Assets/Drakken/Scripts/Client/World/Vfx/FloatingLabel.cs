@@ -20,26 +20,29 @@ namespace Drakken.Client.World.Vfx
             float riseDistance = 0.4f,
             float fontSize = 3f)
         {
-            GameObject labelGo = new($"Floating Label ({text})");
-            var label = labelGo.AddComponent<TextMeshPro>();
-
-            label.rectTransform.SetPositionAndRotation(worldPosition, rotation);
-            label.text = text;
-            label.alignment = TextAlignmentOptions.Center;
-            label.fontSize = fontSize;
-            label.color = color;
-
-            if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
-            if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
-
-            Vector3 startPosition = worldPosition;
-            Vector3 endPosition = worldPosition + Vector3.up * riseDistance;
-
-            var player = new AnimationPlayer();
-
+            GameObject labelGo = null;
+            
             try
             {
-                // Move upwards and fade alpha over time
+                // Create a new label GO with the correct text
+                labelGo = new($"Floating Label ({text})");
+                var label = labelGo.AddComponent<TextMeshPro>();
+
+                label.rectTransform.SetPositionAndRotation(worldPosition, rotation);
+                label.text = text;
+                label.alignment = TextAlignmentOptions.Center;
+                label.fontSize = fontSize;
+                label.color = color;
+
+                if (assets.DiceFaceLabelFont != null) label.font = assets.DiceFaceLabelFont;
+                if (assets.DiceFaceLabelMaterial != null) label.material = assets.DiceFaceLabelMaterial;
+
+                Vector3 startPosition = worldPosition;
+                Vector3 endPosition = worldPosition + Vector3.up * riseDistance;
+
+                // Animate moving upwards and fade alpha over time
+                var player = new AnimationPlayer();
+
                 await player.Play(AnimationSequenceBuilder.Start()
                     .Next(
                         AnimationTracks.PositionFunc(
@@ -59,7 +62,11 @@ namespace Drakken.Client.World.Vfx
             }
             finally
             {
-                if (labelGo != null) GameObject.Destroy(labelGo);
+                // Always ensure the label GO is destroyed at the end
+                if (labelGo != null)
+                {
+                    GameObject.Destroy(labelGo);
+                }
             }
         }
     }
