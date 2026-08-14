@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
+using Drakken.Common.Utility;
 using Drakken.Domain.Dice;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
@@ -14,20 +15,20 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class MitosisTokenResolution : TokenResolution
     {
-        public List<int> OriginalInstanceIds = new();
+        public int OriginalInstanceId;
         public List<DiceInstance> FinalDiceInstances = new();
         public DiceSimulationTraces DiceTrace = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeList(ref OriginalInstanceIds);
+            serializer.SerializeValue(ref OriginalInstanceId);
             serializer.SerializeList(ref FinalDiceInstances);
             serializer.SerializeValue(ref DiceTrace);
         }
     }
 
-    public class MitosisTokenExecutor : TokenExecutor<EmptyTokenIntent, MitosisTokenResolution>
+    public class MitosisTokenExecutor : TokenExecutor<PickDiceTokenIntent, MitosisTokenResolution>
     {
         private const int MinSides = 4;
 
@@ -51,13 +52,17 @@ namespace Drakken.Domain.Tokens.Implementation
 
         protected override MitosisTokenResolution Execute(
             GameState gameState,
-            EmptyTokenIntent intent,
+            PickDiceTokenIntent intent,
             int sourceClientIndex,
             DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            var originalInstanceIds = client.Dice.ConvertAll(d => d.InstanceId);
+            Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 1);
+            int originalInstanceId = intent.TargetDiceInstanceIds[0];
+            var targetDice = client.Dice.Find(d => d.InstanceId == originalInstanceId);
+            Assert.NotNull(targetDice);
+
             var liveInstances = new Dictionary<int, DiceInstance>();
             var pendingInstanceIds = new HashSet<int>();
 
@@ -65,19 +70,17 @@ namespace Drakken.Domain.Tokens.Implementation
 
             int totalDiceCount = client.Dice.Count;
 
-            foreach (var dice in client.Dice)
-            {
-                liveInstances[dice.InstanceId] = dice;
-                pendingInstanceIds.Add(dice.InstanceId);
+            liveInstances[targetDice.InstanceId] = targetDice;
+            pendingInstanceIds.Add(targetDice.InstanceId);
+            MarkRandomHalf(targetDice);
 
-                // Wake and toss every dice
-                Vector3 tossImpulse = new(
-                    Random.Range(-TossSideways, TossSideways),
-                    Random.Range(TossUpwardMin, TossUpwardMax),
-                    Random.Range(-TossSideways, TossSideways));
+            // Wake and toss the chosen dice
+            Vector3 initialTossImpulse = new(
+                Random.Range(-TossSideways, TossSideways),
+                Random.Range(TossUpwardMin, TossUpwardMax),
+                Random.Range(-TossSideways, TossSideways));
 
-                diceWorld.WakeDice(dice.InstanceId, tossImpulse, Random.insideUnitSphere * TossTorque);
-            }
+            diceWorld.WakeDice(targetDice.InstanceId, initialTossImpulse, Random.insideUnitSphere * TossTorque);
 
             // Dice currently being lifted up to telegraph a split, keyed by their drive id
             var liftDrives = new Dictionary<string, (int SettledId, int ChildSides)>();
@@ -96,16 +99,18 @@ namespace Drakken.Domain.Tokens.Implementation
                     if (!pendingInstanceIds.Remove(settledId)) continue;
 
                     int side = diceWorld.PeekDiceSide(settledId);
-                    int sides = liveInstances[settledId].Sides;
+                    var settledDice = liveInstances[settledId];
+                    int sides = settledDice.Sides;
 
-                    // Check if it is a "high roll" e.g. top 1/3rd
-                    int topThirdCount = Mathf.Max(1, Mathf.RoundToInt(sides / 3f));
-                    bool isHighRoll = (side + 1) > sides - topThirdCount;
+                    bool isHit = settledDice.Faces[side].Effects.Contains(FaceEffectIds.MitosisMark);
 
-                    // Settled without splitting, lock in its final value and leave it alive
-                    if (!isHighRoll || totalDiceCount + 2 > MaxTotalDice)
+                    // Settled without splitting, lock in its final value and leave it alive.
+                    // Effects are left in place here (not cleared) so the session trace - captured later at
+                    // EndSession() - still shows the marks that were rolled for; they're stripped from the
+                    // real game state afterwards, once the trace has already taken its snapshot.
+                    if (!isHit || totalDiceCount + 2 > MaxTotalDice)
                     {
-                        liveInstances[settledId].CurrentSide = side;
+                        settledDice.CurrentSide = side;
                         continue;
                     }
 
@@ -118,7 +123,7 @@ namespace Drakken.Domain.Tokens.Implementation
                         t => Vector3.Lerp(startPosition, liftedPosition, Easing.EaseOutCubic(t)),
                         _ => startRotation);
 
-                    int childSides = Mathf.Max(MinSides, Mathf.CeilToInt(sides / 2f));
+                    int childSides = Mathf.Max(MinSides, RoundUpToEven(sides / 2 + 1));
                     liftDrives[driveId] = (settledId, childSides);
                 }
 
@@ -128,14 +133,18 @@ namespace Drakken.Domain.Tokens.Implementation
                     liftDrives.Remove(completedDriveId);
 
                     var (liftedPosition, _) = diceWorld.GetDicePose(lift.SettledId);
+                    var parentFaces = liveInstances[lift.SettledId].Faces;
                     diceWorld.RemoveDice(lift.SettledId);
                     liveInstances.Remove(lift.SettledId);
 
                     Vector3 outward = new(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f));
                     outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : Vector3.right;
 
-                    var childA = DiceInstance.Create(lift.ChildSides);
-                    var childB = DiceInstance.Create(lift.ChildSides);
+                    var (halfA, halfB) = SplitFacesRandomly(parentFaces);
+                    var childA = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfA);
+                    var childB = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfB);
+                    MarkRandomHalf(childA);
+                    MarkRandomHalf(childB);
 
                     // Fling the two children apart sideways in opposite directions, still with some lift
                     diceWorld.SpawnDice(
@@ -160,20 +169,65 @@ namespace Drakken.Domain.Tokens.Implementation
             diceWorld.FreezeAllDice();
             var trace = diceWorld.EndSession();
 
+            // Marks are ephemeral - the trace already captured them for replay, so the real game state ends clean
+            foreach (var dice in liveInstances.Values)
+            {
+                foreach (var face in dice.Faces) face.Effects.Clear();
+            }
+
             return new MitosisTokenResolution
             {
-                OriginalInstanceIds = originalInstanceIds,
+                OriginalInstanceId = originalInstanceId,
                 FinalDiceInstances = new List<DiceInstance>(liveInstances.Values),
                 DiceTrace = trace,
             };
         }
 
+        private static void MarkRandomHalf(DiceInstance dice)
+        {
+            foreach (var face in dice.Faces) face.Effects.Clear();
+
+            var indices = new List<int>(dice.Sides);
+            for (int i = 0; i < dice.Sides; i++) indices.Add(i);
+
+            for (int i = indices.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (indices[i], indices[j]) = (indices[j], indices[i]);
+            }
+
+            int markCount = dice.Sides / 2;
+            for (int i = 0; i < markCount; i++)
+            {
+                dice.Faces[indices[i]].Effects.Add(FaceEffectIds.MitosisMark);
+            }
+        }
+
+        private static (List<int> HalfA, List<int> HalfB) SplitFacesRandomly(List<DiceInstanceFace> faces)
+        {
+            var values = faces.ConvertAll(f => f.Value);
+
+            for (int i = values.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (values[i], values[j]) = (values[j], values[i]);
+            }
+
+            int half = values.Count / 2;
+            return (values.GetRange(0, half), values.GetRange(half, values.Count - half));
+        }
+
+        private static int RoundUpToEven(int n) => n % 2 == 0 ? n : n + 1;
+
         protected override void Apply(GameState gameState, MitosisTokenResolution resolution, int sourceClientIndex)
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            client.Dice.Clear();
-            client.Dice.AddRange(resolution.FinalDiceInstances);
+            int index = client.Dice.FindIndex(d => d.InstanceId == resolution.OriginalInstanceId);
+            Assert.True(index >= 0);
+
+            client.Dice.RemoveAt(index);
+            client.Dice.InsertRange(index, resolution.FinalDiceInstances);
         }
     }
 
@@ -198,11 +252,8 @@ namespace Drakken.Domain.Tokens.Implementation
             var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
-            // All original IDs are replaced by new dice views
-            foreach (var originalId in resolution.OriginalInstanceIds)
-            {
-                sourcePlayerObjects.DiceViews.Remove(originalId);
-            }
+            // The original dice is replaced by new dice views
+            sourcePlayerObjects.DiceViews.Remove(resolution.OriginalInstanceId);
 
             foreach (var (instanceId, diceView) in newDiceViews)
             {

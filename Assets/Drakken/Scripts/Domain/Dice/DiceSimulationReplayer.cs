@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
+using Drakken.Domain;
 using UnityEngine;
 
 namespace Drakken.Domain.Dice
@@ -28,8 +29,9 @@ namespace Drakken.Domain.Dice
                 maxTimeSeconds = Mathf.Max(maxTimeSeconds, diceTrace.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
 
-            // Views currently on screen for this playback, keyed by dice instance id
+            // liveViews is views currently on screen for this playback, keyed by dice instance id
             // Created and destroyed as playback crosses each dice's SpawnTick / RemoveTick
+            // resultViews is the final list of diceViews after all changrs
             Dictionary<int, DiceView> liveViews = new();
             Dictionary<int, DiceView> resultViews = new();
 
@@ -45,17 +47,25 @@ namespace Drakken.Domain.Dice
                 await Task.Yield();
             }
 
+            // Apply with maxTimeSeconds at the end
             if (!ct.IsCancellationRequested)
+            {
                 ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, maxTimeSeconds);
+            }
 
-            // Once the whole roll has come to rest, reveal every dice's settled face together
+            // Once simulation has come to rest update effects and settled face
             if (!ct.IsCancellationRequested)
             {
                 foreach (var diceTrace in relevantTraces)
                 {
                     if (resultViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
                     {
-                        _ = view.PlaySettledFaceHighlight(diceTrace.Instance.CurrentSide, ct);
+                        var settledFace = diceTrace.Instance.Faces[diceTrace.Instance.CurrentSide];
+                        
+                        // NOTE: Face effects are only refreshed on dice add, or on replay end
+                        view.RefreshFaceEffects(diceTrace.Instance);
+
+                        _ = view.SetSettledFace(diceTrace.Instance.CurrentSide, ct);
                     }
                 }
             }
@@ -78,48 +88,70 @@ namespace Drakken.Domain.Dice
             // For each dice that is being traced
             foreach (var diceTrace in traces)
             {
-                int instanceId = diceTrace.Instance.InstanceId;
+                // Add / remove the dice view
+                var diceView = EnsureLiveDiceView(
+                    assets, gameClient,
+                    diceTrace, rawTick,
+                    existingViews, liveViews, resultViews);
 
-                bool shouldExist =
-                    rawTick >= diceTrace.SpawnTick &&
-                    (diceTrace.RemoveTick < 0 || rawTick < diceTrace.RemoveTick);
+                // Dice view is not required this tick
+                if (diceView == null) continue;
 
-                liveViews.TryGetValue(instanceId, out var view);
-
-                // we are not spawned, or removed, ensure we dont have a dice view
-                if (!shouldExist)
-                {
-                    if (view != null)
-                    {
-                        Object.Destroy(view.gameObject);
-                        liveViews.Remove(instanceId);
-                    }
-                    continue;
-                }
-
-                // Otherwise make sure that we have a live view assigned
-                if (view == null)
-                {
-                    // Reuse existing view or create a new one
-                    view = existingViews?.FindDiceView(instanceId);
-                    if (view == null) view = DiceView.Create(assets, diceTrace.Instance, gameClient);
-                    else view.ClearSettledFaceHighlight();
-                    liveViews[instanceId] = view;
-
-                    // We can only guaranteed add this dice to the result if it is not removed
-                    if (diceTrace.RemoveTick < 0)
-                    {
-                        resultViews[instanceId] = view;
-                    }
-                }
-
-                // Now we have dice views sorted sample and interpolate traces
+                // Now sample and interpolate ticks
                 var (lower, upper, t) = SampleAt(diceTrace.PoseTraces, rawTick);
 
-                view.transform.SetPositionAndRotation(
+                diceView.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),
                     Quaternion.Slerp(lower.Rotation, upper.Rotation, t));
             }
+        }
+
+        private DiceView EnsureLiveDiceView(
+            AssetDatabase assets,
+            GameClient gameClient,
+            DiceSessionTrace diceTrace,
+            float rawTick,
+            ScenePlayerObjects existingViews,
+            Dictionary<int, DiceView> liveViews,
+            Dictionary<int, DiceView> resultViews)
+        {
+            // Check if we should exist and if we already have a view
+            // We shouldn't exist if we haven't spawned, or have been removed
+            bool shouldExist =
+                rawTick >= diceTrace.SpawnTick &&
+                (diceTrace.RemoveTick < 0 || rawTick < diceTrace.RemoveTick);
+
+            int instanceId = diceTrace.Instance.InstanceId;
+            liveViews.TryGetValue(instanceId, out var diceView);
+
+            // We shouldn't have a view so remove if needed
+            if (!shouldExist)
+            {
+                if (diceView != null)
+                {
+                    GameObject.Destroy(diceView.gameObject);
+                    liveViews.Remove(instanceId);
+                }
+                return null;
+            }
+
+            // Otherwise make sure this dice has a live view
+            if (diceView == null)
+            {
+                // Reuse existing view or create a new one
+                diceView = existingViews?.FindDiceView(instanceId);
+                if (diceView == null) diceView = DiceView.Create(assets, diceTrace.Instance, gameClient);
+                liveViews[instanceId] = diceView;
+
+                // Set to not settled and update face effect
+                diceView.UnsetSettledFace();
+                diceView.RefreshFaceEffects(diceTrace.Instance);
+
+                // If this isn't being removed then we can immediately add to resultViews
+                if (diceTrace.RemoveTick < 0) resultViews[instanceId] = diceView;
+            }
+
+            return diceView;
         }
 
         private static (DicePoseTrace Lower, DicePoseTrace Upper, float T) SampleAt(List<DicePoseTrace> poses, float rawTick)

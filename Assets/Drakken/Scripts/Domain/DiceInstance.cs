@@ -6,18 +6,25 @@ using UnityEngine;
 
 namespace Drakken.Domain
 {
+    public static class FaceEffectIds
+    {
+        public const int MitosisMark = 1;
+    }
+
     public class DiceInstanceFace : INetworkSerializable
     {
         public int Value;
+        public List<int> Effects = new();
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref Value);
+            serializer.SerializeList(ref Effects);
         }
 
         public DiceInstanceFace Clone()
         {
-            return new DiceInstanceFace { Value = Value };
+            return new DiceInstanceFace { Value = Value, Effects = new List<int>(Effects) };
         }
     }
 
@@ -51,6 +58,27 @@ namespace Drakken.Domain
                 faces.Add(new DiceInstanceFace { Value = value });
             }
             return faces;
+        }
+
+        public static DiceInstance CreateFromRetainedFaces(int sides, List<int> retainedValues)
+        {
+            List<DiceInstanceFace> faces = new(sides);
+            foreach (int value in retainedValues)
+            {
+                faces.Add(new DiceInstanceFace { Value = value });
+            }
+            while (faces.Count < sides)
+            {
+                faces.Add(new DiceInstanceFace { Value = sides });
+            }
+
+            return new()
+            {
+                InstanceId = nextInstanceId++,
+                Sides = sides,
+                CurrentSide = 0,
+                Faces = faces
+            };
         }
 
         public DiceInstance Roll()

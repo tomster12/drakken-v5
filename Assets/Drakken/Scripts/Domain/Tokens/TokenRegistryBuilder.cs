@@ -51,7 +51,7 @@ namespace Drakken.Domain.Tokens
                     DisplayName = "Forge",
                     Description = "Combine 2 dice, new dice sides has (D1 value + D2 value) rounded up.",
                     Rarity = TokenRarity.Common,
-                    Categories = new[] { TokenCategory.DiceGrowth }
+                    Categories = new[] { TokenCategory.Transformation }
                 },
                 new ForgeTokenExecutor(),
                 typeof(PickDiceTokenIntent),
@@ -68,16 +68,16 @@ namespace Drakken.Domain.Tokens
                 {
                     TokenId = "mitosis",
                     DisplayName = "Mitosis",
-                    Description = "Reroll all dice. Any that land high (top third) split into 2 dice with half the sides (min 4), which also roll and can split again.",
+                    Description = "Mark half the faces on a chosen dice. if it lands on any of these faces, split into 2 new dice (retaining faces) with (sides/2 + 1) rounded up. Repeat with the new dice.",
                     Rarity = TokenRarity.Common,
-                    Categories = new[] { TokenCategory.DiceGrowth, TokenCategory.Chaos }
+                    Categories = new[] { TokenCategory.Transformation, TokenCategory.Chaos }
                 },
                 new MitosisTokenExecutor(),
-                typeof(EmptyTokenIntent),
+                typeof(PickDiceTokenIntent),
                 typeof(MitosisTokenResolution),
                 !includeVisuals ? null : new TokenVisuals(
                     new MitosisTokenAnimator(),
-                    new EmptyTokenIntentPicker(),
+                    new PickDiceTokenIntentPicker(TargetOwner.Self, count: 1),
                     // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )

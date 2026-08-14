@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using System.Linq;
+using Drakken.Common.Utility;
 
 namespace Drakken.Client.World
 {
@@ -51,6 +52,11 @@ namespace Drakken.Client.World
         private Color FaceLabelColor = Colors.Hex("#9f8d81");
         private Color SettledFaceLabelColor = Colors.Hex("#c8bbb2");
         private int? settledFaceHighlightIndex;
+
+        private static readonly Dictionary<int, Color> FaceEffectColors = new()
+        {
+            [FaceEffectIds.MitosisMark] = Colors.Hex("#9bf593"),
+        };
 
         private GameObject inspectLabelGo;
         private TextMeshPro inspectLabelText;
@@ -170,15 +176,44 @@ namespace Drakken.Client.World
             return 0.7f;
         }
 
+        // ------------------------------ State
+
         public void RefreshFaceLabels()
         {
+            // Refresh values on each face
             var dice = DiceInstance;
-            if (dice == null) return;
+            Assert.NotNull(dice);
 
             foreach (var (label, faceIndex) in faceLabels)
             {
-                if (faceIndex < 0 || faceIndex >= dice.Faces.Count) continue;
+                Assert.True(faceIndex >= 0 && faceIndex < dice.Faces.Count);
+
                 label.text = dice.Faces[faceIndex].Value.ToString();
+            }
+        }
+
+        public void RefreshFaceEffects(DiceInstance dice)
+        {
+            // Takes the dice instance explicitly so can show state during trace
+            Assert.NotNull(dice);
+
+            foreach (var (label, faceIndex) in faceLabels)
+            {
+                Assert.True(faceIndex >= 0 && faceIndex < dice.Faces.Count);
+
+                Color color = FaceLabelColor;
+
+                // Update colour of face label based on effects
+                foreach (int effectId in dice.Faces[faceIndex].Effects)
+                {
+                    if (FaceEffectColors.TryGetValue(effectId, out Color effectColor))
+                    {
+                        color = effectColor;
+                        break;
+                    }
+                }
+
+                label.color = color;
             }
         }
 
@@ -309,7 +344,7 @@ namespace Drakken.Client.World
             }
         }
 
-        public void ClearSettledFaceHighlight()
+        public void UnsetSettledFace()
         {
             // Instantly clears any settled face highlight animation
             settledFaceHighlightAnimator.Stop();
@@ -330,7 +365,7 @@ namespace Drakken.Client.World
             settledFaceHighlightIndex = null;
         }
 
-        public async Task PlaySettledFaceHighlight(int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
+        public async Task SetSettledFace(int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
         {
             // Lerps the labels for the given face index to the highlight colour
             settledFaceHighlightIndex = faceIndex;
