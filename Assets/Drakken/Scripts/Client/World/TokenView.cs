@@ -10,6 +10,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Drakken.Client.World
 {
@@ -32,6 +33,7 @@ namespace Drakken.Client.World
         [SerializeField] private TextMeshPro titleText;
         [SerializeField] private Canvas descriptionCanvas;
         [SerializeField] private TextMeshProUGUI descriptionText;
+        [SerializeField] private VerticalLayoutGroup descriptionVlg;
 
         [Header("Config")]
         [SerializeField] private float hoverLiftY = 0.15f;
@@ -94,7 +96,7 @@ namespace Drakken.Client.World
             _ => Color.black
         };
 
-        // ------------------------------ Binding
+        // ------------------------------ Lifetime
 
         public static TokenView Create(AssetDatabase assets, TokenRegistry registry, TokenInstance instance, bool hidden = false)
         {
@@ -167,8 +169,6 @@ namespace Drakken.Client.World
             blankMesh.SetActive(false);
         }
 
-        // ------------------------------ Lifetime
-
         private void Awake()
         {
             currentPosition = transform.localPosition;
@@ -226,14 +226,20 @@ namespace Drakken.Client.World
             }
 
             var showDescription = hoveredAndInteractable && !IsDragging;
-            descriptionCanvas.gameObject.SetActive(showDescription);
 
-            if (showDescription)
+            if (!descriptionCanvas.gameObject.activeSelf && showDescription)
             {
-                descriptionCanvas.transform.SetPositionAndRotation(
-                    titleText.transform.position - Vector3.up * 0.1f,
-                    Quaternion.Euler(90.0f, titleText.transform.rotation.eulerAngles.y, 0));
+                descriptionCanvas.gameObject.SetActive(true);
+
+                // Force text to regenerate and the layout to rebuild
+                descriptionText.ForceMeshUpdate();
+                LayoutRebuilder.ForceRebuildLayoutImmediate(descriptionVlg.transform as RectTransform);
             }
+            else if (descriptionCanvas.gameObject.activeSelf && !showDescription)
+            {
+                descriptionCanvas.gameObject.SetActive(false);
+            }
+
 
             float targetLiftOffsetY =
                 IsDragging ? 0f

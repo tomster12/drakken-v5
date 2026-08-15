@@ -63,6 +63,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 resolution.NewFaceValues.Add(dice.Value + 1);
             }
 
+            diceWorld.Simulate(untilAllSettled: true);
             diceWorld.FreezeAllDice();
             resolution.DiceTrace = diceWorld.EndSession();
 
