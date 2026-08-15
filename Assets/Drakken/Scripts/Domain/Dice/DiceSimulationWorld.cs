@@ -21,6 +21,7 @@ namespace Drakken.Domain.Dice
         private readonly Dictionary<int, DiceBody> diceBodiesByInstanceId = new();
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
         private readonly List<KinematicDrive> activeDrives = new();
+        private GameObject trayGO;
         private int currentTick;
         private int sessionStartTick;
         private int nextDriveId;
@@ -28,6 +29,8 @@ namespace Drakken.Domain.Dice
 
         public bool AllDynamicSettled =>
             diceBodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
+
+        public Transform Tray => trayGO.transform;
 
         public DiceSimulationWorld(string name, DiceTray trayTemplate)
         {
@@ -39,7 +42,7 @@ namespace Drakken.Domain.Dice
 
         private void CreateTray(DiceTray trayTemplate)
         {
-            GameObject trayGO = GameObject.Instantiate(trayTemplate.gameObject);
+            trayGO = GameObject.Instantiate(trayTemplate.gameObject);
             SceneManager.MoveGameObjectToScene(trayGO, scene);
 
             trayGO.SetActive(true);

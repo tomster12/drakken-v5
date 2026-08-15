@@ -344,9 +344,10 @@ namespace Drakken.Client.States
             sourcePlayerObjects.TokenViews = sourcePlayerObjects.TokenViews
                 .Where(tv => tv != tokenView)
                 .ToArray();
+
             GameObject.Destroy(tokenView.gameObject);
 
-            // Tell the server we have finished animating so it can advance the turn/round
+            // Tell the server we have finished animating so it can advance the turn / round
             await Match.MessageAnimatedTokenResolved();
         }
 

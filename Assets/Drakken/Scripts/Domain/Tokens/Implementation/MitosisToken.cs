@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -60,6 +61,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var client = gameState.Clients[sourceClientIndex];
 
+            // Find the selected dice
             int originalInstanceId = intent.TargetDiceInstanceIds[0];
             var targetDice = client.Dice.Find(d => d.InstanceId == originalInstanceId);
             Assert.NotNull(targetDice);
@@ -69,22 +71,23 @@ namespace Drakken.Domain.Tokens.Implementation
             diceWorld.BeginSession();
 
             // If the targeted dice can't be modified we cancel early
-            if (!DiceModifications.TryModify(targetDice, diceWorld, resolution))
+            if (!TokenExecutionLogic.TryModify(targetDice, diceWorld, resolution))
             {
                 resolution.DiceTrace = diceWorld.EndSession();
                 return resolution;
             }
 
+            // Keep track of "live" dice instances            
             var liveInstances = new Dictionary<int, DiceInstance>();
             var pendingInstanceIds = new HashSet<int>();
-
             int totalDiceCount = client.Dice.Count;
 
+            // Start with the selected dice and mark half at random
             liveInstances[targetDice.InstanceId] = targetDice;
             pendingInstanceIds.Add(targetDice.InstanceId);
             MarkRandomHalf(targetDice);
 
-            // Wake and toss the chosen dice
+            // Wake and toss the selected dice
             Vector3 initialTossImpulse = new(
                 Random.Range(-TossSideways, TossSideways),
                 Random.Range(TossUpwardMin, TossUpwardMax),
@@ -92,9 +95,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.WakeDice(targetDice.InstanceId, initialTossImpulse, Random.insideUnitSphere * TossTorque);
 
-            // Dice currently being lifted up to telegraph a split, keyed by their drive id
+            // The main mitosis loop until all is finished
             var liftDrives = new Dictionary<string, (int SettledId, int ChildSides)>();
-
             while (pendingInstanceIds.Count > 0 || liftDrives.Count > 0)
             {
                 // Simulate until either a dice settles or a lift finishes
@@ -104,27 +106,28 @@ namespace Drakken.Domain.Tokens.Implementation
 
                 if (result.TimedOut) break;
 
+                // Process any dice that landed and settled
                 foreach (var settledId in result.SettledInstanceIds)
                 {
-                    if (!pendingInstanceIds.Remove(settledId)) continue;
-
+                    Assert.True(pendingInstanceIds.Remove(settledId));
                     var settledDice = liveInstances[settledId];
                     int sides = settledDice.Sides;
 
-                    // If it was a pending D4 then just skip
+                    // If it was a pending D4 then skip
                     if (sides <= 4) continue;
 
+                    // Check if it landed with a marked face
                     int side = diceWorld.PeekDiceSide(settledId);
                     bool isHit = settledDice.Faces[side].FaceEffects.Contains(FaceEffectIds.MitosisMark);
 
-                    // Settled without splitting lock in its final value and leave it alive
+                    // Settled without splitting
                     if (!isHit || totalDiceCount + 2 > MaxTotalDice)
                     {
                         settledDice.CurrentSide = side;
                         continue;
                     }
 
-                    // Otherwise lift it into the air to show it's about to split
+                    // Otherwise lift it into the air to split
                     var (startPosition, startRotation) = diceWorld.GetDicePose(settledId);
                     Vector3 liftedPosition = startPosition + Vector3.up * LiftHeight;
 
@@ -133,18 +136,17 @@ namespace Drakken.Domain.Tokens.Implementation
                         t => Vector3.Lerp(startPosition, liftedPosition, Easing.EaseOutCubic(t)),
                         _ => startRotation);
 
-                    int childSides = Mathf.Max(MinSides, RoundUpToEven(sides / 2 + 1));
+                    int childSides = Mathf.Max(MinSides, TokenExecutionLogic.RoundUpToEven(sides / 2 + 1));
                     liftDrives[driveId] = (settledId, childSides);
                 }
 
-                // This is a generic catch all for any drive
+                // Process any finished lift drive
                 foreach (var completedDriveId in result.CompletedDriveIds)
                 {
-                    // First ensure it is a lift drive
-                    if (!liftDrives.TryGetValue(completedDriveId, out var lift)) continue;
+                    Assert.True(liftDrives.TryGetValue(completedDriveId, out var lift));
                     liftDrives.Remove(completedDriveId);
 
-                    // So now we can remove the dice view to pop
+                    // So now we can remove the dice view to split
                     var (liftedPosition, _) = diceWorld.GetDicePose(lift.SettledId);
                     var parentFaces = liveInstances[lift.SettledId].Faces;
                     diceWorld.RemoveDice(lift.SettledId);
@@ -153,18 +155,19 @@ namespace Drakken.Domain.Tokens.Implementation
                     Vector3 outward = new(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f));
                     outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : Vector3.right;
 
+                    // Create new dice with split retained faces
                     var (halfA, halfB) = SplitFacesRandomly(parentFaces);
                     var childA = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfA);
                     var childB = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfB);
 
-                    // Only mark and fling if they have >4 sides
+                    // Only mark if they have >4 faces, but still add to pending
                     if (lift.ChildSides > 4)
                     {
                         MarkRandomHalf(childA);
                         MarkRandomHalf(childB);
                     }
 
-                    // Fling the two children apart sideways in opposite directions, still with some lift
+                    // Fling the 2 new split dice apart and start tracking
                     diceWorld.SpawnDice(
                         childA, liftedPosition, Random.rotationUniform,
                         outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
@@ -175,7 +178,6 @@ namespace Drakken.Domain.Tokens.Implementation
                         -outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                         Random.insideUnitSphere * SplitTorque);
 
-                    // Only track the new children if they have >4 sides
                     liveInstances[childA.InstanceId] = childA;
                     liveInstances[childB.InstanceId] = childB;
                     pendingInstanceIds.Add(childA.InstanceId);
@@ -188,10 +190,15 @@ namespace Drakken.Domain.Tokens.Implementation
             diceWorld.FreezeAllDice();
             resolution.DiceTrace = diceWorld.EndSession();
 
-            // Marks are ephemeral - the trace already captured them for replay, so the real game state ends clean
+            // Remove all mitosis marks from all dice
             foreach (var dice in liveInstances.Values)
             {
-                foreach (var face in dice.Faces) face.FaceEffects.Clear();
+                foreach (var face in dice.Faces)
+                {
+                    face.FaceEffects = face.FaceEffects
+                        .Where(e => e != FaceEffectIds.MitosisMark)
+                        .ToList();
+                }
             }
 
             resolution.FinalDiceInstances = new List<DiceInstance>(liveInstances.Values);
@@ -201,7 +208,13 @@ namespace Drakken.Domain.Tokens.Implementation
 
         private static void MarkRandomHalf(DiceInstance dice)
         {
-            foreach (var face in dice.Faces) face.FaceEffects.Clear();
+            // Remove existing mitosis marks
+            foreach (var face in dice.Faces)
+            {
+                face.FaceEffects = face.FaceEffects
+                    .Where(e => e != FaceEffectIds.MitosisMark)
+                    .ToList();
+            }
 
             var indices = new List<int>(dice.Sides);
             for (int i = 0; i < dice.Sides; i++) indices.Add(i);
@@ -233,12 +246,9 @@ namespace Drakken.Domain.Tokens.Implementation
             return (values.GetRange(0, half), values.GetRange(half, values.Count - half));
         }
 
-        private static int RoundUpToEven(int n) => n % 2 == 0 ? n : n + 1;
-
         protected override void Apply(GameState gameState, MitosisTokenResolution resolution, int sourceClientIndex)
         {
-            // The dice couldn't be modified (it broke) - nothing to insert; the framework already
-            // removed it from GameState via DestroyedDiceInstanceIds.
+            // If the modification failed, then exit early
             if (resolution.FinalDiceInstances.Count == 0) return;
 
             var client = gameState.Clients[sourceClientIndex];
@@ -261,23 +271,16 @@ namespace Drakken.Domain.Tokens.Implementation
             MitosisTokenResolution resolution,
             CancellationToken ct)
         {
-            await Task.Delay(250);
-
-            // Give players a moment to read the token before it shrinks out of the way
-            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(1f, ct);
-
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Replay simulation - covers both the original dice being removed (whether it split or
-            // broke) and any new dice spawning in, keeping sourcePlayerObjects.DiceViews in sync
+            // Shrink the token out the way
+            await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
+
+            // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
-            await shrinkTokenTask;
-
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
-
-            await Task.Delay(100);
         }
     }
 }

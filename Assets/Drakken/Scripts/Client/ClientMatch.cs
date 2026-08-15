@@ -26,12 +26,12 @@ namespace Drakken.Client
         public MatchDiceSimulationTraces LastDiceTraces { get; private set; }
         public ulong MatchId { get; private set; }
         public int ClientIndex { get; private set; }
+        public int OpClientIndex => 1 - ClientIndex;
         public bool IsOpJoined { get; private set; }
         public bool IsOpReady { get; private set; }
         public bool IsReady { get; private set; }
         public bool IsOpDiscarded { get; private set; }
         public bool IsMyTurn => GameState?.TurnClientIndex == ClientIndex;
-        public int OpClientIndex => 1 - ClientIndex;
 
         // -------------------------------- Setup
 
@@ -52,6 +52,7 @@ namespace Drakken.Client
         {
             Assert.False(IsReady);
             Assert.True(GameState.Phase == GamePhase.NotStarted);
+
             Log.Info($"ClientMatch-{MatchId}", $"Ready up");
 
             IsReady = true;
@@ -62,6 +63,7 @@ namespace Drakken.Client
         {
             Assert.False(IsOpJoined);
             Assert.True(GameState.Phase == GamePhase.NotStarted);
+
             Log.Info($"ClientMatch-{MatchId}", "OnServerOtherPlayerJoined");
 
             IsOpJoined = true;
@@ -72,6 +74,7 @@ namespace Drakken.Client
         {
             Assert.False(IsOpReady);
             Assert.True(GameState.Phase == GamePhase.NotStarted);
+
             Log.Info($"ClientMatch-{MatchId}", "OnServerOtherPlayerReady");
 
             IsOpReady = true;
@@ -82,11 +85,10 @@ namespace Drakken.Client
 
         public void OnServerStartDraftingPhase(GameState gameState, MatchDiceSimulationTraces diceTraces)
         {
-            // TODO: Allow coming to drafting after round end
             Assert.True(GameState.Phase == GamePhase.NotStarted);
+
             Log.Info($"ClientMatch-{MatchId}", $"Match started drafting phase");
 
-            // Authoritively update entire game state
             GameState = gameState;
             LastDiceTraces = diceTraces;
 
@@ -96,11 +98,11 @@ namespace Drakken.Client
         public async Task<bool> RequestDraftDiscard(DraftDiscardMessage message)
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
+
             Log.Info($"ClientMatch-{MatchId}", $"Sending draft discard");
 
             var response = await connection.Client_RequestMatchDraftDiscard(MatchId, message);
 
-            // Update game state with removed tokens
             GameState.Clients[ClientIndex].Tokens = GameState.Clients[ClientIndex].Tokens
                 .Where(t => !message.DiscardedInstanceIds.Contains(t.InstanceId))
                 .ToList();
@@ -112,6 +114,7 @@ namespace Drakken.Client
         {
             Assert.False(IsOpDiscarded);
             Assert.True(GameState.Phase == GamePhase.Drafting);
+
             Log.Info($"ClientMatch-{MatchId}", "OnServerOtherPlayerDiscarded");
 
             IsOpDiscarded = true;
@@ -124,9 +127,9 @@ namespace Drakken.Client
         public void OnServerStartPlayingPhase(GameState gameState)
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
+
             Log.Info($"ClientMatch-{MatchId}", $"Match started prafting phase");
 
-            // Authoritively update entire game state
             GameState = gameState;
 
             OnPlayingPhaseStarted.Invoke();
@@ -145,9 +148,9 @@ namespace Drakken.Client
         public void OnServerTokenResolved(TokenResolutionMessage message)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
+
             Log.Info($"ClientMatch-{MatchId}", $"Token resolution received for TokenId={message.TokenId}");
 
-            // Directly apply resolution to game state
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
             entry.Executor.Apply(GameState, message.Resolution, message.SourceClientIndex);
             GameState.Clients[message.SourceClientIndex].Tokens.RemoveAll(t => t.InstanceId == message.TokenInstanceId);
@@ -158,6 +161,7 @@ namespace Drakken.Client
         public async Task MessageAnimatedTokenResolved()
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
+
             Log.Info($"ClientMatch-{MatchId}", $"Sending token animated");
 
             await connection.Client_MessageMatchAnimatedTokenResolved(MatchId);
@@ -166,9 +170,9 @@ namespace Drakken.Client
         public void OnServerNextTurn(GameState gameState)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
+
             Log.Info($"ClientMatch-{MatchId}", $"OnServerNextTurn, next clientIndex={gameState.TurnClientIndex}");
 
-            // Authoritively update entire game state
             GameState = gameState;
 
             OnNextTurnStarted.Invoke();
@@ -177,9 +181,9 @@ namespace Drakken.Client
         public void OnServerNextRound(GameState gameState, MatchDiceSimulationTraces diceTraces)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
+
             Log.Info($"ClientMatch-{MatchId}", $"OnServerNextRound, round={gameState.Round}");
 
-            // Authoritively update entire game state
             GameState = gameState;
             LastDiceTraces = diceTraces;
             IsOpDiscarded = false;

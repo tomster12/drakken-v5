@@ -18,23 +18,21 @@ namespace Drakken.Domain.Tokens.Implementation
     {
         public int FirstInstanceId;
         public int SecondInstanceId;
-        public DiceInstance CombinedDiceInstance;
-        public DiceSimulationTraces FlightTrace;
-        public DiceSimulationTraces ForgeTrace;
+        public bool DidMerge;
+        public DiceInstance MergedDiceInstance;
+        public DiceSimulationTraces LiftTrace;
+        public DiceSimulationTraces MergeTrace;
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
             serializer.SerializeValue(ref FirstInstanceId);
             serializer.SerializeValue(ref SecondInstanceId);
-            serializer.SerializeValue(ref FlightTrace);
-            serializer.SerializeValue(ref ForgeTrace);
+            serializer.SerializeValue(ref LiftTrace);
+            serializer.SerializeValue(ref MergeTrace);
 
-            // CombinedDiceInstance is null when the merge failed (one of the targeted dice couldn't
-            // be modified) - only serialize it when present, since INetworkSerializable can't carry null.
-            bool hasCombinedDice = CombinedDiceInstance != null;
-            serializer.SerializeValue(ref hasCombinedDice);
-            if (hasCombinedDice) serializer.SerializeValue(ref CombinedDiceInstance);
+            serializer.SerializeValue(ref DidMerge);
+            if (DidMerge) serializer.SerializeValue(ref MergedDiceInstance);
         }
     }
 
@@ -68,7 +66,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 SecondInstanceId = secondDice.InstanceId,
             };
 
-            // First drive the 2 dice up next to each other
+            // Drive the 2 dice up next to each other in the midpoint
             diceWorld.BeginSession();
 
             var (firstStartPos, firstStartRot) = diceWorld.GetDicePose(firstDice.InstanceId);
@@ -101,18 +99,19 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.Simulate(untilDrivesComplete: flightDriveIds);
 
-            resolution.FlightTrace = diceWorld.EndSession();
+            resolution.LiftTrace = diceWorld.EndSession();
 
-            // Session 2: merge into a combined dice, unless either source dice can't be modified -
-            // in that case the whole merge fails, that dice breaks, and the surviving one flies
-            // back down to the tray instead
+            // Now try and merge the 2 dice together
             diceWorld.BeginSession();
 
-            bool firstCanModify = DiceModifications.TryModify(firstDice, diceWorld, resolution);
-            bool secondCanModify = DiceModifications.TryModify(secondDice, diceWorld, resolution);
+            bool firstCanModify = TokenExecutionLogic.TryModify(firstDice, diceWorld, resolution);
+            bool secondCanModify = TokenExecutionLogic.TryModify(secondDice, diceWorld, resolution);
 
             if (!firstCanModify || !secondCanModify)
             {
+                resolution.DidMerge = false;
+
+                // One of the 2 failed so fling the other away
                 var returnDriveIds = new List<string>();
 
                 if (firstCanModify)
@@ -133,45 +132,48 @@ namespace Drakken.Domain.Tokens.Implementation
                         _ => secondStartRot));
                 }
 
-                if (returnDriveIds.Count > 0) diceWorld.Simulate(untilDrivesComplete: returnDriveIds);
+                if (returnDriveIds.Count > 0)
+                {
+                    diceWorld.Simulate(untilDrivesComplete: returnDriveIds);
+                }
             }
+
             else
             {
-                // Combine into a new dice, with sides = (v1 + v2) rounded up, minimum 4
-                int combinedSides = firstDice.Value + secondDice.Value;
-                if (combinedSides % 2 == 1) combinedSides++;
-                combinedSides = Mathf.Max(combinedSides, 4);
-                var combinedDice = DiceInstance.Create(sides: combinedSides);
-                combinedDice.Roll();
+                resolution.DidMerge = true;
+
+                // Merge into a new dice, with sides = (v1 + v2) rounded up, minimum 4
+                int mergedSides = TokenExecutionLogic.RoundUpToEven(firstDice.Value + secondDice.Value);
+                mergedSides = Mathf.Max(mergedSides, 4);
+
+                var mergedDice = DiceInstance.Create(sides: mergedSides);
+                mergedDice.Roll();
 
                 diceWorld.RemoveDice(firstDice.InstanceId);
                 diceWorld.RemoveDice(secondDice.InstanceId);
 
-                Quaternion combinedRotation = Random.rotationUniform;
-
                 // Pop the forged dice straight up with a small random horizontal drift and spin, then let it fall
+                Quaternion mergedRotation = Random.rotationUniform;
                 Vector3 popImpulse = Vector3.up * ForgePopUpwardSpeed
                     + new Vector3(Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed), 0f, Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed));
                 Vector3 popTorque = Random.insideUnitSphere * ForgePopTorque;
 
-                diceWorld.SpawnDice(combinedDice, liftedMidpoint, combinedRotation, popImpulse, popTorque);
+                diceWorld.SpawnDice(mergedDice, liftedMidpoint, mergedRotation, popImpulse, popTorque);
 
                 diceWorld.Simulate(untilAllSettled: true);
 
-                resolution.CombinedDiceInstance = combinedDice;
+                resolution.MergedDiceInstance = mergedDice;
             }
 
             diceWorld.FreezeAllDice();
-            resolution.ForgeTrace = diceWorld.EndSession();
+            resolution.MergeTrace = diceWorld.EndSession();
 
             return resolution;
         }
 
         protected override void Apply(GameState gameState, ForgeTokenResolution resolution, int sourceClientIndex)
         {
-            // No merge happened (one of the targeted dice couldn't be modified) - the survivor was
-            // never touched here, and the framework already removed whichever dice broke.
-            if (resolution.CombinedDiceInstance == null) return;
+            if (!resolution.DidMerge) return;
 
             var client = gameState.Clients[sourceClientIndex];
 
@@ -179,10 +181,10 @@ namespace Drakken.Domain.Tokens.Implementation
             int secondIndex = client.Dice.FindIndex(d => d.InstanceId == resolution.SecondInstanceId);
             Assert.True(firstIndex >= 0 && secondIndex >= 0);
 
-            // Keep the combined dice at the lower of the two original slots, preserving stable ordering
+            // Keep the merged dice at the lower of the two original slots, preserving stable ordering
             int insertIndex = Mathf.Min(firstIndex, secondIndex);
             client.Dice.RemoveAll(d => d.InstanceId == resolution.FirstInstanceId || d.InstanceId == resolution.SecondInstanceId);
-            client.Dice.Insert(insertIndex, resolution.CombinedDiceInstance);
+            client.Dice.Insert(insertIndex, resolution.MergedDiceInstance);
         }
     }
 
@@ -199,24 +201,21 @@ namespace Drakken.Domain.Tokens.Implementation
             ForgeTokenResolution resolution,
             CancellationToken ct)
         {
-            await Task.Delay(250);
-
-            // Give players a moment to read the token before it shrinks out of the way
-            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(1f, ct);
-
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Physically fly the two source dice up beside each other, matching the server's simulation
-            await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, visualContext.Client, resolution.FlightTrace, sourcePlayerObjects, ct);
+            // Shrink the token out the way
+            await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
 
-            if (resolution.CombinedDiceInstance != null)
+            // Replay the lift simulation
+            await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Client.Assets, visualContext.Client, resolution.LiftTrace, sourcePlayerObjects, ct);
+
+            if (resolution.DidMerge)
             {
                 var firstDiceView = sourcePlayerObjects.DiceViews[resolution.FirstInstanceId];
                 var secondDiceView = sourcePlayerObjects.DiceViews[resolution.SecondInstanceId];
 
-                // Pull the two dice together to a shared midpoint, arching up and across, shrinking away as they arrive.
-                // This part is purely a client-side visual flourish - it isn't driven by any physics on the server.
+                // Do a final client-side animation to merge the 2 dice
                 Vector3 firstStartPosition = firstDiceView.transform.position;
                 Vector3 secondStartPosition = secondDiceView.transform.position;
                 Vector3 midpoint = (firstStartPosition + secondStartPosition) / 2f;
@@ -244,24 +243,13 @@ namespace Drakken.Domain.Tokens.Implementation
                 GameObject.Destroy(secondDiceView.gameObject);
                 sourcePlayerObjects.DiceViews.Remove(resolution.FirstInstanceId);
                 sourcePlayerObjects.DiceViews.Remove(resolution.SecondInstanceId);
-
-                // Physically spawn the forged dice at the merge point, let it hover, then drop it -
-                // matching the server, and keeping sourcePlayerObjects.DiceViews in sync as it goes
-                await sourcePlayerObjects.DiceSimReplayer.Play(
-                    visualContext.Client.Assets, visualContext.Client, resolution.ForgeTrace, sourcePlayerObjects, ct);
-            }
-            else
-            {
-                // The merge failed - whichever dice couldn't be modified breaks, the other flies back down to the tray
-                await sourcePlayerObjects.DiceSimReplayer.Play(
-                    visualContext.Client.Assets, visualContext.Client, resolution.ForgeTrace, sourcePlayerObjects, ct);
             }
 
-            await shrinkTokenTask;
+            // Replay the final merge simulation (either merge or just drop)
+            await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Client.Assets, visualContext.Client, resolution.MergeTrace, sourcePlayerObjects, ct);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
-
-            await Task.Delay(100);
         }
     }
 }

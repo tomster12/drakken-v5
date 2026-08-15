@@ -22,7 +22,6 @@ namespace Drakken.Server
         private readonly TokenRegistry tokenRegistry;
         private readonly IGameConnection connection;
         private readonly DiceTrayLayout diceLayout;
-
         public GameState GameState { get; private set; }
         public DiceSimulationWorld[] DiceWorlds { get; }
         private readonly ulong[] clientIds = new ulong[2];
@@ -90,6 +89,7 @@ namespace Drakken.Server
         public void OnClientReady(ulong clientId)
         {
             Assert.True(GameState.Phase == GamePhase.NotStarted);
+
             Log.Info($"ServerMatch-{matchId}", $"Client {clientId} ready ({startReadyCount + 1}/2)");
 
             startReadyCount++;
@@ -110,6 +110,7 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.NotStarted);
             Assert.True(startReadyCount == 2);
+
             Log.Info($"ServerMatch-{matchId}", $"Match starting drafting phase");
 
             // Arbitrary delay before starting
@@ -176,6 +177,7 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
             Assert.True(clientIdIndexAssignment.TryGetValue(clientId, out int playerIndex));
+
             Log.Info($"ServerMatch-{matchId}", $"Player {clientId} discarded tokens");
 
             // Remove the discarded tokens
@@ -206,6 +208,7 @@ namespace Drakken.Server
         private async void StartPlayingPhase()
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
+
             Log.Info($"ServerMatch-{matchId}", $"Match starting playing phase");
 
             // Arbitrary delay before starting
@@ -226,10 +229,12 @@ namespace Drakken.Server
             if (tokenInstance == null || tokenInstance.TokenId != message.TokenId)
                 throw new InvalidOperationException("Client attempted to play a token they do not own");
 
-            // Calculate and apply resolution to game state
+            // Calculate on a copy of gamestate then apply to real game state afterwards
+            // This lets us ensure it occurs the same on server as on the client
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            var resolution = entry.Executor.Execute(GameState, message.Intent, sourceClientIndex, DiceWorlds[sourceClientIndex]);
+            var resolution = entry.Executor.Execute(GameState.Clone(), message.Intent, sourceClientIndex, DiceWorlds[sourceClientIndex]);
             entry.Executor.Apply(GameState, resolution, sourceClientIndex);
+
             GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);
 
             respond(true);
@@ -247,6 +252,7 @@ namespace Drakken.Server
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
             Assert.True(clientIdIndexAssignment.ContainsKey(clientId));
+
             Log.Info($"ServerMatch-{matchId}", $"Client {clientId} confirmed animated resolution ({animatedTokenResolvedConfirmCount + 1}/2)");
 
             // Wait until both clients have finished animating before advancing
@@ -272,6 +278,7 @@ namespace Drakken.Server
         private void AdvanceTurn()
         {
             GameState.TurnClientIndex = 1 - GameState.TurnClientIndex;
+
             Log.Info($"ServerMatch-{matchId}", $"Advancing turn, next clientIndex={GameState.TurnClientIndex}");
 
             connection.Server_BroadcastMatchNextTurn(clientIds, GameState);

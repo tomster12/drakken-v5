@@ -416,37 +416,34 @@ namespace Drakken.Client.World
 
         private void Update()
         {
-            // Enable / disable outline, preferring the selected color, then highlight, then hover
-            // Hovering to inspect a dice is allowed even while interaction is locked (e.g. mid-turn)
-            // Only suppress it while the dice is actively animating, since it isn't meaningfully inspectable then
+            // Enable / disable outline
             bool showOutline = IsSelected || isHighlighted || (IsHovered && !Animator.IsAnimating);
             outline.SetEnabled(showOutline);
+
             if (showOutline)
             {
+                // Prefer the selected color, then highlight, then hover
                 outline.OutlineColor = IsSelected
                     ? selectedOutlineColor
                     : isHighlighted ? currentHighlightOutlineColor : hoverOutlineColor;
             }
 
-            UpdateInspectLabel();
-        }
+            // Enable / disable inspector label
+            bool controlShowLabel = IsSettled && IsHovered && !Animator.IsAnimating;
+            currentInspectAlpha = Mathf.Lerp(currentInspectAlpha, controlShowLabel ? 1f : 0f, InspectLabelFadeLerp * Time.deltaTime);
 
-        private void UpdateInspectLabel()
-        {
-            // Only offer the value/sides readout once the dice has settled on a result - hovering mid-roll wouldn't show anything meaningful
-            bool wantsVisible = IsHovered && IsSettled && !Animator.IsAnimating;
-            currentInspectAlpha = Mathf.Lerp(currentInspectAlpha, wantsVisible ? 1f : 0f, InspectLabelFadeLerp * Time.deltaTime);
+            bool showLabel = controlShowLabel || currentInspectAlpha > 0.01f;
+            if (inspectLabelGo.activeSelf != showLabel) inspectLabelGo.SetActive(showLabel);
 
-            bool shouldBeActive = wantsVisible || currentInspectAlpha > 0.01f;
-            if (inspectLabelGo.activeSelf != shouldBeActive) inspectLabelGo.SetActive(shouldBeActive);
-            if (!shouldBeActive) return;
+            if (showLabel)
+            {
+                if (controlShowLabel) RefreshInspectLabelText();
+                inspectLabelText.alpha = currentInspectAlpha;
 
-            if (wantsVisible) RefreshInspectLabelText();
-            inspectLabelText.alpha = currentInspectAlpha;
-
-            inspectLabelText.transform.SetPositionAndRotation(
-                transform.position + Vector3.up * InspectLabelRiseHeight,
-                Quaternion.Euler(45f, inspectLabelRotationY, 0f));
+                inspectLabelText.transform.SetPositionAndRotation(
+                    transform.position + Vector3.up * InspectLabelRiseHeight,
+                    Quaternion.Euler(45f, inspectLabelRotationY, 0f));
+            }
         }
 
         public void SetInteractionLocked(bool interactionLocked)

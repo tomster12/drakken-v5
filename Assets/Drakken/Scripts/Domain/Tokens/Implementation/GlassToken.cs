@@ -26,8 +26,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
     public class GlassTokenExecutor : TokenExecutor<EmptyTokenIntent, GlassTokenResolution>
     {
-        private const float TossUpwardMin = 5.5f;
-        private const float TossUpwardMax = 7.5f;
+        private const float TossUpwardMin = 4.5f;
+        private const float TossUpwardMax = 6f;
         private const float TossSideways = 0.6f;
         private const float TossTorque = 20f;
         private const float SpawnHeight = 1f;
@@ -39,19 +39,17 @@ namespace Drakken.Domain.Tokens.Implementation
             DiceSimulationWorld diceWorld)
         {
             var client = gameState.Clients[sourceClientIndex];
-            Assert.True(client.Dice.Count > 0);
 
-            // Value is always 7, regardless of which face it physically lands on
-            var glassDice = DiceInstance.Create(sides: GameConstants.StandardDiceSideCount);
+            // Create a new glass dice
+            var glassDice = DiceInstance.Create(sides: 6);
             foreach (var face in glassDice.Faces) face.Value = 7;
             glassDice.DiceEffects.Add(DiceEffectIds.Glass);
 
             diceWorld.BeginSession();
 
-            // Toss it in above one of the player's existing dice - there's no dedicated
-            // "gain a new dice" spawn point, so this anchors it somewhere already in the tray
-            var (anchorPosition, _) = diceWorld.GetDicePose(client.Dice[0].InstanceId);
-            Vector3 spawnPosition = anchorPosition + Vector3.up * SpawnHeight;
+            // Spawn and toss the dice into the world
+            var trayPosition = diceWorld.Tray.position;
+            Vector3 spawnPosition = trayPosition + Vector3.up * SpawnHeight;
 
             Vector3 tossImpulse = new(
                 Random.Range(-TossSideways, TossSideways),
@@ -74,6 +72,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
         protected override void Apply(GameState gameState, GlassTokenResolution resolution, int sourceClientIndex)
         {
+            // Directly add new dice into the world
             gameState.Clients[sourceClientIndex].Dice.Add(resolution.AddedDiceInstance);
         }
     }
@@ -88,22 +87,16 @@ namespace Drakken.Domain.Tokens.Implementation
             GlassTokenResolution resolution,
             CancellationToken ct)
         {
-            await Task.Delay(250);
-
-            // Give players a moment to read the token before it shrinks out of the way
-            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(1f, ct);
-
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Replaying keeps sourcePlayerObjects.DiceViews in sync with the newly spawned dice
+            // Shrink the token out the way
+            await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
+
+            // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
-            await shrinkTokenTask;
-
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
-
-            await Task.Delay(100);
         }
     }
 }

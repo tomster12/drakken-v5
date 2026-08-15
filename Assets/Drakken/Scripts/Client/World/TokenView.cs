@@ -198,7 +198,7 @@ namespace Drakken.Client.World
                 position => currentPosition = position);
         }
 
-        public async Task AnimateShrink(float delaySeconds, CancellationToken ct)
+        public async Task AnimateShrinkAfter(float delaySeconds, CancellationToken ct)
         {
             if (delaySeconds > 0f)
                 await Task.Delay((int)(delaySeconds * 1000f));

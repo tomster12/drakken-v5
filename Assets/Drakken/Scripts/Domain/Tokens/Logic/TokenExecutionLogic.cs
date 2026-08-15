@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Drakken.Domain.Tokens.Logic
 {
-    public static class DiceModifications
+    public static class TokenExecutionLogic
     {
         public static bool TryModify(DiceInstance dice, DiceSimulationWorld diceWorld, TokenResolution resolution)
         {
@@ -19,5 +19,7 @@ namespace Drakken.Domain.Tokens.Logic
 
             return false;
         }
+
+        public static int RoundUpToEven(int n) => n % 2 == 0 ? n : n + 1;
     }
 }

@@ -41,6 +41,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var client = gameState.Clients[sourceClientIndex];
 
+            // Pick the dice we want to bolster
             int count = Mathf.Min(BolsterCount, client.Dice.Count);
             var bolsteredIndices = Enumerable.Range(0, client.Dice.Count)
                 .OrderBy(_ => Random.value)
@@ -51,11 +52,12 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.BeginSession();
 
+            // Try apply bolster modification to each dice
             foreach (var index in bolsteredIndices)
             {
                 var dice = client.Dice[index];
 
-                if (!DiceModifications.TryModify(dice, diceWorld, resolution)) continue;
+                if (!TokenExecutionLogic.TryModify(dice, diceWorld, resolution)) continue;
 
                 resolution.BolsteredInstanceIds.Add(dice.InstanceId);
                 resolution.NewFaceValues.Add(dice.Value + 1);
@@ -73,11 +75,11 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var client = gameState.Clients[sourceClientIndex];
 
+            // Apply the new face values to each bolstered dice
             for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
             {
                 var dice = client.Dice.Find(d => d.InstanceId == resolution.BolsteredInstanceIds[i]);
                 Assert.True(dice != null);
-
                 dice.Faces[dice.CurrentSide].Value = resolution.NewFaceValues[i];
             }
         }
@@ -97,16 +99,16 @@ namespace Drakken.Domain.Tokens.Implementation
             BolsterTokenResolution resolution,
             CancellationToken ct)
         {
-            await Task.Delay(250);
-
-            var shrinkTokenTask = visualContext.TokenView.AnimateShrink(0.6f, ct);
-
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Only relevant if a dice broke - replaying keeps sourcePlayerObjects.DiceViews in sync
+            // Shrink the token out the way
+            await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
+
+            // Replay simulation for any modification side effects
             await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
+            // Play animation for bolstering each dice
             var bolsterTasks = new List<Task>();
 
             for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
@@ -114,8 +116,6 @@ namespace Drakken.Domain.Tokens.Implementation
                 int instanceId = resolution.BolsteredInstanceIds[i];
                 Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
 
-                // Bump the printed value shown on the dice's current face and flag it as
-                // picked, without moving the dice at all.
                 diceView.RefreshLabels();
 
                 bolsterTasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
@@ -128,7 +128,6 @@ namespace Drakken.Domain.Tokens.Implementation
             }
 
             await Task.WhenAll(bolsterTasks);
-            await shrinkTokenTask;
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

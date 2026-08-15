@@ -2,12 +2,10 @@ using Drakken.Client.World;
 using Drakken.Domain.Animation;
 using Drakken.Common.Utility;
 using Drakken.Domain;
-using Drakken.Networking;
 using Drakken.Domain.Static;
 using Drakken.Utility;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -57,10 +55,8 @@ namespace Drakken.Client.States
 
             UpdateClientUI();
 
-            await Task.Delay(500);
-            await RollDice(isReroll: fromType == ClientStateType.Playing);
+            await RollDice(firstRoll: fromType == ClientStateType.Title);
 
-            await Task.Delay(1000);
             SpawnTokens();
         }
 
@@ -86,25 +82,22 @@ namespace Drakken.Client.States
             SceneLayout.Drafting.DraftConfirmButton.gameObject.SetActive(false);
         }
 
-        private async Task RollDice(bool isReroll)
+        private async Task RollDice(bool firstRoll)
         {
             client.UI.UpdateDiceTotal(Match.ClientIndex, 0, unknown: true);
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1, unknown: true);
 
-            if (isReroll)
+            if (firstRoll)
             {
-                // Coming back from a played round
-                // Directly simulate the servers physics on the current dice views
+                // Start of a new game, spawn dice views first
+                SceneObjects.P1.DestroyAllDice();
+                SceneObjects.P2.DestroyAllDice();
+                await SpawnDiceForRoll(Match.LastDiceTraces);
                 await SimulateDiceTraces(Match.LastDiceTraces);
             }
             else
             {
-                // Start of a new game
-                // Spawn dice views ready for the simulation
-                SceneObjects.P1.DestroyAllDice();
-                SceneObjects.P2.DestroyAllDice();
-
-                await SpawnDiceForRoll(Match.LastDiceTraces);
+                // Coming back from a played round, replay the simulation
                 await SimulateDiceTraces(Match.LastDiceTraces);
             }
 
