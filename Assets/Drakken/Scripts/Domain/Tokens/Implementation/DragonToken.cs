@@ -122,7 +122,7 @@ namespace Drakken.Domain.Tokens.Implementation
             // All changes + hovers finished, drop dice back down to finish
             foreach (var newDice in addedDice)
             {
-                diceWorld.WakeDice(newDice.InstanceId, Vector3.zero, Vector3.zero);
+                diceWorld.WakeDice(newDice.InstanceId);
             }
 
             diceWorld.Simulate(untilAllSettled: true);

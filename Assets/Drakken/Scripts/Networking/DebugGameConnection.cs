@@ -218,6 +218,7 @@ namespace Drakken.Networking
             {
                 "forge" => PickDiceTokenIntent.PickRandom(match.GameState.Clients[clientIndex].Dice, 2),
                 "mitosis" => PickDiceTokenIntent.PickRandom(match.GameState.Clients[clientIndex].Dice, 1),
+                "reinforce" => PickDiceTokenIntent.PickRandom(match.GameState.Clients[clientIndex].Dice, 1),
                 _ => new EmptyTokenIntent()
             };
 

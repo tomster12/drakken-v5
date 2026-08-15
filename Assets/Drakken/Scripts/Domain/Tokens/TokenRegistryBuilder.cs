@@ -31,7 +31,7 @@ namespace Drakken.Domain.Tokens
                     TokenId = "dragon",
                     DisplayName = "Dragon",
                     Description = "Roll a D4, replace that many dice randomly with new D8s.",
-                    Rarity = TokenRarity.Rare,
+                    Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.Transformation }
                 },
                 new DragonTokenExecutor(),
@@ -109,7 +109,7 @@ namespace Drakken.Domain.Tokens
                     TokenId = "glass",
                     DisplayName = "Glass",
                     Description = "Gain a new glass dice whose value is always 7. If it is modified it breaks.",
-                    Rarity = TokenRarity.Rare,
+                    Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
                 new GlassTokenExecutor(),
@@ -118,6 +118,26 @@ namespace Drakken.Domain.Tokens
                 !includeVisuals ? null : new TokenVisuals(
                     new GlassTokenAnimator(),
                     new EmptyTokenIntentPicker(),
+                    // Re-use assets for now
+                    prefabFactory?.Invoke("forge")
+                )
+            );
+
+            registry.Register(
+                new TokenDefinition
+                {
+                    TokenId = "reinforce",
+                    DisplayName = "Reinforce",
+                    Description = "Increase a dices roll by 2. If this exceeds its maximum increase its side count by 2, retaining sides, and reroll.",
+                    Rarity = TokenRarity.Common,
+                    Categories = new[] { TokenCategory.DiceGrowth }
+                },
+                new ReinforceTokenExecutor(),
+                typeof(PickDiceTokenIntent),
+                typeof(ReinforceTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new ReinforceTokenAnimator(),
+                    new PickDiceTokenIntentPicker(TargetOwner.Self, count: 1),
                     // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )

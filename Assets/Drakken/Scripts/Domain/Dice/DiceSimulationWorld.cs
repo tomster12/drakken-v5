@@ -183,8 +183,8 @@ namespace Drakken.Domain.Dice
 
         public void WakeDice(
             int diceInstanceId,
-            Vector3 linearImpulse,
-            Vector3 angularImpulse)
+            Vector3? linearImpulse = null,
+            Vector3? angularImpulse = null)
         {
             Assert.True(isInSession, "Cannot wake dice outside of a session");
 
@@ -194,8 +194,8 @@ namespace Drakken.Domain.Dice
             diceBody.RecordPose(currentTick);
 
             diceBody.Rigidbody.isKinematic = false;
-            diceBody.Rigidbody.AddForce(linearImpulse, ForceMode.VelocityChange);
-            diceBody.Rigidbody.AddTorque(angularImpulse, ForceMode.VelocityChange);
+            if (linearImpulse.HasValue) diceBody.Rigidbody.AddForce(linearImpulse.Value, ForceMode.VelocityChange);
+            if (angularImpulse.HasValue) diceBody.Rigidbody.AddTorque(angularImpulse.Value, ForceMode.VelocityChange);
             diceBody.IsSettled = false;
             diceBody.SettledTimer = 0f;
         }
