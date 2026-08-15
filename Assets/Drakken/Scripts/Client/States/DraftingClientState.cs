@@ -150,7 +150,7 @@ namespace Drakken.Client.States
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
-                    client.Assets, client, diceTraces.Player(clientIndex), sceneObjects, cts.Token));
+                    diceTraces.Player(clientIndex), sceneObjects, cts.Token));
             }
             await Task.WhenAll(tasks);
         }

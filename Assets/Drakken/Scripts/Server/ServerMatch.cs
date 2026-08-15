@@ -229,10 +229,12 @@ namespace Drakken.Server
             if (tokenInstance == null || tokenInstance.TokenId != message.TokenId)
                 throw new InvalidOperationException("Client attempted to play a token they do not own");
 
-            // Calculate on a copy of gamestate then apply to real game state afterwards
+            // Calculate the token on a copy of gamestate then apply to real game state afterwards
             // This lets us ensure it occurs the same on server as on the client
+            // Important to note that the diceWorld is leaky and is modified by the Execute()
+            var diceWorld = DiceWorlds[sourceClientIndex];
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            var resolution = entry.Executor.Execute(GameState.Clone(), message.Intent, sourceClientIndex, DiceWorlds[sourceClientIndex]);
+            var resolution = entry.Executor.Execute(GameState.Clone(), message.Intent, sourceClientIndex, diceWorld);
             entry.Executor.Apply(GameState, resolution, sourceClientIndex);
 
             GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);

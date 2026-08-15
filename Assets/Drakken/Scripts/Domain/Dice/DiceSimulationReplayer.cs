@@ -10,13 +10,25 @@ namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
-        public Task Play(
-            AssetDatabase assets, GameClient gameClient, DiceSimulationTraces trace, CancellationToken ct)
-            => Play(assets, gameClient, trace, existingViews: null, ct);
+        private AssetDatabase assets;
+        private GameClient gameClient;
+
+        public void Init(AssetDatabase assets, GameClient gameClient)
+        {
+            this.assets = assets;
+            this.gameClient = gameClient;
+        }
+
+        public void Cleanup()
+        {
+            assets = null;
+            gameClient = null;
+        }
+
+        public Task Play(DiceSimulationTraces trace, CancellationToken ct)
+            => Play(trace, existingViews: null, ct);
 
         public async Task Play(
-            AssetDatabase assets,
-            GameClient gameClient,
             DiceSimulationTraces trace,
             ScenePlayerObjects existingViews,
             CancellationToken ct)
@@ -40,7 +52,7 @@ namespace Drakken.Domain.Dice
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(relevantTraces, existingViews, liveViews, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
@@ -48,7 +60,7 @@ namespace Drakken.Domain.Dice
             // Apply with maxTimeSeconds at the end
             if (!ct.IsCancellationRequested)
             {
-                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(relevantTraces, existingViews, liveViews, trace.FixedTimestep, maxTimeSeconds);
             }
 
             // Once simulation has come to rest update effects and settled face
@@ -71,8 +83,6 @@ namespace Drakken.Domain.Dice
         }
 
         private void ApplyAtTime(
-            AssetDatabase assets,
-            GameClient gameClient,
             List<DiceSessionTrace> traces,
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
@@ -85,7 +95,7 @@ namespace Drakken.Domain.Dice
             foreach (var diceTrace in traces)
             {
                 // Add / remove the dice view
-                var diceView = EnsureLiveDiceView(assets, gameClient, diceTrace, rawTick, existingViews, liveViews);
+                var diceView = EnsureLiveDiceView(diceTrace, rawTick, existingViews, liveViews);
 
                 // Dice view is not required this tick
                 if (diceView == null) continue;
@@ -100,8 +110,6 @@ namespace Drakken.Domain.Dice
         }
 
         private DiceView EnsureLiveDiceView(
-            AssetDatabase assets,
-            GameClient gameClient,
             DiceSessionTrace diceTrace,
             float rawTick,
             ScenePlayerObjects existingViews,

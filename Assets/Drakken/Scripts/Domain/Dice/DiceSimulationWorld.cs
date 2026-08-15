@@ -71,9 +71,24 @@ namespace Drakken.Domain.Dice
 
         // ------------------------------ Session
 
-        public void BeginSession()
+        public void BeginSession(IEnumerable<DiceInstance> currentDiceInstances = null)
         {
             Assert.True(!isInSession, "Cannot begin a session while one is already in progress");
+
+            // Execute() on tokens runs on a fresh GameState.Clone()
+            // This means the persistent DiceBody points at an old DiceInstance
+            // This is the tradeoff for leaky simulation, but the execute on a cloned gamestate
+            // Vaguely mirrors TokenViews usage of the real GameState dice instance
+            if (currentDiceInstances != null)
+            {
+                foreach (var instance in currentDiceInstances)
+                {
+                    if (diceBodiesByInstanceId.TryGetValue(instance.InstanceId, out var body))
+                    {
+                        body.Instance = instance;
+                    }
+                }
+            }
 
             isInSession = true;
             sessionStartTick = currentTick;

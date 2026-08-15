@@ -45,7 +45,7 @@ namespace Drakken.Domain.Tokens.Implementation
             foreach (var face in glassDice.Faces) face.Value = 7;
             glassDice.DiceEffects.Add(DiceEffectIds.Glass);
 
-            diceWorld.BeginSession();
+            diceWorld.BeginSession(client.Dice);
 
             // Spawn and toss the dice into the world
             var trayPosition = diceWorld.Tray.position;
@@ -94,7 +94,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, sourcePlayerObjects, ct);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

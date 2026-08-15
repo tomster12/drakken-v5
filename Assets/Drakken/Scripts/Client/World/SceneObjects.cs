@@ -53,12 +53,15 @@ namespace Drakken.Client.World
             this.tokenRegistry = tokenRegistry;
             this.gameClient = gameClient;
             this.clientIndex = clientIndex;
+
+            DiceSimReplayer.Init(assets, gameClient);
         }
 
         public void OnDisconnect()
         {
             DestroyAllTokens();
             DestroyAllDice();
+            DiceSimReplayer.Cleanup();
         }
 
         // ------------------------------ Dice

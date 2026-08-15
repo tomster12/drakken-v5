@@ -68,7 +68,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new MitosisTokenResolution { OriginalInstanceId = originalInstanceId };
 
-            diceWorld.BeginSession();
+            diceWorld.BeginSession(client.Dice);
 
             // If the targeted dice can't be modified we cancel early
             if (!TokenExecutionLogic.TryModify(targetDice, diceWorld, resolution))
@@ -278,7 +278,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, sourcePlayerObjects, ct);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

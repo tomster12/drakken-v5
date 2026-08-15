@@ -41,7 +41,7 @@ namespace Drakken.Client.World
         public bool IsPickable { get; private set; } = false;
         private bool isInteractionLocked = false;
         public bool IsInteractable => !Animator.IsAnimating && !isInteractionLocked;
-        public bool IsSettled => settledFaceHighlightIndex.HasValue;
+        public bool IsSettled => settledFaceIndex.HasValue;
 
         private Color hoverOutlineColor = Color.white;
         private Color selectedOutlineColor = Colors.Hex("#a1e0ff");
@@ -51,7 +51,8 @@ namespace Drakken.Client.World
         private Vector2 FaceLabelSize = new(1.0f, 1.0f);
         private Color FaceLabelColor = Colors.Hex("#9f8d81");
         private Color SettledFaceLabelColor = Colors.Hex("#c8bbb2");
-        private int? settledFaceHighlightIndex;
+        private int? settledFaceIndex;
+        private int? displaySettledValue;
 
         private static readonly Dictionary<int, Color> FaceEffectColors = new()
         {
@@ -262,8 +263,8 @@ namespace Drakken.Client.World
             var dice = DiceInstance;
             if (dice == null) return;
 
-            // Value reads bigger and whiter than the smaller, greyer sides suffix
-            inspectLabelText.text = $"<size=135%><color=#FFFFFF>{dice.Value}</color></size> <color=#9F8D81>d{dice.Sides}</color>";
+            string valueText = displaySettledValue.HasValue ? displaySettledValue.Value.ToString() : "?";
+            inspectLabelText.text = $"<size=135%><color=#FFFFFF>{valueText}</color></size> <color=#9F8D81>d{dice.Sides}</color>";
         }
 
         // ------------------------------ Animation
@@ -372,10 +373,10 @@ namespace Drakken.Client.World
             // Instantly clears any settled face highlight animation
             settledFaceHighlightAnimator.Stop();
 
-            if (settledFaceHighlightIndex.HasValue)
+            if (settledFaceIndex.HasValue)
             {
                 List<TextMeshPro> labels = faceLabels
-                    .Where(fl => fl.FaceIndex == settledFaceHighlightIndex.Value)
+                    .Where(fl => fl.FaceIndex == settledFaceIndex.Value)
                     .Select(fl => fl.Label)
                     .ToList();
 
@@ -385,13 +386,17 @@ namespace Drakken.Client.World
                 }
             }
 
-            settledFaceHighlightIndex = null;
+            settledFaceIndex = null;
+            displaySettledValue = null;
         }
 
         public async Task SetSettledFace(DiceInstance dice, int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
         {
             // Lerps the labels for the given face index to the highlight colour
-            settledFaceHighlightIndex = faceIndex;
+            settledFaceIndex = faceIndex;
+
+            // Cache the provided value so we show the intermediate value amount during an animation
+            displaySettledValue = dice.Faces[faceIndex].Value;
 
             List<TextMeshPro> labels = faceLabels
                 .Where(fl => fl.FaceIndex == faceIndex)
@@ -429,7 +434,8 @@ namespace Drakken.Client.World
             }
 
             // Enable / disable inspector label
-            bool controlShowLabel = IsSettled && IsHovered && !Animator.IsAnimating;
+            // always available on hover, value shows "?" until settled
+            bool controlShowLabel = IsHovered && !Animator.IsAnimating;
             currentInspectAlpha = Mathf.Lerp(currentInspectAlpha, controlShowLabel ? 1f : 0f, InspectLabelFadeLerp * Time.deltaTime);
 
             bool showLabel = controlShowLabel || currentInspectAlpha > 0.01f;

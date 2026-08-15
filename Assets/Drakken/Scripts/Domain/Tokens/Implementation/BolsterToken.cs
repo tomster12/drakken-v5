@@ -50,7 +50,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new BolsterTokenResolution();
 
-            diceWorld.BeginSession();
+            diceWorld.BeginSession(client.Dice);
 
             // Try apply bolster modification to each dice
             foreach (var index in bolsteredIndices)
@@ -106,7 +106,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay simulation for any modification side effects
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, sourcePlayerObjects, ct);
 
             // Play animation for bolstering each dice
             var bolsterTasks = new List<Task>();
