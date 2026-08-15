@@ -128,7 +128,7 @@ namespace Drakken.Client
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
 
-            Log.Info($"ClientMatch-{MatchId}", $"Match started prafting phase");
+            Log.Info($"ClientMatch-{MatchId}", $"Match started playing phase");
 
             GameState = gameState;
 

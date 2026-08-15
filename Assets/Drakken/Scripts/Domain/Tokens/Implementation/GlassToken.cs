@@ -19,6 +19,7 @@ namespace Drakken.Domain.Tokens.Implementation
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
+            if (serializer.IsReader) AddedDiceInstance = new DiceInstance();
             serializer.SerializeValue(ref AddedDiceInstance);
             serializer.SerializeValue(ref DiceTrace);
         }

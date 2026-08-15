@@ -29,7 +29,11 @@ namespace Drakken.Domain.Tokens.Implementation
 
             bool hasFinalDice = FinalDiceInstance != null;
             serializer.SerializeValue(ref hasFinalDice);
-            if (hasFinalDice) serializer.SerializeValue(ref FinalDiceInstance);
+            if (hasFinalDice)
+            {
+                if (serializer.IsReader) FinalDiceInstance = new DiceInstance();
+                serializer.SerializeValue(ref FinalDiceInstance);
+            }
         }
     }
 

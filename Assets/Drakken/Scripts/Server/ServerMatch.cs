@@ -18,6 +18,7 @@ namespace Drakken.Server
         private static ulong nextMatchId = 1;
         private static readonly TimeSpan draftingStartDelay = TimeSpan.FromSeconds(0.5);
         private static readonly TimeSpan playingStartDelay = TimeSpan.FromSeconds(0.5);
+        private static readonly TimeSpan nextTurnDelay = TimeSpan.FromSeconds(0.5);
 
         private readonly TokenRegistry tokenRegistry;
         private readonly IGameConnection connection;
@@ -250,7 +251,7 @@ namespace Drakken.Server
             });
         }
 
-        public void OnClientMessageTokenResolved(ulong clientId)
+        public async void OnClientMessageTokenResolved(ulong clientId)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
             Assert.True(clientIdIndexAssignment.ContainsKey(clientId));
@@ -269,6 +270,7 @@ namespace Drakken.Server
 
             if (roundIsOver)
             {
+                await Task.Delay(nextTurnDelay);
                 EndRound();
             }
             else

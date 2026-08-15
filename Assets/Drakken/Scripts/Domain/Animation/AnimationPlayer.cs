@@ -14,13 +14,23 @@ namespace Drakken.Domain.Animation
         public bool IsAnimating { get; private set; }
         private CancellationTokenSource animationStoppingCts;
         private CancellationTokenSource animationCts;
+        private TaskCompletionSource<bool> activePlayCompletion;
 
         public async Task Play(AnimationSequence sequence, CancellationToken parentCt)
         {
+            // If we are animating already stop, then wait for a notification that it is finished
             if (IsAnimating || animationCts != null)
-                throw new InvalidOperationException("Cannot Play() animation while already animating");
+            {
+                Stop();
+                if (activePlayCompletion != null)
+                {
+                    await activePlayCompletion.Task;
+                }
+            }
 
             IsAnimating = true;
+            var myCompletion = new TaskCompletionSource<bool>();
+            activePlayCompletion = myCompletion;
 
             animationStoppingCts = new();
             animationCts = CancellationTokenSource.CreateLinkedTokenSource(animationStoppingCts.Token, parentCt);
@@ -68,6 +78,11 @@ namespace Drakken.Domain.Animation
 
                 animationStoppingCts = null;
                 animationCts = null;
+
+                // Notify that we have finished
+                if (activePlayCompletion == myCompletion)
+                    activePlayCompletion = null;
+                myCompletion.TrySetResult(true);
             }
         }
 

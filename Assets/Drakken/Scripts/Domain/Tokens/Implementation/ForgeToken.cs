@@ -28,11 +28,21 @@ namespace Drakken.Domain.Tokens.Implementation
             base.NetworkSerialize(serializer);
             serializer.SerializeValue(ref FirstInstanceId);
             serializer.SerializeValue(ref SecondInstanceId);
+
+            if (serializer.IsReader)
+            {
+                LiftTrace = new DiceSimulationTraces();
+                MergeTrace = new DiceSimulationTraces();
+            }
             serializer.SerializeValue(ref LiftTrace);
             serializer.SerializeValue(ref MergeTrace);
 
             serializer.SerializeValue(ref DidMerge);
-            if (DidMerge) serializer.SerializeValue(ref MergedDiceInstance);
+            if (DidMerge)
+            {
+                if (serializer.IsReader) MergedDiceInstance = new DiceInstance();
+                serializer.SerializeValue(ref MergedDiceInstance);
+            }
         }
     }
 
