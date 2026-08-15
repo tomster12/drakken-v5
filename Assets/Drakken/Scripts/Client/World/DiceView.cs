@@ -202,35 +202,42 @@ namespace Drakken.Client.World
             // Takes the dice instance explicitly so can show state during trace
             Assert.NotNull(dice);
 
-            // Dice-level effects (e.g. Glass) set a baseline tint for every face
-            Color diceEffectColor = FaceLabelColor;
-            foreach (int effectId in dice.DiceEffects)
-            {
-                if (DiceEffectColors.TryGetValue(effectId, out Color effectColor))
-                {
-                    diceEffectColor = effectColor;
-                    break;
-                }
-            }
-
             foreach (var (label, faceIndex) in faceLabels)
             {
                 Assert.True(faceIndex >= 0 && faceIndex < dice.Faces.Count);
 
-                Color color = diceEffectColor;
-
-                // A face-level effect (e.g. MitosisMark) takes priority over the dice-level tint
-                foreach (int effectId in dice.Faces[faceIndex].FaceEffects)
-                {
-                    if (FaceEffectColors.TryGetValue(effectId, out Color effectColor))
-                    {
-                        color = effectColor;
-                        break;
-                    }
-                }
-
-                label.color = color;
+                label.color = TryGetFaceEffectColor(dice, faceIndex, out Color effectColor)
+                    ? effectColor
+                    : FaceLabelColor;
             }
+        }
+
+        private bool TryGetFaceEffectColor(DiceInstance dice, int faceIndex, out Color color)
+        {
+            color = FaceLabelColor;
+            bool found = false;
+
+            // Dice-level effects (e.g. Glass) set a baseline tint for every face
+            foreach (int effectId in dice.DiceEffects)
+            {
+                if (DiceEffectColors.TryGetValue(effectId, out color))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            // A face-level effect (e.g. MitosisMark) takes priority over the dice-level tint
+            foreach (int effectId in dice.Faces[faceIndex].FaceEffects)
+            {
+                if (FaceEffectColors.TryGetValue(effectId, out Color faceColor))
+                {
+                    color = faceColor;
+                    return true;
+                }
+            }
+
+            return found;
         }
 
         private void CreateInspectLabel(AssetDatabase assets)
@@ -381,7 +388,7 @@ namespace Drakken.Client.World
             settledFaceHighlightIndex = null;
         }
 
-        public async Task SetSettledFace(int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
+        public async Task SetSettledFace(DiceInstance dice, int faceIndex, CancellationToken ct, float durationSeconds = 0.3f)
         {
             // Lerps the labels for the given face index to the highlight colour
             settledFaceHighlightIndex = faceIndex;
@@ -392,6 +399,9 @@ namespace Drakken.Client.World
                 .ToList();
 
             if (labels.Count == 0) return;
+
+            // Dice/face effects (e.g. Glass) take colour priority over the settled-face highlight
+            if (TryGetFaceEffectColor(dice, faceIndex, out _)) return;
 
             await settledFaceHighlightAnimator.Play(
                 AnimationSequenceBuilder.Start()

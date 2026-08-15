@@ -108,14 +108,17 @@ namespace Drakken.Domain.Tokens.Implementation
                 {
                     if (!pendingInstanceIds.Remove(settledId)) continue;
 
-                    int side = diceWorld.PeekDiceSide(settledId);
                     var settledDice = liveInstances[settledId];
                     int sides = settledDice.Sides;
 
+                    // If it was a pending D4 then just skip
+                    if (sides <= 4) continue;
+
+                    int side = diceWorld.PeekDiceSide(settledId);
                     bool isHit = settledDice.Faces[side].FaceEffects.Contains(FaceEffectIds.MitosisMark);
 
                     // Settled without splitting lock in its final value and leave it alive
-                    if (!isHit || totalDiceCount + 2 > MaxTotalDice || sides <= 4)
+                    if (!isHit || totalDiceCount + 2 > MaxTotalDice)
                     {
                         settledDice.CurrentSide = side;
                         continue;
@@ -173,13 +176,10 @@ namespace Drakken.Domain.Tokens.Implementation
                         Random.insideUnitSphere * SplitTorque);
 
                     // Only track the new children if they have >4 sides
-                    if (lift.ChildSides > 4)
-                    {
-                        liveInstances[childA.InstanceId] = childA;
-                        liveInstances[childB.InstanceId] = childB;
-                        pendingInstanceIds.Add(childA.InstanceId);
-                        pendingInstanceIds.Add(childB.InstanceId);
-                    }
+                    liveInstances[childA.InstanceId] = childA;
+                    liveInstances[childB.InstanceId] = childB;
+                    pendingInstanceIds.Add(childA.InstanceId);
+                    pendingInstanceIds.Add(childB.InstanceId);
 
                     totalDiceCount++;
                 }

@@ -58,10 +58,13 @@ namespace Drakken.Domain.Dice
                 {
                     if (liveViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
                     {
-                        // NOTE: Face effects are only refreshed on dice add, or on replay end
-                        view.RefreshEffects(diceTrace.Instance);
+                        // Update view with final game state dice instance
+                        var finalInstance = view.DiceInstance;
 
-                        _ = view.SetSettledFace(diceTrace.Instance.CurrentSide, ct);
+                        // NOTE: Face effects are only refreshed on dice add, or on replay end
+                        view.RefreshEffects(finalInstance);
+
+                        _ = view.SetSettledFace(finalInstance, finalInstance.CurrentSide, ct);
                     }
                 }
             }
@@ -111,7 +114,13 @@ namespace Drakken.Domain.Dice
                 (diceTrace.RemoveTick < 0 || rawTick < diceTrace.RemoveTick);
 
             int instanceId = diceTrace.Instance.InstanceId;
-            liveViews.TryGetValue(instanceId, out var diceView);
+
+            // Use liveView and existingViews to find the diceView
+            // This ensures the removal !shouldExist works on frame 0
+            if (!liveViews.TryGetValue(instanceId, out var diceView))
+            {
+                diceView = existingViews?.FindDiceView(instanceId);
+            }
 
             // We shouldn't have a view so remove if needed
             if (!shouldExist)
@@ -128,10 +137,8 @@ namespace Drakken.Domain.Dice
             }
 
             // Otherwise make sure this dice has a live view
-            if (diceView == null)
+            if (!liveViews.ContainsKey(instanceId))
             {
-                // Reuse existing view or create a new one
-                diceView = existingViews?.FindDiceView(instanceId);
                 if (diceView == null) diceView = DiceView.Create(assets, diceTrace.Instance, gameClient);
                 liveViews[instanceId] = diceView;
 
