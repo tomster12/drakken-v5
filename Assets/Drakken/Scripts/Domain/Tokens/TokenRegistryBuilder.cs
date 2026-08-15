@@ -102,6 +102,26 @@ namespace Drakken.Domain.Tokens
                     prefabFactory?.Invoke("forge")
                 )
             );
+
+            registry.Register(
+                new TokenDefinition
+                {
+                    TokenId = "glass",
+                    DisplayName = "Glass",
+                    Description = "Gain a new glass dice whose value is always 7. If it is modified it breaks.",
+                    Rarity = TokenRarity.Rare,
+                    Categories = new[] { TokenCategory.DiceGrowth }
+                },
+                new GlassTokenExecutor(),
+                typeof(EmptyTokenIntent),
+                typeof(GlassTokenResolution),
+                !includeVisuals ? null : new TokenVisuals(
+                    new GlassTokenAnimator(),
+                    new EmptyTokenIntentPicker(),
+                    // Re-use assets for now
+                    prefabFactory?.Invoke("forge")
+                )
+            );
         }
     }
 }

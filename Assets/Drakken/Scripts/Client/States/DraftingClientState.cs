@@ -151,24 +151,15 @@ namespace Drakken.Client.States
 
         private async Task SimulateDiceTraces(MatchDiceSimulationTraces diceTraces)
         {
-            List<Task<Dictionary<int, DiceView>>> tasks = new();
-
             // Replay the dice simulation traces for each player
+            List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
-
                 tasks.Add(sceneObjects.DiceSimReplayer.Play(
                     client.Assets, client, diceTraces.Player(clientIndex), sceneObjects, cts.Token));
             }
-
-            // Get the final dice views out and update scene objects
-            // The results of the replayer is the final list of relevant dice views
-            var results = await Task.WhenAll(tasks);
-            for (int clientIndex = 0; clientIndex < 2; clientIndex++)
-            {
-                SceneObjects.Player(clientIndex).DiceViews = results[clientIndex];
-            }
+            await Task.WhenAll(tasks);
         }
 
         private async void SpawnTokens()

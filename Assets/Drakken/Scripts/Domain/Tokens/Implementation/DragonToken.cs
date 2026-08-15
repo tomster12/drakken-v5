@@ -58,9 +58,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 .Take(replaceCount)
                 .ToList();
 
-            var replacedInstanceIds = replacedIndices
-                .Select(i => client.Dice[i].InstanceId)
-                .ToList();
+            var resolution = new DragonTokenResolution { ReplaceCount = replaceCount };
 
             diceWorld.BeginSession();
 
@@ -84,15 +82,21 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.Simulate(untilDrivesComplete: liftDriveIds);
 
-            // Swap each lifted dice for a D8, spin it place, then drop
+            // Swap each lifted dice for a D8, spin it place, then drop - unless it can't be modified,
+            // in which case it breaks instead
             var addedDice = new List<DiceInstance>();
             var hoverDriveIds = new List<string>();
             foreach (var replacedIndex in replacedIndices)
             {
-                diceWorld.RemoveDice(client.Dice[replacedIndex].InstanceId);
+                var replacedDice = client.Dice[replacedIndex];
+
+                if (!DiceModifications.TryModify(replacedDice, diceWorld, resolution)) continue;
+
+                diceWorld.RemoveDice(replacedDice.InstanceId);
 
                 var newDice = DiceInstance.Create(sides: 8);
                 addedDice.Add(newDice);
+                resolution.ReplacedInstanceIds.Add(replacedDice.InstanceId);
 
                 Vector3 hoverPosition = liftPositions[replacedIndex];
                 Quaternion spawnRotation = Random.rotationUniform;
@@ -107,7 +111,7 @@ namespace Drakken.Domain.Tokens.Implementation
                     t => spawnRotation * Quaternion.AngleAxis(HoverSpinTurns * 360f * Easing.EaseOutCubic(t), spinAxis)));
             }
 
-            diceWorld.Simulate(untilDrivesComplete: hoverDriveIds);
+            if (hoverDriveIds.Count > 0) diceWorld.Simulate(untilDrivesComplete: hoverDriveIds);
 
             foreach (var newDice in addedDice)
             {
@@ -117,21 +121,16 @@ namespace Drakken.Domain.Tokens.Implementation
             diceWorld.Simulate(untilAllSettled: true);
 
             diceWorld.FreezeAllDice();
-            var trace = diceWorld.EndSession();
+            resolution.AddedDiceInstances = addedDice;
+            resolution.DiceTrace = diceWorld.EndSession();
 
-            return new DragonTokenResolution
-            {
-                ReplaceCount = replaceCount,
-                ReplacedInstanceIds = replacedInstanceIds,
-                AddedDiceInstances = addedDice,
-                DiceTrace = trace,
-            };
+            return resolution;
         }
 
         protected override void Apply(GameState gameState, DragonTokenResolution resolution, int sourceClientIndex)
         {
             Assert.True(resolution.ReplacedInstanceIds.Count == resolution.AddedDiceInstances.Count);
-            Assert.True(resolution.ReplaceCount == resolution.AddedDiceInstances.Count);
+            Assert.True(resolution.ReplaceCount == resolution.ReplacedInstanceIds.Count + resolution.SideEffectsDestroyedDiceInstanceIds.Count);
 
             var client = gameState.Clients[sourceClientIndex];
 
@@ -188,20 +187,12 @@ namespace Drakken.Domain.Tokens.Implementation
 
             await Task.WhenAll(flashTasks);
 
-            // Replay full physical animation
-            var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
+            // Replay full physical animation - this covers both the replaced dice being removed and
+            // the new ones spawning in, keeping sourcePlayerObjects.DiceViews in sync as it goes
+            await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
 
             await shrinkTokenTask;
-
-            // Swap out the replaced dice for the newly rolled ones keyed by instance id
-            for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
-            {
-                var addedInstance = resolution.AddedDiceInstances[i];
-                var newDiceView = newDiceViews[addedInstance.InstanceId];
-                sourcePlayerObjects.DiceViews.Remove(resolution.ReplacedInstanceIds[i]);
-                sourcePlayerObjects.DiceViews[addedInstance.InstanceId] = newDiceView;
-            }
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
 

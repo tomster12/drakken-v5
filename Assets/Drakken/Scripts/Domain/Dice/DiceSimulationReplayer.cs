@@ -10,11 +10,11 @@ namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
-        public Task<Dictionary<int, DiceView>> Play(
+        public Task Play(
             AssetDatabase assets, GameClient gameClient, DiceSimulationTraces trace, CancellationToken ct)
             => Play(assets, gameClient, trace, existingViews: null, ct);
 
-        public async Task<Dictionary<int, DiceView>> Play(
+        public async Task Play(
             AssetDatabase assets,
             GameClient gameClient,
             DiceSimulationTraces trace,
@@ -29,11 +29,9 @@ namespace Drakken.Domain.Dice
                 maxTimeSeconds = Mathf.Max(maxTimeSeconds, diceTrace.PoseTraces[^1].Tick * trace.FixedTimestep);
             }
 
-            // liveViews is views currently on screen for this playback, keyed by dice instance id
+            // Views currently on screen for this playback keyed by dice instance id
             // Created and destroyed as playback crosses each dice's SpawnTick / RemoveTick
-            // resultViews is the final list of diceViews after all changrs
             Dictionary<int, DiceView> liveViews = new();
-            Dictionary<int, DiceView> resultViews = new();
 
             // Scrub through the simulation with interpolated frames
             float elapsedSeconds = 0f;
@@ -42,7 +40,7 @@ namespace Drakken.Domain.Dice
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, elapsedSeconds);
+                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, trace.FixedTimestep, elapsedSeconds);
 
                 await Task.Yield();
             }
@@ -50,7 +48,7 @@ namespace Drakken.Domain.Dice
             // Apply with maxTimeSeconds at the end
             if (!ct.IsCancellationRequested)
             {
-                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, resultViews, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(assets, gameClient, relevantTraces, existingViews, liveViews, trace.FixedTimestep, maxTimeSeconds);
             }
 
             // Once simulation has come to rest update effects and settled face
@@ -58,19 +56,15 @@ namespace Drakken.Domain.Dice
             {
                 foreach (var diceTrace in relevantTraces)
                 {
-                    if (resultViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
+                    if (liveViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
                     {
-                        var settledFace = diceTrace.Instance.Faces[diceTrace.Instance.CurrentSide];
-                        
                         // NOTE: Face effects are only refreshed on dice add, or on replay end
-                        view.RefreshFaceEffects(diceTrace.Instance);
+                        view.RefreshEffects(diceTrace.Instance);
 
                         _ = view.SetSettledFace(diceTrace.Instance.CurrentSide, ct);
                     }
                 }
             }
-
-            return resultViews;
         }
 
         private void ApplyAtTime(
@@ -79,7 +73,6 @@ namespace Drakken.Domain.Dice
             List<DiceSessionTrace> traces,
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
-            Dictionary<int, DiceView> resultViews,
             float fixedTimestep,
             float elapsedSeconds)
         {
@@ -89,10 +82,7 @@ namespace Drakken.Domain.Dice
             foreach (var diceTrace in traces)
             {
                 // Add / remove the dice view
-                var diceView = EnsureLiveDiceView(
-                    assets, gameClient,
-                    diceTrace, rawTick,
-                    existingViews, liveViews, resultViews);
+                var diceView = EnsureLiveDiceView(assets, gameClient, diceTrace, rawTick, existingViews, liveViews);
 
                 // Dice view is not required this tick
                 if (diceView == null) continue;
@@ -112,8 +102,7 @@ namespace Drakken.Domain.Dice
             DiceSessionTrace diceTrace,
             float rawTick,
             ScenePlayerObjects existingViews,
-            Dictionary<int, DiceView> liveViews,
-            Dictionary<int, DiceView> resultViews)
+            Dictionary<int, DiceView> liveViews)
         {
             // Check if we should exist and if we already have a view
             // We shouldn't exist if we haven't spawned, or have been removed
@@ -131,6 +120,9 @@ namespace Drakken.Domain.Dice
                 {
                     GameObject.Destroy(diceView.gameObject);
                     liveViews.Remove(instanceId);
+
+                    // Ensure the passed in state is kept up to date
+                    existingViews?.DiceViews.Remove(instanceId);
                 }
                 return null;
             }
@@ -145,10 +137,10 @@ namespace Drakken.Domain.Dice
 
                 // Set to not settled and update face effect
                 diceView.UnsetSettledFace();
-                diceView.RefreshFaceEffects(diceTrace.Instance);
+                diceView.RefreshEffects(diceTrace.Instance);
 
-                // If this isn't being removed then we can immediately add to resultViews
-                if (diceTrace.RemoveTick < 0) resultViews[instanceId] = diceView;
+                // Ensure the passed in state is kept up to date
+                if (existingViews != null) existingViews.DiceViews[instanceId] = diceView;
             }
 
             return diceView;

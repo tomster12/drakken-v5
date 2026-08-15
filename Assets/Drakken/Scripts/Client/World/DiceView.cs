@@ -58,6 +58,11 @@ namespace Drakken.Client.World
             [FaceEffectIds.MitosisMark] = Colors.Hex("#9bf593"),
         };
 
+        private static readonly Dictionary<int, Color> DiceEffectColors = new()
+        {
+            [DiceEffectIds.Glass] = Colors.Hex("#bfe9ff"),
+        };
+
         private GameObject inspectLabelGo;
         private TextMeshPro inspectLabelText;
         private float inspectLabelRotationY;
@@ -178,7 +183,7 @@ namespace Drakken.Client.World
 
         // ------------------------------ State
 
-        public void RefreshFaceLabels()
+        public void RefreshLabels()
         {
             // Refresh values on each face
             var dice = DiceInstance;
@@ -192,19 +197,30 @@ namespace Drakken.Client.World
             }
         }
 
-        public void RefreshFaceEffects(DiceInstance dice)
+        public void RefreshEffects(DiceInstance dice)
         {
             // Takes the dice instance explicitly so can show state during trace
             Assert.NotNull(dice);
+
+            // Dice-level effects (e.g. Glass) set a baseline tint for every face
+            Color diceEffectColor = FaceLabelColor;
+            foreach (int effectId in dice.DiceEffects)
+            {
+                if (DiceEffectColors.TryGetValue(effectId, out Color effectColor))
+                {
+                    diceEffectColor = effectColor;
+                    break;
+                }
+            }
 
             foreach (var (label, faceIndex) in faceLabels)
             {
                 Assert.True(faceIndex >= 0 && faceIndex < dice.Faces.Count);
 
-                Color color = FaceLabelColor;
+                Color color = diceEffectColor;
 
-                // Update colour of face label based on effects
-                foreach (int effectId in dice.Faces[faceIndex].Effects)
+                // A face-level effect (e.g. MitosisMark) takes priority over the dice-level tint
+                foreach (int effectId in dice.Faces[faceIndex].FaceEffects)
                 {
                     if (FaceEffectColors.TryGetValue(effectId, out Color effectColor))
                     {

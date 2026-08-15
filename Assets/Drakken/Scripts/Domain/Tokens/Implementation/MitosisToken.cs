@@ -56,17 +56,27 @@ namespace Drakken.Domain.Tokens.Implementation
             int sourceClientIndex,
             DiceSimulationWorld diceWorld)
         {
+            Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 1);
+
             var client = gameState.Clients[sourceClientIndex];
 
-            Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 1);
             int originalInstanceId = intent.TargetDiceInstanceIds[0];
             var targetDice = client.Dice.Find(d => d.InstanceId == originalInstanceId);
             Assert.NotNull(targetDice);
 
-            var liveInstances = new Dictionary<int, DiceInstance>();
-            var pendingInstanceIds = new HashSet<int>();
+            var resolution = new MitosisTokenResolution { OriginalInstanceId = originalInstanceId };
 
             diceWorld.BeginSession();
+
+            // If the targeted dice can't be modified we cancel early
+            if (!DiceModifications.TryModify(targetDice, diceWorld, resolution))
+            {
+                resolution.DiceTrace = diceWorld.EndSession();
+                return resolution;
+            }
+
+            var liveInstances = new Dictionary<int, DiceInstance>();
+            var pendingInstanceIds = new HashSet<int>();
 
             int totalDiceCount = client.Dice.Count;
 
@@ -102,13 +112,10 @@ namespace Drakken.Domain.Tokens.Implementation
                     var settledDice = liveInstances[settledId];
                     int sides = settledDice.Sides;
 
-                    bool isHit = settledDice.Faces[side].Effects.Contains(FaceEffectIds.MitosisMark);
+                    bool isHit = settledDice.Faces[side].FaceEffects.Contains(FaceEffectIds.MitosisMark);
 
-                    // Settled without splitting, lock in its final value and leave it alive.
-                    // Effects are left in place here (not cleared) so the session trace - captured later at
-                    // EndSession() - still shows the marks that were rolled for; they're stripped from the
-                    // real game state afterwards, once the trace has already taken its snapshot.
-                    if (!isHit || totalDiceCount + 2 > MaxTotalDice)
+                    // Settled without splitting lock in its final value and leave it alive
+                    if (!isHit || totalDiceCount + 2 > MaxTotalDice || sides <= 4)
                     {
                         settledDice.CurrentSide = side;
                         continue;
@@ -127,11 +134,14 @@ namespace Drakken.Domain.Tokens.Implementation
                     liftDrives[driveId] = (settledId, childSides);
                 }
 
+                // This is a generic catch all for any drive
                 foreach (var completedDriveId in result.CompletedDriveIds)
                 {
+                    // First ensure it is a lift drive
                     if (!liftDrives.TryGetValue(completedDriveId, out var lift)) continue;
                     liftDrives.Remove(completedDriveId);
 
+                    // So now we can remove the dice view to pop
                     var (liftedPosition, _) = diceWorld.GetDicePose(lift.SettledId);
                     var parentFaces = liveInstances[lift.SettledId].Faces;
                     diceWorld.RemoveDice(lift.SettledId);
@@ -143,8 +153,13 @@ namespace Drakken.Domain.Tokens.Implementation
                     var (halfA, halfB) = SplitFacesRandomly(parentFaces);
                     var childA = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfA);
                     var childB = DiceInstance.CreateFromRetainedFaces(lift.ChildSides, halfB);
-                    MarkRandomHalf(childA);
-                    MarkRandomHalf(childB);
+
+                    // Only mark and fling if they have >4 sides
+                    if (lift.ChildSides > 4)
+                    {
+                        MarkRandomHalf(childA);
+                        MarkRandomHalf(childB);
+                    }
 
                     // Fling the two children apart sideways in opposite directions, still with some lift
                     diceWorld.SpawnDice(
@@ -157,35 +172,36 @@ namespace Drakken.Domain.Tokens.Implementation
                         -outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                         Random.insideUnitSphere * SplitTorque);
 
-                    liveInstances[childA.InstanceId] = childA;
-                    liveInstances[childB.InstanceId] = childB;
-                    pendingInstanceIds.Add(childA.InstanceId);
-                    pendingInstanceIds.Add(childB.InstanceId);
+                    // Only track the new children if they have >4 sides
+                    if (lift.ChildSides > 4)
+                    {
+                        liveInstances[childA.InstanceId] = childA;
+                        liveInstances[childB.InstanceId] = childB;
+                        pendingInstanceIds.Add(childA.InstanceId);
+                        pendingInstanceIds.Add(childB.InstanceId);
+                    }
 
                     totalDiceCount++;
                 }
             }
 
             diceWorld.FreezeAllDice();
-            var trace = diceWorld.EndSession();
+            resolution.DiceTrace = diceWorld.EndSession();
 
             // Marks are ephemeral - the trace already captured them for replay, so the real game state ends clean
             foreach (var dice in liveInstances.Values)
             {
-                foreach (var face in dice.Faces) face.Effects.Clear();
+                foreach (var face in dice.Faces) face.FaceEffects.Clear();
             }
 
-            return new MitosisTokenResolution
-            {
-                OriginalInstanceId = originalInstanceId,
-                FinalDiceInstances = new List<DiceInstance>(liveInstances.Values),
-                DiceTrace = trace,
-            };
+            resolution.FinalDiceInstances = new List<DiceInstance>(liveInstances.Values);
+
+            return resolution;
         }
 
         private static void MarkRandomHalf(DiceInstance dice)
         {
-            foreach (var face in dice.Faces) face.Effects.Clear();
+            foreach (var face in dice.Faces) face.FaceEffects.Clear();
 
             var indices = new List<int>(dice.Sides);
             for (int i = 0; i < dice.Sides; i++) indices.Add(i);
@@ -199,7 +215,7 @@ namespace Drakken.Domain.Tokens.Implementation
             int markCount = dice.Sides / 2;
             for (int i = 0; i < markCount; i++)
             {
-                dice.Faces[indices[i]].Effects.Add(FaceEffectIds.MitosisMark);
+                dice.Faces[indices[i]].FaceEffects.Add(FaceEffectIds.MitosisMark);
             }
         }
 
@@ -221,6 +237,10 @@ namespace Drakken.Domain.Tokens.Implementation
 
         protected override void Apply(GameState gameState, MitosisTokenResolution resolution, int sourceClientIndex)
         {
+            // The dice couldn't be modified (it broke) - nothing to insert; the framework already
+            // removed it from GameState via DestroyedDiceInstanceIds.
+            if (resolution.FinalDiceInstances.Count == 0) return;
+
             var client = gameState.Clients[sourceClientIndex];
 
             int index = client.Dice.FindIndex(d => d.InstanceId == resolution.OriginalInstanceId);
@@ -248,17 +268,10 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Replay simulation
-            var newDiceViews = await sourcePlayerObjects.DiceSimReplayer.Play(
+            // Replay simulation - covers both the original dice being removed (whether it split or
+            // broke) and any new dice spawning in, keeping sourcePlayerObjects.DiceViews in sync
+            await sourcePlayerObjects.DiceSimReplayer.Play(
                 visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
-
-            // The original dice is replaced by new dice views
-            sourcePlayerObjects.DiceViews.Remove(resolution.OriginalInstanceId);
-
-            foreach (var (instanceId, diceView) in newDiceViews)
-            {
-                sourcePlayerObjects.DiceViews[instanceId] = diceView;
-            }
 
             await shrinkTokenTask;
 

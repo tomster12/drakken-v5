@@ -16,7 +16,19 @@ namespace Drakken.Domain.Tokens.Logic
             => Execute(gameState, (TIntent)intent, sourceClientIndex, diceWorld);
 
         public void Apply(GameState gameState, TokenResolution resolution, int sourceClientIndex)
-            => Apply(gameState, (TResolution)resolution, sourceClientIndex);
+        {
+            var typedResolution = (TResolution)resolution;
+
+            // Handle dice resolution side effects
+            // Currently just ensure we remove any dice that were removed (e.g. Glass)
+            if (typedResolution.SideEffectsDestroyedDiceInstanceIds.Count > 0)
+            {
+                gameState.Clients[sourceClientIndex].Dice.RemoveAll(
+                    d => typedResolution.SideEffectsDestroyedDiceInstanceIds.Contains(d.InstanceId));
+            }
+
+            Apply(gameState, typedResolution, sourceClientIndex);
+        }
 
         protected abstract TResolution Execute(GameState gameState, TIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld);
 

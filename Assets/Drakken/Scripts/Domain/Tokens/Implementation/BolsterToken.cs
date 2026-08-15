@@ -18,12 +18,14 @@ namespace Drakken.Domain.Tokens.Implementation
     {
         public List<int> BolsteredInstanceIds = new();
         public List<int> NewFaceValues = new();
+        public DiceSimulationTraces DiceTrace = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
             serializer.SerializeList(ref BolsteredInstanceIds);
             serializer.SerializeList(ref NewFaceValues);
+            serializer.SerializeValue(ref DiceTrace);
         }
     }
 
@@ -45,22 +47,24 @@ namespace Drakken.Domain.Tokens.Implementation
                 .Take(count)
                 .ToList();
 
-            var bolsteredInstanceIds = new List<int>();
-            var newFaceValues = new List<int>();
+            var resolution = new BolsterTokenResolution();
+
+            diceWorld.BeginSession();
 
             foreach (var index in bolsteredIndices)
             {
                 var dice = client.Dice[index];
 
-                bolsteredInstanceIds.Add(dice.InstanceId);
-                newFaceValues.Add(dice.Value + 1);
+                if (!DiceModifications.TryModify(dice, diceWorld, resolution)) continue;
+
+                resolution.BolsteredInstanceIds.Add(dice.InstanceId);
+                resolution.NewFaceValues.Add(dice.Value + 1);
             }
 
-            return new BolsterTokenResolution
-            {
-                BolsteredInstanceIds = bolsteredInstanceIds,
-                NewFaceValues = newFaceValues,
-            };
+            diceWorld.FreezeAllDice();
+            resolution.DiceTrace = diceWorld.EndSession();
+
+            return resolution;
         }
 
         protected override void Apply(GameState gameState, BolsterTokenResolution resolution, int sourceClientIndex)
@@ -99,6 +103,10 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
+            // Only relevant if a dice broke - replaying keeps sourcePlayerObjects.DiceViews in sync
+            await sourcePlayerObjects.DiceSimReplayer.Play(
+                visualContext.Client.Assets, visualContext.Client, resolution.DiceTrace, sourcePlayerObjects, ct);
+
             var bolsterTasks = new List<Task>();
 
             for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
@@ -108,7 +116,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
                 // Bump the printed value shown on the dice's current face and flag it as
                 // picked, without moving the dice at all.
-                diceView.RefreshFaceLabels();
+                diceView.RefreshLabels();
 
                 bolsterTasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
                 bolsterTasks.Add(visualContext.Client.Vfx.SpawnFloatingLabel(

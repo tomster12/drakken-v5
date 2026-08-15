@@ -11,20 +11,25 @@ namespace Drakken.Domain
         public const int MitosisMark = 1;
     }
 
+    public static class DiceEffectIds
+    {
+        public const int Glass = 1;
+    }
+
     public class DiceInstanceFace : INetworkSerializable
     {
         public int Value;
-        public List<int> Effects = new();
+        public List<int> FaceEffects = new();
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref Value);
-            serializer.SerializeList(ref Effects);
+            serializer.SerializeList(ref FaceEffects);
         }
 
         public DiceInstanceFace Clone()
         {
-            return new DiceInstanceFace { Value = Value, Effects = new List<int>(Effects) };
+            return new DiceInstanceFace { Value = Value, FaceEffects = new List<int>(FaceEffects) };
         }
     }
 
@@ -35,8 +40,10 @@ namespace Drakken.Domain
         public int Sides;
         public int CurrentSide;
         public List<DiceInstanceFace> Faces;
+        public List<int> DiceEffects = new();
 
         public int Value => Faces[CurrentSide].Value;
+        public bool CanBeModified => !DiceEffects.Contains(DiceEffectIds.Glass);
 
         public static DiceInstance Create(int sides, int currentSide = 0)
         {
@@ -93,6 +100,7 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref Sides);
             serializer.SerializeValue(ref CurrentSide);
             serializer.SerializeList(ref Faces);
+            serializer.SerializeList(ref DiceEffects);
         }
 
         public DiceInstance Clone()
@@ -102,7 +110,8 @@ namespace Drakken.Domain
                 InstanceId = InstanceId,
                 Sides = Sides,
                 CurrentSide = CurrentSide,
-                Faces = Faces?.Select(f => f.Clone()).ToList()
+                Faces = Faces?.Select(f => f.Clone()).ToList(),
+                DiceEffects = new List<int>(DiceEffects)
             };
         }
     }
