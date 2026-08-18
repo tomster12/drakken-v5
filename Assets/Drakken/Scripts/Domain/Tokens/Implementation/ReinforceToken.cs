@@ -67,7 +67,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new ReinforceTokenResolution { OriginalInstanceId = originalInstanceId };
 
-            diceWorld.BeginSession(client.Dice);
+            diceWorld.BeginSession(resolution, client.Dice);
 
             // Ensure we can modify the dice
             if (!TokenExecutionLogic.TryModify(targetDice, diceWorld, resolution))
@@ -193,7 +193,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation (float, spin, and dice swap if it occurred)
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

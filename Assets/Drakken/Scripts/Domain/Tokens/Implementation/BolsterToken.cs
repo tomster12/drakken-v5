@@ -1,14 +1,10 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
-using Drakken.Common.Utility;
 using Drakken.Domain.Dice;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
-using Drakken.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -16,22 +12,25 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class BolsterTokenResolution : TokenResolution
     {
-        public List<int> BolsteredInstanceIds = new();
-        public List<int> NewFaceValues = new();
+        public DiceInstance AddedDiceInstance;
         public DiceSimulationTraces DiceTrace = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeList(ref BolsteredInstanceIds);
-            serializer.SerializeList(ref NewFaceValues);
+            if (serializer.IsReader) AddedDiceInstance = new DiceInstance();
+            serializer.SerializeValue(ref AddedDiceInstance);
             serializer.SerializeValue(ref DiceTrace);
         }
     }
 
     public class BolsterTokenExecutor : TokenExecutor<EmptyTokenIntent, BolsterTokenResolution>
     {
-        private const int BolsterCount = 3;
+        private const float TossUpwardMin = 4.5f;
+        private const float TossUpwardMax = 6f;
+        private const float TossSideways = 0.6f;
+        private const float TossTorque = 20f;
+        private const float SpawnHeight = 1f;
 
         protected override BolsterTokenResolution Execute(
             GameState gameState,
@@ -41,29 +40,29 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            // Pick the dice we want to bolster
-            int count = Mathf.Min(BolsterCount, client.Dice.Count);
-            var bolsteredIndices = Enumerable.Range(0, client.Dice.Count)
-                .OrderBy(_ => Random.value)
-                .Take(count)
-                .ToList();
+            // The bolster dice always shows 1 on every face for now, upgradeable later
+            var bolsterDice = DiceInstance.Create(sides: 4);
+            foreach (var face in bolsterDice.Faces) face.Value = 1;
+            bolsterDice.DiceEffects.Add(DiceEffectIds.Bolster);
 
-            var resolution = new BolsterTokenResolution();
+            var resolution = new BolsterTokenResolution { AddedDiceInstance = bolsterDice };
 
-            diceWorld.BeginSession(client.Dice);
+            diceWorld.BeginSession(resolution, client.Dice);
 
-            // Try apply bolster modification to each dice
-            foreach (var index in bolsteredIndices)
-            {
-                var dice = client.Dice[index];
+            var trayPosition = diceWorld.Tray.position;
+            Vector3 spawnPosition = trayPosition + Vector3.up * SpawnHeight;
 
-                if (!TokenExecutionLogic.TryModify(dice, diceWorld, resolution)) continue;
+            Vector3 tossImpulse = new(
+                Random.Range(-TossSideways, TossSideways),
+                Random.Range(TossUpwardMin, TossUpwardMax),
+                Random.Range(-TossSideways, TossSideways));
 
-                resolution.BolsteredInstanceIds.Add(dice.InstanceId);
-                resolution.NewFaceValues.Add(dice.Value + 1);
-            }
+            diceWorld.SpawnDice(bolsterDice, spawnPosition, Random.rotationUniform, tossImpulse, Random.insideUnitSphere * TossTorque);
 
+            // Its Bolster effect fires automatically once it settles in see BolsterDiceEffectLogic
             diceWorld.Simulate(untilAllSettled: true);
+
+            // The bolster dice stays in the pool permanently
             diceWorld.FreezeAllDice();
             resolution.DiceTrace = diceWorld.EndSession();
 
@@ -75,26 +74,12 @@ namespace Drakken.Domain.Tokens.Implementation
             BolsterTokenResolution resolution,
             int sourceClientIndex)
         {
-            Assert.True(resolution.BolsteredInstanceIds.Count == resolution.NewFaceValues.Count);
-
-            var client = gameState.Clients[sourceClientIndex];
-
-            // Apply the new face values to each bolstered dice
-            for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
-            {
-                var dice = client.Dice.Find(d => d.InstanceId == resolution.BolsteredInstanceIds[i]);
-                Assert.True(dice != null);
-                dice.Faces[dice.CurrentSide].Value = resolution.NewFaceValues[i];
-            }
+            gameState.Clients[sourceClientIndex].Dice.Add(resolution.AddedDiceInstance);
         }
     }
 
     public class BolsterTokenAnimator : TokenAnimator<BolsterTokenResolution>
     {
-        private static readonly Color HighlightColor = Colors.Hex("#9cec92");
-        private const float HighlightDuration = 0.9f;
-        private const float LabelRiseHeight = 0.6f;
-
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,
@@ -108,32 +93,10 @@ namespace Drakken.Domain.Tokens.Implementation
             // Shrink the token out the way
             await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
 
-            // Replay simulation for any modification side effects
+            // Replay the full simulation - any dice bolstered along the way flash automatically,
+            // synced to the moment the bolster dice settles, via SideEffectsValueChanges
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, sourcePlayerObjects, ct);
-
-            // Play animation for bolstering each dice
-            var bolsterTasks = new List<Task>();
-
-            for (int i = 0; i < resolution.BolsteredInstanceIds.Count; i++)
-            {
-                int instanceId = resolution.BolsteredInstanceIds[i];
-                Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
-
-                diceView.RefreshLabels();
-
-                bolsterTasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
-                bolsterTasks.Add(visualContext.Client.Vfx.SpawnFloatingLabel(
-                    "+1",
-                    HighlightColor,
-                    diceView.transform.position + Vector3.up * LabelRiseHeight,
-                    Quaternion.Euler(45f, visualContext.Client.Match.ClientIndex == 1 ? 180f : 0f, 0f),
-                    ct));
-
-                _ = diceView.SetSettledFace(diceView.DiceInstance, diceView.DiceInstance.CurrentSide, ct);
-            }
-
-            await Task.WhenAll(bolsterTasks);
+                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

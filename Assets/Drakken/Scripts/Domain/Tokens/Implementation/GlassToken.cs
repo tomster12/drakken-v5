@@ -46,7 +46,9 @@ namespace Drakken.Domain.Tokens.Implementation
             foreach (var face in glassDice.Faces) face.Value = 7;
             glassDice.DiceEffects.Add(DiceEffectIds.Glass);
 
-            diceWorld.BeginSession(client.Dice);
+            var resolution = new GlassTokenResolution { AddedDiceInstance = glassDice };
+
+            diceWorld.BeginSession(resolution, client.Dice);
 
             // Spawn and toss the dice into the world
             var trayPosition = diceWorld.Tray.position;
@@ -62,13 +64,9 @@ namespace Drakken.Domain.Tokens.Implementation
             diceWorld.Simulate(untilAllSettled: true);
 
             diceWorld.FreezeAllDice();
-            var trace = diceWorld.EndSession();
+            resolution.DiceTrace = diceWorld.EndSession();
 
-            return new GlassTokenResolution
-            {
-                AddedDiceInstance = glassDice,
-                DiceTrace = trace,
-            };
+            return resolution;
         }
 
         protected override void Apply(GameState gameState, GlassTokenResolution resolution, int sourceClientIndex)
@@ -95,7 +93,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

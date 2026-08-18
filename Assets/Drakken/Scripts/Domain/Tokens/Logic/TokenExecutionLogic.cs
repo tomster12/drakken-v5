@@ -1,5 +1,6 @@
+using System.Collections.Generic;
 using Drakken.Domain.Dice;
-using UnityEngine;
+using Drakken.Domain.Dice.Effects;
 
 namespace Drakken.Domain.Tokens.Logic
 {
@@ -7,17 +8,18 @@ namespace Drakken.Domain.Tokens.Logic
     {
         public static bool TryModify(DiceInstance dice, DiceSimulationWorld diceWorld, TokenResolution resolution)
         {
-            if (dice.CanBeModified) return true;
+            bool allowed = true;
 
-            // When a glass dice blocks a modification it is removed
-            if (dice.DiceEffects.Contains(DiceEffectIds.Glass))
+            // Every dice effect gets a chance to block / react to the attempted modification
+            foreach (var effectId in new List<int>(dice.DiceEffects))
             {
-                diceWorld.WakeDice(dice.InstanceId, Vector3.zero, Vector3.zero);
-                diceWorld.RemoveDice(dice.InstanceId);
-                resolution.SideEffectsDestroyedDiceInstanceIds.Add(dice.InstanceId);
+                var effect = DiceEffectRegistry.Get(effectId);
+                
+                if (effect != null && !effect.TryModify(dice, diceWorld, resolution))
+                    allowed = false;
             }
 
-            return false;
+            return allowed;
         }
 
         public static int RoundUpToEven(int n) => n % 2 == 0 ? n : n + 1;

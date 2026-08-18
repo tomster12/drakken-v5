@@ -14,6 +14,7 @@ namespace Drakken.Domain
     public static class DiceEffectIds
     {
         public const int Glass = 1;
+        public const int Bolster = 2;
     }
 
     public class DiceInstanceFace : INetworkSerializable
@@ -43,7 +44,6 @@ namespace Drakken.Domain
         public List<int> DiceEffects = new();
 
         public int Value => Faces[CurrentSide].Value;
-        public bool CanBeModified => !DiceEffects.Contains(DiceEffectIds.Glass);
 
         public static DiceInstance Create(int sides, int currentSide = 0)
         {

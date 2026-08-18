@@ -18,13 +18,19 @@ namespace Drakken.Domain.Tokens.Logic
         public void Apply(GameState gameState, TokenResolution resolution, int sourceClientIndex)
         {
             var typedResolution = (TResolution)resolution;
+            var client = gameState.Clients[sourceClientIndex];
 
-            // Handle dice resolution side effects
-            // Currently just ensure we remove any dice that were removed (e.g. Glass)
+            // Handle generic dice side effects - these can come from any settle-triggered dice/face
+            // effect (e.g. Bolster, Glass), no matter which token's simulation caused them
             if (typedResolution.SideEffectsDestroyedDiceInstanceIds.Count > 0)
             {
-                gameState.Clients[sourceClientIndex].Dice.RemoveAll(
-                    d => typedResolution.SideEffectsDestroyedDiceInstanceIds.Contains(d.InstanceId));
+                client.Dice.RemoveAll(d => typedResolution.SideEffectsDestroyedDiceInstanceIds.Contains(d.InstanceId));
+            }
+
+            foreach (var change in typedResolution.SideEffectsValueChanges)
+            {
+                var dice = client.Dice.Find(d => d.InstanceId == change.InstanceId);
+                if (dice != null) dice.Faces[dice.CurrentSide].Value = change.NewValue;
             }
 
             Apply(gameState, typedResolution, sourceClientIndex);

@@ -77,7 +77,7 @@ namespace Drakken.Domain.Tokens.Implementation
             };
 
             // Drive the 2 dice up next to each other in the midpoint
-            diceWorld.BeginSession(client.Dice);
+            diceWorld.BeginSession(resolution, client.Dice);
 
             var (firstStartPos, firstStartRot) = diceWorld.GetDicePose(firstDice.InstanceId);
             var (secondStartPos, secondStartRot) = diceWorld.GetDicePose(secondDice.InstanceId);
@@ -112,7 +112,7 @@ namespace Drakken.Domain.Tokens.Implementation
             resolution.LiftTrace = diceWorld.EndSession();
 
             // Now try and merge the 2 dice together
-            diceWorld.BeginSession(client.Dice);
+            diceWorld.BeginSession(resolution, client.Dice);
 
             bool firstCanModify = TokenExecutionLogic.TryModify(firstDice, diceWorld, resolution);
             bool secondCanModify = TokenExecutionLogic.TryModify(secondDice, diceWorld, resolution);
@@ -218,7 +218,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the lift simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.LiftTrace, sourcePlayerObjects, ct);
+                resolution.LiftTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             if (resolution.DidMerge)
             {
@@ -257,7 +257,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the final merge simulation (either merge or just drop)
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.MergeTrace, sourcePlayerObjects, ct);
+                resolution.MergeTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

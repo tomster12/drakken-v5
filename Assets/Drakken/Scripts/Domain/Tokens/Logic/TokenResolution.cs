@@ -14,9 +14,29 @@ namespace Drakken.Domain.Tokens.Logic
         // tokens don't need to handle that part.
         public List<int> SideEffectsDestroyedDiceInstanceIds = new();
 
+        // Dice value changes caused by a settle-triggered dice/face effect (e.g. Bolster) - these
+        // fire no matter which token's simulation caused the settle, so they're applied and
+        // animated generically here rather than each token needing its own equivalent field.
+        public List<DiceValueChange> SideEffectsValueChanges = new();
+
         public virtual void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeList(ref SideEffectsDestroyedDiceInstanceIds);
+            serializer.SerializeList(ref SideEffectsValueChanges);
+        }
+    }
+
+    public class DiceValueChange : INetworkSerializable
+    {
+        public int InstanceId;
+        public int NewValue;
+        public int SourceInstanceId;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref InstanceId);
+            serializer.SerializeValue(ref NewValue);
+            serializer.SerializeValue(ref SourceInstanceId);
         }
     }
 }

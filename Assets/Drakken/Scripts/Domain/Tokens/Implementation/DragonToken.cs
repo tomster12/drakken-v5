@@ -63,7 +63,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 ReplaceCount = replaceCount
             };
 
-            diceWorld.BeginSession(client.Dice);
+            diceWorld.BeginSession(resolution, client.Dice);
 
             // Lift each replaced dice into the air with a spin
             var liftDriveIds = new List<string>();
@@ -199,7 +199,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, sourcePlayerObjects, ct);
+                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
 
             await Task.WhenAll(tasks);
 

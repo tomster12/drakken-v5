@@ -3,11 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
+using Drakken.Domain.Dice.Effects;
+using Drakken.Domain.Tokens.Logic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Drakken.Domain.Dice
 {
+    // Dispatches dice/face effects (see Drakken.Domain.Dice.Effects) as part of its own physics
+    // step - this is what makes permanent effects (e.g. Bolster) fire no matter which token's
+    // session disturbs the dice, rather than only when their own token happens to be running.
     public class DiceSimulationWorld
     {
         private const float fixedTimestep = 1f / 30f;
@@ -26,8 +31,10 @@ namespace Drakken.Domain.Dice
         private int sessionStartTick;
         private int nextDriveId;
         private bool isInSession;
+        private TokenResolution sessionResolution;
 
         public bool AllDynamicSettled =>
+            activeDrives.Count == 0 &&
             diceBodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
 
         public Transform Tray => trayGO.transform;
@@ -71,7 +78,10 @@ namespace Drakken.Domain.Dice
 
         // ------------------------------ Session
 
-        public void BeginSession(IEnumerable<DiceInstance> currentDiceInstances)
+        // resolution is null for sessions not driven by a token (e.g. a plain reroll) - any
+        // settle-triggered effect that fires still mutates dice directly, it just has nothing to
+        // record outcomes into for a later Apply/animate step
+        public void BeginSession(TokenResolution resolution, IEnumerable<DiceInstance> currentDiceInstances)
         {
             Assert.True(!isInSession, "Cannot begin a session while one is already in progress");
 
@@ -89,6 +99,7 @@ namespace Drakken.Domain.Dice
 
             isInSession = true;
             sessionStartTick = currentTick;
+            sessionResolution = resolution;
         }
 
         public DiceSimulationTraces EndSession()
@@ -100,10 +111,11 @@ namespace Drakken.Domain.Dice
             // Get a trace of each dice for this session and clear out traces
             foreach (var body in diceBodiesByInstanceId.Values)
             {
-                if (body.SessionPoses.Count == 0) continue;
+                if (body.SessionPoseTraces.Count == 0) continue;
 
                 traces.Dice.Add(BuildSessionTrace(body, removeTick: -1));
-                body.SessionPoses.Clear();
+                body.SessionPoseTraces.Clear();
+                body.SessionSettleEvents.Clear();
             }
 
             // Make sure to also include any dice that was removed this session
@@ -114,17 +126,18 @@ namespace Drakken.Domain.Dice
             sessionRemovedTraces.Clear();
 
             isInSession = false;
+            sessionResolution = null;
             return traces;
         }
 
         private DiceSessionTrace BuildSessionTrace(DiceBody body, int removeTick)
         {
             // Build a trace of a dice over this session, rebased to 0 at session start
-            List<DicePoseTrace> poses = new(body.SessionPoses.Count);
+            List<DicePoseTrace> poseTraces = new(body.SessionPoseTraces.Count);
 
-            foreach (var pose in body.SessionPoses)
+            foreach (var pose in body.SessionPoseTraces)
             {
-                poses.Add(new DicePoseTrace
+                poseTraces.Add(new DicePoseTrace
                 {
                     Tick = pose.Tick - sessionStartTick,
                     Position = pose.Position,
@@ -132,11 +145,23 @@ namespace Drakken.Domain.Dice
                 });
             }
 
+            List<DiceSettleEvent> settleEvents = new(body.SessionSettleEvents.Count);
+
+            foreach (var settleEvent in body.SessionSettleEvents)
+            {
+                settleEvents.Add(new DiceSettleEvent
+                {
+                    Tick = settleEvent.Tick - sessionStartTick,
+                    Side = settleEvent.Side,
+                });
+            }
+
             return new DiceSessionTrace
             {
                 Instance = body.Instance.Clone(),
                 SpawnTick = Mathf.Max(0, body.SpawnTick - sessionStartTick),
-                PoseTraces = poses,
+                PoseTraces = poseTraces,
+                SettleEvents = settleEvents,
                 RemoveTick = removeTick < 0 ? -1 : removeTick - sessionStartTick,
             };
         }
@@ -234,7 +259,8 @@ namespace Drakken.Domain.Dice
             int diceInstanceId,
             float durationSeconds,
             Func<float, Vector3> positionAtTime,
-            Func<float, Quaternion> rotationAtTime)
+            Func<float, Quaternion> rotationAtTime,
+            Action onComplete = null)
         {
             Assert.True(isInSession, "Cannot drive dice outside of a session");
 
@@ -250,6 +276,7 @@ namespace Drakken.Domain.Dice
                 DurationTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / fixedTimestep)),
                 PositionAtTime = positionAtTime,
                 RotationAtTime = rotationAtTime,
+                OnComplete = onComplete,
             };
             activeDrives.Add(drive);
             return drive.Id;
@@ -327,6 +354,7 @@ namespace Drakken.Domain.Dice
                     {
                         completedDrives.Add(drive.Id);
                         activeDrives.RemoveAt(i);
+                        drive.OnComplete?.Invoke();
                     }
                 }
             }
@@ -366,6 +394,11 @@ namespace Drakken.Domain.Dice
                     {
                         body.IsSettled = true;
                         settled.Add(instanceId);
+                        body.SessionSettleEvents.Add(new DiceSettleEvent
+                        {
+                            Tick = currentTick,
+                            Side = DiceMeshFactory.GetFaceUpSide(body.Rigidbody.transform, body.MeshFaces),
+                        });
                     }
                 }
                 else
@@ -375,7 +408,33 @@ namespace Drakken.Domain.Dice
                 }
             }
 
+            // Dispatch after the structural iteration above so effects are free to spawn/remove
+            // dice (e.g. Mitosis splitting) without invalidating it
+            foreach (var instanceId in settled)
+            {
+                if (diceBodiesByInstanceId.TryGetValue(instanceId, out var settledBody))
+                    DispatchSettle(settledBody);
+            }
+
             return new(settled, completedDrives);
+        }
+
+        // Fires any registered dice/face effect on a settled dice, regardless of which token's
+        // session (if any) is driving this simulation - this is what makes permanent effects
+        // like Bolster work no matter what caused the dice to settle
+        private void DispatchSettle(DiceBody body)
+        {
+            var dice = body.Instance;
+            dice.CurrentSide = DiceMeshFactory.GetFaceUpSide(body.Rigidbody.transform, body.MeshFaces);
+
+            var candidatePool = diceBodiesByInstanceId.Values.Select(b => b.Instance).ToList();
+            var ctx = new DiceEffectSettleContext(dice, candidatePool, this, sessionResolution);
+
+            foreach (var effectId in dice.DiceEffects.ToList())
+                DiceEffectRegistry.Get(effectId)?.OnSettled(ctx);
+
+            foreach (var effectId in dice.Faces[dice.CurrentSide].FaceEffects.ToList())
+                FaceEffectRegistry.Get(effectId)?.OnSettled(ctx);
         }
 
         public int PeekDiceSide(int diceInstanceId)
@@ -426,6 +485,7 @@ namespace Drakken.Domain.Dice
             public int DurationTicks;
             public Func<float, Vector3> PositionAtTime;
             public Func<float, Quaternion> RotationAtTime;
+            public Action OnComplete;
         }
 
         private class DiceBody
@@ -436,11 +496,12 @@ namespace Drakken.Domain.Dice
             public int SpawnTick;
             public bool IsSettled;
             public float SettledTimer;
-            public readonly List<DicePoseTrace> SessionPoses = new();
+            public readonly List<DicePoseTrace> SessionPoseTraces = new();
+            public readonly List<DiceSettleEvent> SessionSettleEvents = new();
 
             public void RecordPose(int tick)
             {
-                SessionPoses.Add(new DicePoseTrace
+                SessionPoseTraces.Add(new DicePoseTrace
                 {
                     Tick = tick,
                     Position = Rigidbody.position,

@@ -3,13 +3,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
-using Drakken.Domain;
+using Drakken.Common.Utility;
+using Drakken.Domain.Tokens.Logic;
 using UnityEngine;
 
 namespace Drakken.Domain.Dice
 {
     public class DiceSimulationReplayer
     {
+        private static readonly Color ValueChangeColor = Colors.Hex("#9cec92");
+        private const float ValueChangeHighlightDuration = 0.9f;
+        private const float ValueChangeLabelRiseHeight = 0.6f;
+
         private AssetDatabase assets;
         private GameClient gameClient;
 
@@ -25,13 +30,14 @@ namespace Drakken.Domain.Dice
             gameClient = null;
         }
 
-        public Task Play(DiceSimulationTraces trace, CancellationToken ct)
-            => Play(trace, existingViews: null, ct);
-
+        // valueChanges is a resolution's generic side effect list (e.g. Bolster's +1s) - any entry
+        // whose SourceInstanceId settles during this replay gets a default flash+label, synced to
+        // the moment it actually lands rather than as a fixed beat tacked onto the end
         public async Task Play(
             DiceSimulationTraces trace,
-            ScenePlayerObjects existingViews,
-            CancellationToken ct)
+            CancellationToken ct,
+            ScenePlayerObjects existingViews = null,
+            List<DiceValueChange> valueChanges = null)
         {
             var relevantTraces = trace.Dice.FindAll(diceTrace => diceTrace.PoseTraces.Count > 0);
 
@@ -45,6 +51,12 @@ namespace Drakken.Domain.Dice
             // Created and destroyed as playback crosses each dice's SpawnTick / RemoveTick
             Dictionary<int, DiceView> liveViews = new();
 
+            // Track unprocessed SettleEvents indices per dice instance so each is only applied once
+            Dictionary<int, int> nextSettleIndices = new();
+
+            // Any flash/label tasks triggered by value changes along the way, awaited at the end
+            List<Task> effectTasks = new();
+
             // Scrub through the simulation with interpolated frames
             float elapsedSeconds = 0f;
             while (elapsedSeconds < maxTimeSeconds)
@@ -52,42 +64,31 @@ namespace Drakken.Domain.Dice
                 if (ct.IsCancellationRequested) break;
 
                 elapsedSeconds += Time.deltaTime;
-                ApplyAtTime(relevantTraces, existingViews, liveViews, trace.FixedTimestep, elapsedSeconds);
+
+                ApplyAtTime(relevantTraces, existingViews, liveViews, nextSettleIndices, valueChanges, effectTasks, trace.FixedTimestep, elapsedSeconds, ct);
 
                 await Task.Yield();
             }
 
-            // Apply with maxTimeSeconds at the end
+            // Apply with maxTimeSeconds at the end to catch up any remaining settle events
             if (!ct.IsCancellationRequested)
             {
-                ApplyAtTime(relevantTraces, existingViews, liveViews, trace.FixedTimestep, maxTimeSeconds);
+                ApplyAtTime(relevantTraces, existingViews, liveViews, nextSettleIndices, valueChanges, effectTasks, trace.FixedTimestep, maxTimeSeconds, ct);
             }
 
-            // Once simulation has come to rest update effects and settled face
-            if (!ct.IsCancellationRequested)
-            {
-                foreach (var diceTrace in relevantTraces)
-                {
-                    if (liveViews.TryGetValue(diceTrace.Instance.InstanceId, out var view))
-                    {
-                        // Update view with final game state dice instance
-                        var finalInstance = view.DiceInstance;
-
-                        // NOTE: Face effects are only refreshed on dice add, or on replay end
-                        view.RefreshEffects(finalInstance);
-
-                        _ = view.SetSettledFace(finalInstance, finalInstance.CurrentSide, ct);
-                    }
-                }
-            }
+            await Task.WhenAll(effectTasks);
         }
 
         private void ApplyAtTime(
             List<DiceSessionTrace> traces,
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
+            Dictionary<int, int> nextSettleIndices,
+            List<DiceValueChange> valueChanges,
+            List<Task> effectTasks,
             float fixedTimestep,
-            float elapsedSeconds)
+            float elapsedSeconds,
+            CancellationToken ct)
         {
             float rawTick = elapsedSeconds / fixedTimestep;
 
@@ -106,6 +107,71 @@ namespace Drakken.Domain.Dice
                 diceView.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),
                     Quaternion.Slerp(lower.Rotation, upper.Rotation, t));
+
+                ApplySettleEvents(diceTrace, diceView, rawTick, nextSettleIndices, existingViews, liveViews, valueChanges, effectTasks, ct);
+            }
+        }
+
+        private void ApplySettleEvents(
+            DiceSessionTrace diceTrace,
+            DiceView diceView,
+            float rawTick,
+            Dictionary<int, int> nextSettleIndices,
+            ScenePlayerObjects existingViews,
+            Dictionary<int, DiceView> liveViews,
+            List<DiceValueChange> valueChanges,
+            List<Task> effectTasks,
+            CancellationToken ct)
+        {
+            int instanceId = diceTrace.Instance.InstanceId;
+            nextSettleIndices.TryGetValue(instanceId, out int nextIndex);
+
+            // Fire every settle event this dice has crossed since the last processed frame
+            while (nextIndex < diceTrace.SettleEvents.Count && rawTick >= diceTrace.SettleEvents[nextIndex].Tick)
+            {
+                var settleEvent = diceTrace.SettleEvents[nextIndex];
+
+                diceView.RefreshEffects(diceTrace.Instance);
+                _ = diceView.SetSettledFace(diceTrace.Instance, settleEvent.Side, ct);
+
+                PlayValueChangeEffects(instanceId, existingViews, liveViews, valueChanges, effectTasks, ct);
+
+                nextIndex++;
+            }
+
+            nextSettleIndices[instanceId] = nextIndex;
+        }
+
+        private void PlayValueChangeEffects(
+            int sourceInstanceId,
+            ScenePlayerObjects existingViews,
+            Dictionary<int, DiceView> liveViews,
+            List<DiceValueChange> valueChanges,
+            List<Task> effectTasks,
+            CancellationToken ct)
+        {
+            if (valueChanges == null) return;
+
+            foreach (var change in valueChanges)
+            {
+                if (change.SourceInstanceId != sourceInstanceId) continue;
+
+                if (!liveViews.TryGetValue(change.InstanceId, out var diceView))
+                    diceView = existingViews?.FindDiceView(change.InstanceId);
+
+                if (diceView == null) continue;
+
+                diceView.RefreshLabels();
+
+                effectTasks.Add(diceView.FlashHighlight(ValueChangeColor, ValueChangeHighlightDuration, ct));
+                effectTasks.Add(gameClient.Vfx.SpawnFloatingLabel(
+                    "+1",
+                    ValueChangeColor,
+                    diceView.transform.position + Vector3.up * ValueChangeLabelRiseHeight,
+                    Quaternion.Euler(45f, gameClient.Match.ClientIndex == 1 ? 180f : 0f, 0f),
+                    ct));
+
+                _ = diceView.SetSettledFace(diceView.DiceInstance, diceView.DiceInstance.CurrentSide, ct);
             }
         }
 

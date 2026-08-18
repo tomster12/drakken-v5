@@ -21,6 +21,7 @@ namespace Drakken.Domain
     {
         public DiceInstance Instance = new();
         public List<DicePoseTrace> PoseTraces = new();
+        public List<DiceSettleEvent> SettleEvents = new();
         public int SpawnTick;
         public int RemoveTick = -1;
 
@@ -30,6 +31,7 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref SpawnTick);
             serializer.SerializeValue(ref RemoveTick);
             serializer.SerializeList(ref PoseTraces);
+            serializer.SerializeList(ref SettleEvents);
         }
     }
 
@@ -44,6 +46,18 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref Tick);
             serializer.SerializeValue(ref Position);
             serializer.SerializeValue(ref Rotation);
+        }
+    }
+
+    public class DiceSettleEvent : INetworkSerializable
+    {
+        public int Tick;
+        public int Side;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref Tick);
+            serializer.SerializeValue(ref Side);
         }
     }
 }
