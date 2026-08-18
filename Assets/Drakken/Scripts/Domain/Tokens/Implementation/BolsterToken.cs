@@ -27,7 +27,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class BolsterTokenExecutor : TokenExecutor<EmptyTokenIntent, BolsterTokenResolution>
+    public class BolsterTokenLogic : TokenLogic<EmptyTokenIntent, BolsterTokenResolution>
     {
         private const float TossUpwardMin = 4.5f;
         private const float TossUpwardMax = 6f;
@@ -77,10 +77,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             gameState.Clients[sourceClientIndex].Dice.Add(resolution.AddedDiceInstance);
         }
-    }
 
-    public class BolsterTokenAnimator : TokenAnimator<BolsterTokenResolution>
-    {
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,

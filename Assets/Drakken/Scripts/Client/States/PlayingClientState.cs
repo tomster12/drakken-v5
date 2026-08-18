@@ -331,7 +331,7 @@ namespace Drakken.Client.States
             var tokenRegistry = client.TokenRegistry;
             var tokenRegistryEntry = tokenRegistry.GetEntryOrThrow(message.TokenId);
 
-            await tokenRegistryEntry.Visuals.Animator.Animate(
+            await tokenRegistryEntry.Logic.Animate(
                 Match,
                 visualContext,
                 message.SourceClientIndex,

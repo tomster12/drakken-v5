@@ -34,11 +34,8 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.Transformation }
                 },
-                new DragonTokenExecutor(),
-                typeof(EmptyTokenIntent),
-                typeof(DragonTokenResolution),
+                new DragonTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new DragonTokenAnimator(),
                     new EmptyTokenIntentPicker(),
                     prefabFactory?.Invoke("dragon")
                 )
@@ -53,11 +50,8 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.Transformation }
                 },
-                new ForgeTokenExecutor(),
-                typeof(PickDiceTokenIntent),
-                typeof(ForgeTokenResolution),
+                new ForgeTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new ForgeTokenAnimator(),
                     new PickDiceTokenIntentPicker(TargetOwner.Self, count: 2),
                     prefabFactory?.Invoke("forge")
                 )
@@ -72,13 +66,9 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.Transformation, TokenCategory.Chaos }
                 },
-                new MitosisTokenExecutor(),
-                typeof(PickDiceTokenIntent),
-                typeof(MitosisTokenResolution),
+                new MitosisTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new MitosisTokenAnimator(),
                     new PickDiceTokenIntentPicker(TargetOwner.Self, count: 1),
-                    // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )
             );
@@ -92,13 +82,9 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
-                new BolsterTokenExecutor(),
-                typeof(EmptyTokenIntent),
-                typeof(BolsterTokenResolution),
+                new BolsterTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new BolsterTokenAnimator(),
                     new EmptyTokenIntentPicker(),
-                    // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )
             );
@@ -112,13 +98,9 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
-                new GlassTokenExecutor(),
-                typeof(EmptyTokenIntent),
-                typeof(GlassTokenResolution),
+                new GlassTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new GlassTokenAnimator(),
                     new EmptyTokenIntentPicker(),
-                    // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )
             );
@@ -132,13 +114,9 @@ namespace Drakken.Domain.Tokens
                     Rarity = TokenRarity.Common,
                     Categories = new[] { TokenCategory.DiceGrowth }
                 },
-                new ReinforceTokenExecutor(),
-                typeof(PickDiceTokenIntent),
-                typeof(ReinforceTokenResolution),
+                new ReinforceTokenLogic(),
                 !includeVisuals ? null : new TokenVisuals(
-                    new ReinforceTokenAnimator(),
                     new PickDiceTokenIntentPicker(TargetOwner.Self, count: 1),
-                    // Re-use assets for now
                     prefabFactory?.Invoke("forge")
                 )
             );

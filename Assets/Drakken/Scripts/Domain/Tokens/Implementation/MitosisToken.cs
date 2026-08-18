@@ -38,7 +38,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class MitosisTokenExecutor : TokenExecutor<PickDiceTokenIntent, MitosisTokenResolution>
+    public class MitosisTokenLogic : TokenLogic<PickDiceTokenIntent, MitosisTokenResolution>
     {
         private const float TossUpwardMin = 5.5f;
         private const float TossUpwardMax = 7.5f;
@@ -107,10 +107,7 @@ namespace Drakken.Domain.Tokens.Implementation
             int index = client.Dice.FindIndex(d => d.InstanceId == resolution.FinalTargetDice.InstanceId);
             if (index >= 0) client.Dice[index] = resolution.FinalTargetDice;
         }
-    }
 
-    public class MitosisTokenAnimator : TokenAnimator<MitosisTokenResolution>
-    {
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,

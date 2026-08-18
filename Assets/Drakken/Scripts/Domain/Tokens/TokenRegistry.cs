@@ -24,14 +24,12 @@ namespace Drakken.Domain.Tokens
 
         internal void Register(
             TokenDefinition definition,
-            ITokenExecutor executor,
-            Type intentType,
-            Type resolutionType,
+            ITokenLogic logic,
             TokenVisuals visuals = null)
         {
             Assert.NotNullOrEmpty(definition.TokenId, "TokenDefinition must have a non-empty TokenId");
 
-            entries[definition.TokenId] = new TokenRegistryEntry(definition, executor, intentType, resolutionType, visuals);
+            entries[definition.TokenId] = new TokenRegistryEntry(definition, logic, visuals);
         }
 
         public TokenRegistryEntry GetEntryOrThrow(string tokenId)
@@ -46,38 +44,32 @@ namespace Drakken.Domain.Tokens
     public class TokenRegistryEntry
     {
         public readonly TokenDefinition Definition;
-        public readonly ITokenExecutor Executor;
-        public readonly Type IntentType;
-        public readonly Type ResolutionType;
+        public readonly ITokenLogic Logic;
         public readonly TokenVisuals Visuals;
+
+        public Type IntentType => Logic.IntentType;
+        public Type ResolutionType => Logic.ResolutionType;
 
         public TokenRegistryEntry(
             TokenDefinition definition,
-            ITokenExecutor executor,
-            Type intentType,
-            Type resolutionType,
+            ITokenLogic logic,
             TokenVisuals visuals)
         {
             Definition = definition;
-            Executor = executor;
-            IntentType = intentType;
-            ResolutionType = resolutionType;
+            Logic = logic;
             Visuals = visuals;
         }
     }
 
     public class TokenVisuals
     {
-        public readonly ITokenAnimator Animator;
         public readonly ITokenIntentPicker IntentPicker;
         public readonly GameObject MeshPrefab;
 
         public TokenVisuals(
-            ITokenAnimator animator,
             ITokenIntentPicker intentPicker,
             GameObject meshPrefab)
         {
-            Animator = animator;
             IntentPicker = intentPicker;
             MeshPrefab = meshPrefab;
         }

@@ -152,7 +152,7 @@ namespace Drakken.Client
             Log.Info($"ClientMatch-{MatchId}", $"Token resolution received for TokenId={message.TokenId}");
 
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            entry.Executor.Apply(GameState, message.Resolution, message.SourceClientIndex);
+            entry.Logic.Apply(GameState, message.Resolution, message.SourceClientIndex);
             GameState.Clients[message.SourceClientIndex].Tokens.RemoveAll(t => t.InstanceId == message.TokenInstanceId);
 
             OnTokenResolved.Invoke(message);

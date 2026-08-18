@@ -28,7 +28,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class GlassTokenExecutor : TokenExecutor<EmptyTokenIntent, GlassTokenResolution>
+    public class GlassTokenLogic : TokenLogic<EmptyTokenIntent, GlassTokenResolution>
     {
         private const float TossUpwardMin = 4.5f;
         private const float TossUpwardMax = 6f;
@@ -77,10 +77,7 @@ namespace Drakken.Domain.Tokens.Implementation
             // Directly add new dice into the world
             gameState.Clients[sourceClientIndex].Dice.Add(resolution.AddedDiceInstance);
         }
-    }
 
-    public class GlassTokenAnimator : TokenAnimator<GlassTokenResolution>
-    {
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,

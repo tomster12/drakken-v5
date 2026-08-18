@@ -40,7 +40,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class ReinforceTokenExecutor : TokenExecutor<PickDiceTokenIntent, ReinforceTokenResolution>
+    public class ReinforceTokenLogic : TokenLogic<PickDiceTokenIntent, ReinforceTokenResolution>
     {
         private const int FaceIncrease = 2;
         private const int SidesIncrease = 2;
@@ -177,10 +177,7 @@ namespace Drakken.Domain.Tokens.Implementation
             Assert.True(index >= 0);
             client.Dice[index] = resolution.FinalDiceInstance;
         }
-    }
 
-    public class ReinforceTokenAnimator : TokenAnimator<ReinforceTokenResolution>
-    {
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,

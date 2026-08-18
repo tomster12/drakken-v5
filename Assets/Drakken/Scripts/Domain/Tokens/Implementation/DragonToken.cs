@@ -34,7 +34,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class DragonTokenExecutor : TokenExecutor<EmptyTokenIntent, DragonTokenResolution>
+    public class DragonTokenLogic : TokenLogic<EmptyTokenIntent, DragonTokenResolution>
     {
         private const float LiftHeight = 1.2f;
         private const float LiftDuration = 0.5f;
@@ -153,10 +153,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 client.Dice[index] = resolution.AddedDiceInstances[i];
             }
         }
-    }
 
-    public class DragonTokenAnimator : TokenAnimator<DragonTokenResolution>
-    {
         private static readonly Color HighlightColor = Colors.Hex("#f8827e");
         private const float HighlightDuration = 0.9f;
         private const float D4OffsetDistance = 1.5f;

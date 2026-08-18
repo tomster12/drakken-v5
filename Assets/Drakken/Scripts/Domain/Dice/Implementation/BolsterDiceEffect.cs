@@ -23,7 +23,7 @@ namespace Drakken.Domain.Dice.Implementation
         }
     }
 
-    public class BolsterDiceEffect : DiceEffect<BolsterDiceEffectResolution>
+    public class BolsterDiceEffect : DiceEffectLogic<BolsterDiceEffectResolution>
     {
         private static readonly Color HighlightColor = Colors.Hex("#9cec92");
         private const float HighlightDuration = 0.9f;

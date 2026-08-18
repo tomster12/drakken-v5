@@ -24,7 +24,7 @@ namespace Drakken.Domain.Dice.Logic
         void Execute(DiceEffectExecuteContext ctx);
     }
 
-    public abstract class DiceEffect<TResolution> : IDiceEffectLogic
+    public abstract class DiceEffectLogic<TResolution> : IDiceEffectLogic
         where TResolution : EffectResolution
     {
         public abstract int EffectId { get; }

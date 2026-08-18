@@ -48,7 +48,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class ForgeTokenExecutor : TokenExecutor<PickDiceTokenIntent, ForgeTokenResolution>
+    public class ForgeTokenLogic : TokenLogic<PickDiceTokenIntent, ForgeTokenResolution>
     {
         private const float FlightDuration = 0.5f;
         private const float FlightLiftHeight = 1.3f;
@@ -198,10 +198,7 @@ namespace Drakken.Domain.Tokens.Implementation
             client.Dice.RemoveAll(d => d.InstanceId == resolution.FirstInstanceId || d.InstanceId == resolution.SecondInstanceId);
             client.Dice.Insert(insertIndex, resolution.MergedDiceInstance);
         }
-    }
 
-    public class ForgeTokenAnimator : TokenAnimator<ForgeTokenResolution>
-    {
         private const float PullTogetherDuration = 0.35f;
         private const float PullTogetherArchHeight = 0.5f;
 

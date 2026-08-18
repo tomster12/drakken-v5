@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Drakken.Domain.Dice.Implementation
 {
-    public class GlassDiceEffect : DiceEffect<EmptyEffectResolution>
+    public class GlassDiceEffect : DiceEffectLogic<EmptyEffectResolution>
     {
         public override int EffectId => DiceEffectIds.Glass;
 

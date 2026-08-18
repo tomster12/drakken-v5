@@ -20,7 +20,7 @@ namespace Drakken.Domain.Tokens.Implementation
         }
     }
 
-    public class BlankTokenExecutor : TokenExecutor<EmptyTokenIntent, BlankTokenResolution>
+    public class BlankTokenLogic : TokenLogic<EmptyTokenIntent, BlankTokenResolution>
     {
         protected override BlankTokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, DiceSimulationWorld diceWorld)
         {
@@ -33,10 +33,7 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             // TODO
         }
-    }
 
-    public class BlankTokenAnimator : TokenAnimator<BlankTokenResolution>
-    {
         protected override async Task Animate(
             ClientMatch match,
             TokenVisualContext visualContext,
