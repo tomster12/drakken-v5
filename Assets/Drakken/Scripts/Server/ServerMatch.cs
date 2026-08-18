@@ -394,7 +394,7 @@ namespace Drakken.Server
                     throw new InvalidOperationException("Cannot simulate initial roll with null grid");
 
                 var world = DiceWorlds[p];
-                world.BeginSession();
+                world.BeginSession(diceInstances);
 
                 for (int i = 0; i < diceInstances.Count; i++)
                 {
@@ -426,7 +426,7 @@ namespace Drakken.Server
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
 
                 var world = DiceWorlds[p];
-                world.BeginSession();
+                world.BeginSession(diceInstances);
 
                 // Rise the existing dice into the row layout, or if too many to fit a grid, rise each
                 // dice straight up from wherever it currently is

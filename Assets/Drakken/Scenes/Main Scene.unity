@@ -1604,7 +1604,7 @@ MonoBehaviour:
   server: {fileID: 865993105}
   sceneLayout: {fileID: 865993107}
   debugPreventApplication: 0
-  debugUseFakeConnection: 0
+  debugUseFakeConnection: 1
 --- !u!114 &865993105
 MonoBehaviour:
   m_ObjectHideFlags: 0

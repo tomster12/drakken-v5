@@ -70,7 +70,10 @@ namespace Drakken.Domain.Tokens.Implementation
             return resolution;
         }
 
-        protected override void Apply(GameState gameState, BolsterTokenResolution resolution, int sourceClientIndex)
+        protected override void Apply(
+            GameState gameState,
+            BolsterTokenResolution resolution,
+            int sourceClientIndex)
         {
             Assert.True(resolution.BolsteredInstanceIds.Count == resolution.NewFaceValues.Count);
 
@@ -126,6 +129,8 @@ namespace Drakken.Domain.Tokens.Implementation
                     diceView.transform.position + Vector3.up * LabelRiseHeight,
                     Quaternion.Euler(45f, visualContext.Client.Match.ClientIndex == 1 ? 180f : 0f, 0f),
                     ct));
+
+                _ = diceView.SetSettledFace(diceView.DiceInstance, diceView.DiceInstance.CurrentSide, ct);
             }
 
             await Task.WhenAll(bolsterTasks);
