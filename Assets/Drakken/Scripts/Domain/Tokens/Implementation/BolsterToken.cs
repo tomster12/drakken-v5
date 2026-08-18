@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -14,6 +15,8 @@ namespace Drakken.Domain.Tokens.Implementation
     {
         public DiceInstance AddedDiceInstance;
         public DiceSimulationTraces DiceTrace = new();
+
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { DiceTrace };
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
@@ -47,7 +50,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new BolsterTokenResolution { AddedDiceInstance = bolsterDice };
 
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
             var trayPosition = diceWorld.Tray.position;
             Vector3 spawnPosition = trayPosition + Vector3.up * SpawnHeight;
@@ -59,10 +62,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.SpawnDice(bolsterDice, spawnPosition, Random.rotationUniform, tossImpulse, Random.insideUnitSphere * TossTorque);
 
-            // Its Bolster effect fires automatically once it settles in see BolsterDiceEffectLogic
             diceWorld.Simulate(untilAllSettled: true);
 
-            // The bolster dice stays in the pool permanently
             diceWorld.FreezeAllDice();
             resolution.DiceTrace = diceWorld.EndSession();
 
@@ -90,13 +91,10 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Shrink the token out the way
             await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
 
-            // Replay the full simulation - any dice bolstered along the way flash automatically,
-            // synced to the moment the bolster dice settles, via SideEffectsValueChanges
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.DiceTrace, ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

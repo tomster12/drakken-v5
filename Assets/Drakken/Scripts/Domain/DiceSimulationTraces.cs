@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Drakken.Domain.Dice.Logic;
 using Drakken.Domain.Networking;
 using Unity.Netcode;
 using UnityEngine;
@@ -9,11 +11,22 @@ namespace Drakken.Domain
     {
         public float FixedTimestep;
         public List<DiceSessionTrace> Dice = new();
+        public List<EffectOccurrence> EffectOccurrences = new();
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref FixedTimestep);
             serializer.SerializeList(ref Dice);
+            serializer.SerializeList(ref EffectOccurrences);
+        }
+
+        public void ApplyEffects(GameState gameState, int clientIndex)
+        {
+            foreach (var occurrence in EffectOccurrences)
+            {
+                var effect = EffectRegistry.Get(occurrence.EffectId, occurrence.IsFaceEffect);
+                effect?.Apply(gameState, occurrence.Resolution, clientIndex, occurrence.SourceInstanceId);
+            }
         }
     }
 
@@ -58,6 +71,31 @@ namespace Drakken.Domain
         {
             serializer.SerializeValue(ref Tick);
             serializer.SerializeValue(ref Side);
+        }
+    }
+
+    public class EffectOccurrence : INetworkSerializable
+    {
+        public int EffectId;
+        public bool IsFaceEffect;
+        public int Tick;
+        public int SourceInstanceId;
+        public EffectResolution Resolution;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref EffectId);
+            serializer.SerializeValue(ref IsFaceEffect);
+            serializer.SerializeValue(ref Tick);
+            serializer.SerializeValue(ref SourceInstanceId);
+
+            if (serializer.IsReader)
+            {
+                var effect = EffectRegistry.Get(EffectId, IsFaceEffect);
+                Resolution = (EffectResolution)Activator.CreateInstance(effect.ResolutionType);
+            }
+
+            Resolution.NetworkSerialize(serializer);
         }
     }
 }

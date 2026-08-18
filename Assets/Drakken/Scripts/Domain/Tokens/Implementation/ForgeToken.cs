@@ -23,6 +23,8 @@ namespace Drakken.Domain.Tokens.Implementation
         public DiceSimulationTraces LiftTrace;
         public DiceSimulationTraces MergeTrace;
 
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { LiftTrace, MergeTrace };
+
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
@@ -77,7 +79,7 @@ namespace Drakken.Domain.Tokens.Implementation
             };
 
             // Drive the 2 dice up next to each other in the midpoint
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
             var (firstStartPos, firstStartRot) = diceWorld.GetDicePose(firstDice.InstanceId);
             var (secondStartPos, secondStartRot) = diceWorld.GetDicePose(secondDice.InstanceId);
@@ -112,10 +114,10 @@ namespace Drakken.Domain.Tokens.Implementation
             resolution.LiftTrace = diceWorld.EndSession();
 
             // Now try and merge the 2 dice together
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
-            bool firstCanModify = TokenExecutionLogic.TryModify(firstDice, diceWorld, resolution);
-            bool secondCanModify = TokenExecutionLogic.TryModify(secondDice, diceWorld, resolution);
+            bool firstCanModify = TokenExecutionLogic.TryModify(firstDice, diceWorld);
+            bool secondCanModify = TokenExecutionLogic.TryModify(secondDice, diceWorld);
 
             if (!firstCanModify || !secondCanModify)
             {
@@ -218,7 +220,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the lift simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.LiftTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.LiftTrace, ct, sourcePlayerObjects);
 
             if (resolution.DidMerge)
             {
@@ -257,7 +259,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the final merge simulation (either merge or just drop)
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.MergeTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.MergeTrace, ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

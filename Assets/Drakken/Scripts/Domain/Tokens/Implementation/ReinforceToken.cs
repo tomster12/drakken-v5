@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +20,8 @@ namespace Drakken.Domain.Tokens.Implementation
         public bool DiceExpanded;
         public DiceInstance FinalDiceInstance;
         public DiceSimulationTraces DiceTrace = new();
+
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { DiceTrace };
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
@@ -67,10 +70,10 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new ReinforceTokenResolution { OriginalInstanceId = originalInstanceId };
 
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
             // Ensure we can modify the dice
-            if (!TokenExecutionLogic.TryModify(targetDice, diceWorld, resolution))
+            if (!TokenExecutionLogic.TryModify(targetDice, diceWorld))
             {
                 resolution.DiceTrace = diceWorld.EndSession();
                 return resolution;
@@ -193,7 +196,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation (float, spin, and dice swap if it occurred)
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.DiceTrace, ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

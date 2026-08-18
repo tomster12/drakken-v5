@@ -5,7 +5,8 @@ using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Common.Utility;
 using Drakken.Domain.Dice;
-using Drakken.Domain.Dice.Effects;
+using Drakken.Domain.Dice.Implementation;
+using Drakken.Domain.Dice.Logic;
 using Drakken.Domain.Networking;
 using Drakken.Domain.Tokens.Implementation.Common;
 using Drakken.Domain.Tokens.Logic;
@@ -16,22 +17,29 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class MitosisTokenResolution : TokenResolution
     {
-        public int OriginalInstanceId;
-        public List<DiceInstance> FinalDiceInstances = new();
+        public DiceInstance FinalTargetDice;
         public DiceSimulationTraces DiceTrace = new();
+
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { DiceTrace };
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
-            serializer.SerializeValue(ref OriginalInstanceId);
-            serializer.SerializeList(ref FinalDiceInstances);
+
+            bool hasFinalTargetDice = FinalTargetDice != null;
+            serializer.SerializeValue(ref hasFinalTargetDice);
+            if (hasFinalTargetDice)
+            {
+                if (serializer.IsReader) FinalTargetDice = new DiceInstance();
+                serializer.SerializeValue(ref FinalTargetDice);
+            }
+
             serializer.SerializeValue(ref DiceTrace);
         }
     }
 
     public class MitosisTokenExecutor : TokenExecutor<PickDiceTokenIntent, MitosisTokenResolution>
     {
-        // Initial roll toss
         private const float TossUpwardMin = 5.5f;
         private const float TossUpwardMax = 7.5f;
         private const float TossSideways = 0.6f;
@@ -47,26 +55,22 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var client = gameState.Clients[sourceClientIndex];
 
-            // Find the selected dice
             int originalInstanceId = intent.TargetDiceInstanceIds[0];
             var targetDice = client.Dice.Find(d => d.InstanceId == originalInstanceId);
             Assert.NotNull(targetDice);
 
-            var resolution = new MitosisTokenResolution { OriginalInstanceId = originalInstanceId };
+            var resolution = new MitosisTokenResolution();
 
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
-            // If the targeted dice can't be modified we cancel early
-            if (!TokenExecutionLogic.TryModify(targetDice, diceWorld, resolution))
+            if (!TokenExecutionLogic.TryModify(targetDice, diceWorld))
             {
                 resolution.DiceTrace = diceWorld.EndSession();
                 return resolution;
             }
 
-            resolution.FinalDiceInstances.Add(targetDice);
-            MitosisFaceEffectLogic.MarkRandomHalf(targetDice);
+            MitosisFaceEffect.MarkRandomHalf(targetDice);
 
-            // Wake and toss the selected dice
             Vector3 initialTossImpulse = new(
                 Random.Range(-TossSideways, TossSideways),
                 Random.Range(TossUpwardMin, TossUpwardMax),
@@ -74,14 +78,9 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.WakeDice(targetDice.InstanceId, initialTossImpulse, Random.insideUnitSphere * TossTorque);
 
-            // Every settle on a marked face lifts and splits via MitosisFaceEffectLogic
             diceWorld.Simulate(untilAllSettled: true);
 
-            diceWorld.FreezeAllDice();
-            resolution.DiceTrace = diceWorld.EndSession();
-
-            // Remove all marks at the end of this tokens resolution
-            foreach (var dice in resolution.FinalDiceInstances)
+            foreach (var dice in diceWorld.LiveInstances)
             {
                 foreach (var face in dice.Faces)
                 {
@@ -91,21 +90,22 @@ namespace Drakken.Domain.Tokens.Implementation
                 }
             }
 
+            resolution.FinalTargetDice = diceWorld.LiveInstances
+                .FirstOrDefault(d => d.InstanceId == originalInstanceId);
+
+            diceWorld.FreezeAllDice();
+            resolution.DiceTrace = diceWorld.EndSession();
+
             return resolution;
         }
 
         protected override void Apply(GameState gameState, MitosisTokenResolution resolution, int sourceClientIndex)
         {
-            // If the modification failed, then exit early
-            if (resolution.FinalDiceInstances.Count == 0) return;
+            if (resolution.FinalTargetDice == null) return;
 
             var client = gameState.Clients[sourceClientIndex];
-
-            int index = client.Dice.FindIndex(d => d.InstanceId == resolution.OriginalInstanceId);
-            Assert.True(index >= 0);
-
-            client.Dice.RemoveAt(index);
-            client.Dice.InsertRange(index, resolution.FinalDiceInstances);
+            int index = client.Dice.FindIndex(d => d.InstanceId == resolution.FinalTargetDice.InstanceId);
+            if (index >= 0) client.Dice[index] = resolution.FinalTargetDice;
         }
     }
 
@@ -121,12 +121,10 @@ namespace Drakken.Domain.Tokens.Implementation
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
 
-            // Shrink the token out the way
             await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
 
-            // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.DiceTrace, ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

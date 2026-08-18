@@ -1,16 +1,34 @@
 using System.Collections.Generic;
 using System.Linq;
-using Drakken.Domain.Tokens.Implementation;
+using System.Threading;
+using System.Threading.Tasks;
+using Drakken.Domain.Dice.Logic;
 using Drakken.Domain.Tokens.Logic;
 using Drakken.Utility;
+using Unity.Netcode;
 using UnityEngine;
 
-namespace Drakken.Domain.Dice.Effects
+namespace Drakken.Domain.Dice.Implementation
 {
-    // Marks never outlive the Mitosis token's own session (stripped before it returns), so this
-    // effect only ever fires within that session and can safely assume ctx.Resolution is a
-    // MitosisTokenResolution - unlike a permanent effect such as Bolster.
-    public class MitosisFaceEffectLogic : FaceEffectLogic
+    public class MitosisSplitResolution : EffectResolution
+    {
+        public DiceInstance ChildA;
+        public DiceInstance ChildB;
+
+        public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
+        {
+            if (serializer.IsReader)
+            {
+                ChildA = new DiceInstance();
+                ChildB = new DiceInstance();
+            }
+
+            serializer.SerializeValue(ref ChildA);
+            serializer.SerializeValue(ref ChildB);
+        }
+    }
+    
+    public class MitosisFaceEffect : FaceEffectLogic<MitosisSplitResolution>
     {
         public const int MinSides = 4;
         private const int MaxTotalDice = 32; // shouldn't hit this but just in case
@@ -22,15 +40,11 @@ namespace Drakken.Domain.Dice.Effects
 
         public override int EffectId => FaceEffectIds.MitosisMark;
 
-        public override void OnSettled(DiceEffectSettleContext ctx)
+        public override void Execute(DiceEffectExecuteContext ctx)
         {
             var dice = ctx.SettledDice;
 
-            // Pending split children start below the min size and can't split further
             if (dice.Sides <= MinSides) return;
-
-            // CandidatePool is the world's own live dice, so this already reflects the running
-            // total including anything spawned earlier in this same recursive chain
             if (ctx.CandidatePool.Count + 2 > MaxTotalDice) return;
 
             var (startPosition, startRotation) = ctx.World.GetDicePose(dice.InstanceId);
@@ -42,15 +56,12 @@ namespace Drakken.Domain.Dice.Effects
                 dice.InstanceId, LiftDuration,
                 t => Vector3.Lerp(startPosition, liftedPosition, Easing.EaseOutCubic(t)),
                 _ => startRotation,
-                onComplete: () => Split(ctx, dice, liftedPosition, childSides));
+                onComplete: () => Split(ctx.World, dice, liftedPosition, childSides));
         }
 
-        private static void Split(DiceEffectSettleContext ctx, DiceInstance parent, Vector3 liftedPosition, int childSides)
+        private void Split(DiceSimulationWorld world, DiceInstance parent, Vector3 liftedPosition, int childSides)
         {
-            var resolution = (MitosisTokenResolution)ctx.Resolution;
-
-            ctx.World.RemoveDice(parent.InstanceId);
-            resolution.FinalDiceInstances.Remove(parent);
+            world.RemoveDice(parent.InstanceId);
 
             Vector3 outward = new(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f));
             outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : Vector3.right;
@@ -59,30 +70,44 @@ namespace Drakken.Domain.Dice.Effects
             var childA = DiceInstance.CreateFromRetainedFaces(childSides, halfA);
             var childB = DiceInstance.CreateFromRetainedFaces(childSides, halfB);
 
-            // Only mark if they have >4 faces, but still spawn either way
             if (childSides > MinSides)
             {
                 MarkRandomHalf(childA);
                 MarkRandomHalf(childB);
             }
 
-            ctx.World.SpawnDice(
+            world.SpawnDice(
                 childA, liftedPosition, Random.rotationUniform,
                 outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                 Random.insideUnitSphere * SplitTorque);
 
-            ctx.World.SpawnDice(
+            world.SpawnDice(
                 childB, liftedPosition, Random.rotationUniform,
                 -outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                 Random.insideUnitSphere * SplitTorque);
 
-            resolution.FinalDiceInstances.Add(childA);
-            resolution.FinalDiceInstances.Add(childB);
+            world.RecordEffectOccurrence(EffectId, isFaceEffect: true, parent.InstanceId, new MitosisSplitResolution
+            {
+                ChildA = childA,
+                ChildB = childB,
+            });
         }
+
+        protected override void Apply(GameState gameState, MitosisSplitResolution resolution, int clientIndex, int sourceInstanceId)
+        {
+            var client = gameState.Clients[clientIndex];
+            int index = client.Dice.FindIndex(d => d.InstanceId == sourceInstanceId);
+            if (index < 0) return;
+
+            client.Dice.RemoveAt(index);
+            client.Dice.InsertRange(index, new[] { resolution.ChildA, resolution.ChildB });
+        }
+
+        protected override Task Animate(EffectAnimateContext ctx, MitosisSplitResolution resolution, int sourceInstanceId, CancellationToken ct)
+            => Task.CompletedTask;
 
         public static void MarkRandomHalf(DiceInstance dice)
         {
-            // Remove existing mitosis marks
             foreach (var face in dice.Faces)
             {
                 face.FaceEffects = face.FaceEffects

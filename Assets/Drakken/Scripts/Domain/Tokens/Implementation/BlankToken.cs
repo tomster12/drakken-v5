@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -10,6 +12,8 @@ namespace Drakken.Domain.Tokens.Implementation
 {
     public class BlankTokenResolution : TokenResolution
     {
+        public override IEnumerable<DiceSimulationTraces> Traces => Array.Empty<DiceSimulationTraces>();
+
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             // TODO

@@ -3,16 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using Drakken.Client.World;
 using Drakken.Common.Utility;
-using Drakken.Domain.Dice.Effects;
-using Drakken.Domain.Tokens.Logic;
+using Drakken.Domain.Dice.Logic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Drakken.Domain.Dice
 {
-    // Dispatches dice/face effects (see Drakken.Domain.Dice.Effects) as part of its own physics
-    // step - this is what makes permanent effects (e.g. Bolster) fire no matter which token's
-    // session disturbs the dice, rather than only when their own token happens to be running.
     public class DiceSimulationWorld
     {
         private const float fixedTimestep = 1f / 30f;
@@ -25,17 +21,19 @@ namespace Drakken.Domain.Dice
         private readonly PhysicsScene physicsScene;
         private readonly Dictionary<int, DiceBody> diceBodiesByInstanceId = new();
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
+        private readonly List<EffectOccurrence> sessionEffectOccurrences = new();
         private readonly List<KinematicDrive> activeDrives = new();
         private GameObject trayGO;
         private int currentTick;
         private int sessionStartTick;
         private int nextDriveId;
         private bool isInSession;
-        private TokenResolution sessionResolution;
 
         public bool AllDynamicSettled =>
             activeDrives.Count == 0 &&
             diceBodiesByInstanceId.Values.All(body => body.Rigidbody.isKinematic || body.IsSettled);
+
+        public IEnumerable<DiceInstance> LiveInstances => diceBodiesByInstanceId.Values.Select(b => b.Instance);
 
         public Transform Tray => trayGO.transform;
 
@@ -78,10 +76,7 @@ namespace Drakken.Domain.Dice
 
         // ------------------------------ Session
 
-        // resolution is null for sessions not driven by a token (e.g. a plain reroll) - any
-        // settle-triggered effect that fires still mutates dice directly, it just has nothing to
-        // record outcomes into for a later Apply/animate step
-        public void BeginSession(TokenResolution resolution, IEnumerable<DiceInstance> currentDiceInstances)
+        public void BeginSession(IEnumerable<DiceInstance> currentDiceInstances)
         {
             Assert.True(!isInSession, "Cannot begin a session while one is already in progress");
 
@@ -99,7 +94,6 @@ namespace Drakken.Domain.Dice
 
             isInSession = true;
             sessionStartTick = currentTick;
-            sessionResolution = resolution;
         }
 
         public DiceSimulationTraces EndSession()
@@ -125,8 +119,10 @@ namespace Drakken.Domain.Dice
             }
             sessionRemovedTraces.Clear();
 
+            traces.EffectOccurrences.AddRange(sessionEffectOccurrences);
+            sessionEffectOccurrences.Clear();
+
             isInSession = false;
-            sessionResolution = null;
             return traces;
         }
 
@@ -164,6 +160,20 @@ namespace Drakken.Domain.Dice
                 SettleEvents = settleEvents,
                 RemoveTick = removeTick < 0 ? -1 : removeTick - sessionStartTick,
             };
+        }
+
+        public void RecordEffectOccurrence(int effectId, bool isFaceEffect, int sourceInstanceId, EffectResolution resolution)
+        {
+            Assert.True(isInSession, "Cannot record an effect outside of a session");
+
+            sessionEffectOccurrences.Add(new EffectOccurrence
+            {
+                EffectId = effectId,
+                IsFaceEffect = isFaceEffect,
+                Tick = currentTick - sessionStartTick,
+                SourceInstanceId = sourceInstanceId,
+                Resolution = resolution,
+            });
         }
 
         // ------------------------------ Dice
@@ -419,22 +429,19 @@ namespace Drakken.Domain.Dice
             return new(settled, completedDrives);
         }
 
-        // Fires any registered dice/face effect on a settled dice, regardless of which token's
-        // session (if any) is driving this simulation - this is what makes permanent effects
-        // like Bolster work no matter what caused the dice to settle
         private void DispatchSettle(DiceBody body)
         {
             var dice = body.Instance;
             dice.CurrentSide = DiceMeshFactory.GetFaceUpSide(body.Rigidbody.transform, body.MeshFaces);
 
             var candidatePool = diceBodiesByInstanceId.Values.Select(b => b.Instance).ToList();
-            var ctx = new DiceEffectSettleContext(dice, candidatePool, this, sessionResolution);
+            var ctx = new DiceEffectExecuteContext(dice, candidatePool, this);
 
             foreach (var effectId in dice.DiceEffects.ToList())
-                DiceEffectRegistry.Get(effectId)?.OnSettled(ctx);
+                DiceEffectRegistry.Get(effectId)?.Execute(ctx);
 
             foreach (var effectId in dice.Faces[dice.CurrentSide].FaceEffects.ToList())
-                FaceEffectRegistry.Get(effectId)?.OnSettled(ctx);
+                FaceEffectRegistry.Get(effectId)?.Execute(ctx);
         }
 
         public int PeekDiceSide(int diceInstanceId)

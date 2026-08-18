@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client;
@@ -15,6 +16,8 @@ namespace Drakken.Domain.Tokens.Implementation
     {
         public DiceInstance AddedDiceInstance;
         public DiceSimulationTraces DiceTrace = new();
+
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { DiceTrace };
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
@@ -48,7 +51,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             var resolution = new GlassTokenResolution { AddedDiceInstance = glassDice };
 
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
             // Spawn and toss the dice into the world
             var trayPosition = diceWorld.Tray.position;
@@ -93,7 +96,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.DiceTrace, ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }

@@ -22,6 +22,8 @@ namespace Drakken.Domain.Tokens.Implementation
         public List<DiceInstance> AddedDiceInstances = new();
         public DiceSimulationTraces DiceTrace = new();
 
+        public override IEnumerable<DiceSimulationTraces> Traces => new[] { DiceTrace };
+
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             base.NetworkSerialize(serializer);
@@ -63,7 +65,7 @@ namespace Drakken.Domain.Tokens.Implementation
                 ReplaceCount = replaceCount
             };
 
-            diceWorld.BeginSession(resolution, client.Dice);
+            diceWorld.BeginSession(client.Dice);
 
             // Lift each replaced dice into the air with a spin
             var liftDriveIds = new List<string>();
@@ -92,7 +94,7 @@ namespace Drakken.Domain.Tokens.Implementation
             {
                 var replacedDice = client.Dice[replacedIndex];
 
-                if (!TokenExecutionLogic.TryModify(replacedDice, diceWorld, resolution)) continue;
+                if (!TokenExecutionLogic.TryModify(replacedDice, diceWorld)) continue;
 
                 // Successfully modified so remove old dice, add new dice
                 diceWorld.RemoveDice(replacedDice.InstanceId);
@@ -142,7 +144,6 @@ namespace Drakken.Domain.Tokens.Implementation
             var client = gameState.Clients[sourceClientIndex];
 
             Assert.True(resolution.ReplacedInstanceIds.Count == resolution.AddedDiceInstances.Count);
-            Assert.True(resolution.ReplaceCount == resolution.ReplacedInstanceIds.Count + resolution.SideEffectsDestroyedDiceInstanceIds.Count);
 
             // Directly overwrite replaced indices with new dice instances
             for (int i = 0; i < resolution.ReplacedInstanceIds.Count; i++)
@@ -199,7 +200,7 @@ namespace Drakken.Domain.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.DiceSimReplayer.Play(
-                resolution.DiceTrace, ct, sourcePlayerObjects, resolution.SideEffectsValueChanges);
+                resolution.DiceTrace, ct, sourcePlayerObjects);
 
             await Task.WhenAll(tasks);
 

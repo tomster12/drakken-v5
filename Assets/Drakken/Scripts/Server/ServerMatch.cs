@@ -394,7 +394,7 @@ namespace Drakken.Server
                     throw new InvalidOperationException("Cannot simulate initial roll with null grid");
 
                 var world = DiceWorlds[p];
-                world.BeginSession(null, diceInstances);
+                world.BeginSession(diceInstances);
 
                 for (int i = 0; i < diceInstances.Count; i++)
                 {
@@ -409,11 +409,16 @@ namespace Drakken.Server
                 world.FreezeAllDice();
             }
 
-            return new()
+            var traces = new MatchDiceSimulationTraces
             {
                 P1 = DiceWorlds[0].EndSession(),
                 P2 = DiceWorlds[1].EndSession(),
             };
+
+            traces.P1.ApplyEffects(GameState, clientIndex: 0);
+            traces.P2.ApplyEffects(GameState, clientIndex: 1);
+
+            return traces;
         }
 
         private MatchDiceSimulationTraces SimulateRerollDice()
@@ -426,7 +431,7 @@ namespace Drakken.Server
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
 
                 var world = DiceWorlds[p];
-                world.BeginSession(null, diceInstances);
+                world.BeginSession(diceInstances);
 
                 // Rise the existing dice into the row layout, or if too many to fit a grid, rise each
                 // dice straight up from wherever it currently is
@@ -461,11 +466,16 @@ namespace Drakken.Server
                 world.FreezeAllDice();
             }
 
-            return new()
+            var traces = new MatchDiceSimulationTraces
             {
                 P1 = DiceWorlds[0].EndSession(),
                 P2 = DiceWorlds[1].EndSession(),
             };
+
+            traces.P1.ApplyEffects(GameState, clientIndex: 0);
+            traces.P2.ApplyEffects(GameState, clientIndex: 1);
+
+            return traces;
         }
     }
 }
