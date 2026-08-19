@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Drakken.Client;
-using Drakken.Common;
+using Drakken.Utility;
 using Drakken.Domain;
-using Drakken.Domain.Tokens.Implementation.Common;
-using Drakken.Domain.Tokens.Logic;
+using Drakken.Gameplay.Tokens.Implementation.Common;
+using Drakken.Gameplay.Tokens.Logic;
 using Drakken.Server;
 using Drakken.Domain.Networking;
 
@@ -99,11 +99,11 @@ namespace Drakken.Networking
         public void Server_BroadcastMatchStartDraftingPhase(
             ulong[] clientIds,
             GameState gameState,
-            MatchDiceSimulationTraces diceTraces)
+            GameSimulationMatchTrace trace)
         {
             foreach (var clientId in clientIds)
             {
-                clientsById[clientId].Match.OnServerStartDraftingPhase(gameState.Clone(), diceTraces);
+                clientsById[clientId].Match.OnServerStartDraftingPhase(gameState.Clone(), trace);
             }
         }
 
@@ -233,11 +233,11 @@ namespace Drakken.Networking
         public void Server_BroadcastMatchNextRound(
             ulong[] clientIds,
             GameState gameState,
-            MatchDiceSimulationTraces diceTraces)
+            GameSimulationMatchTrace trace)
         {
             foreach (var clientId in clientIds)
             {
-                clientsById[clientId].Match.OnServerNextRound(gameState.Clone(), diceTraces);
+                clientsById[clientId].Match.OnServerNextRound(gameState.Clone(), trace);
             }
         }
     }

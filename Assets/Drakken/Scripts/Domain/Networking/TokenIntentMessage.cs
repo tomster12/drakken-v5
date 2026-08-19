@@ -1,6 +1,6 @@
 using System;
-using Drakken.Domain.Tokens;
-using Drakken.Domain.Tokens.Logic;
+using Drakken.Gameplay.Tokens;
+using Drakken.Gameplay.Tokens.Logic;
 using Unity.Netcode;
 
 namespace Drakken.Domain.Networking

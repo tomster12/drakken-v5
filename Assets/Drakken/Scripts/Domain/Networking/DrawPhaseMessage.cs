@@ -1,4 +1,4 @@
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 using System.Collections.Generic;
 using Unity.Netcode;
 

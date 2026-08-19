@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Drakken.Common.Utility;
+using Drakken.Utility;
 
-namespace Drakken.Common
+namespace Drakken.Utility
 {
     internal interface IPendingTaskCompletion
     {

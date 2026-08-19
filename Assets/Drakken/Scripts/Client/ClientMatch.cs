@@ -1,10 +1,10 @@
 using Drakken.Domain;
-using Drakken.Common.Utility;
+using Drakken.Utility;
 using System;
 using Drakken.Networking;
 using System.Threading.Tasks;
 using System.Linq;
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 using Drakken.Domain.Networking;
 
 namespace Drakken.Client
@@ -23,7 +23,7 @@ namespace Drakken.Client
         private readonly TokenRegistry tokenRegistry;
         private readonly IGameConnection connection;
         public GameState GameState { get; private set; }
-        public MatchDiceSimulationTraces LastDiceTraces { get; private set; }
+        public GameSimulationMatchTrace LastDiceTraces { get; private set; }
         public ulong MatchId { get; private set; }
         public int ClientIndex { get; private set; }
         public int OpClientIndex => 1 - ClientIndex;
@@ -83,14 +83,14 @@ namespace Drakken.Client
 
         // -------------------------------- Drafting
 
-        public void OnServerStartDraftingPhase(GameState gameState, MatchDiceSimulationTraces diceTraces)
+        public void OnServerStartDraftingPhase(GameState gameState, GameSimulationMatchTrace trace)
         {
             Assert.True(GameState.Phase == GamePhase.NotStarted);
 
             Log.Info($"ClientMatch-{MatchId}", $"Match started drafting phase");
 
             GameState = gameState;
-            LastDiceTraces = diceTraces;
+            LastDiceTraces = trace;
 
             OnDraftingPhaseStarted.Invoke();
         }
@@ -178,14 +178,14 @@ namespace Drakken.Client
             OnNextTurnStarted.Invoke();
         }
 
-        public void OnServerNextRound(GameState gameState, MatchDiceSimulationTraces diceTraces)
+        public void OnServerNextRound(GameState gameState, GameSimulationMatchTrace trace)
         {
             Assert.True(GameState.Phase == GamePhase.Playing);
 
             Log.Info($"ClientMatch-{MatchId}", $"OnServerNextRound, round={gameState.Round}");
 
             GameState = gameState;
-            LastDiceTraces = diceTraces;
+            LastDiceTraces = trace;
             IsOpDiscarded = false;
 
             OnRoundEnded.Invoke();

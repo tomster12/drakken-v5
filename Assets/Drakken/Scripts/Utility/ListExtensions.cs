@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 
-namespace Drakken.Common.Utility
+namespace Drakken.Utility
 {
     public static class ListExtensions
     {
@@ -16,4 +16,4 @@ namespace Drakken.Common.Utility
             return list;
         }
     }
-}
+}

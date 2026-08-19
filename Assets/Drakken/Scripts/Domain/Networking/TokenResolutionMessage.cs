@@ -1,6 +1,4 @@
-using System;
-using Drakken.Domain.Tokens;
-using Drakken.Domain.Tokens.Logic;
+using Drakken.Gameplay.Tokens.Logic;
 using Unity.Netcode;
 
 namespace Drakken.Domain.Networking
@@ -22,9 +20,7 @@ namespace Drakken.Domain.Networking
 
             if (serializer.IsReader)
             {
-                var tokenRegistry = GameEntrypoint.Singleton.TokenRegistry;
-                var entry = tokenRegistry.GetEntryOrThrow(TokenId);
-                Resolution = (TokenResolution)Activator.CreateInstance(entry.ResolutionType);
+                Resolution = new TokenResolution();
             }
 
             Resolution.NetworkSerialize(serializer);

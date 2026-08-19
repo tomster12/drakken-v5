@@ -1,9 +1,8 @@
 using Drakken.Client.World;
-using Drakken.Domain.Animation;
-using Drakken.Common.Utility;
+using Drakken.Presentation.Animation;
+using Drakken.Utility;
 using Drakken.Domain;
 using Drakken.Domain.Static;
-using Drakken.Utility;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -106,7 +105,7 @@ namespace Drakken.Client.States
             client.UI.UpdateDiceTotal(Match.ClientIndex, 1);
         }
 
-        private async Task SpawnDiceForRoll(MatchDiceSimulationTraces diceTraces)
+        private async Task SpawnDiceForRoll(GameSimulationMatchTrace trace)
         {
             List<Task> tasks = new();
 
@@ -120,10 +119,10 @@ namespace Drakken.Client.States
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
-                var trace = diceTraces.Player(clientIndex);
+                var playerTrace = trace.Player(clientIndex);
 
                 Dictionary<int, DiceView> views = new();
-                foreach (var diceTrace in trace.Dice)
+                foreach (var diceTrace in playerTrace.Dice)
                 {
                     if (diceTrace.PoseTraces.Count == 0) continue;
 
@@ -142,15 +141,15 @@ namespace Drakken.Client.States
             await Task.WhenAll(tasks);
         }
 
-        private async Task SimulateDiceTraces(MatchDiceSimulationTraces diceTraces)
+        private async Task SimulateDiceTraces(GameSimulationMatchTrace trace)
         {
             // Replay the dice simulation traces for each player
             List<Task> tasks = new();
             for (int clientIndex = 0; clientIndex < 2; clientIndex++)
             {
                 var sceneObjects = SceneObjects.Player(clientIndex);
-                tasks.Add(sceneObjects.DiceSimReplayer.Play(
-                    diceTraces.Player(clientIndex), cts.Token, sceneObjects));
+                tasks.Add(sceneObjects.SimReplayer.Play(
+                    trace.Player(clientIndex), cts.Token, sceneObjects));
             }
             await Task.WhenAll(tasks);
         }

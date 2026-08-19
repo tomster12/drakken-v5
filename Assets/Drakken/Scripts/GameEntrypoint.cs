@@ -1,12 +1,12 @@
 using System.Linq;
 using UnityEngine;
-using Drakken.Common.Utility;
+using Drakken.Utility;
 using Drakken.Client;
 using Drakken.Client.World;
 using Drakken.Server;
 using System;
 using Drakken.Networking;
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 
 namespace Drakken
 {

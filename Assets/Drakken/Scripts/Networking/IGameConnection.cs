@@ -17,13 +17,13 @@ namespace Drakken.Networking
         void Client_MessageMatchClientReady(ulong matchId);
         void Server_MessageMatchOtherPlayerReady(ulong clientId);
         void Server_MessageMatchOtherPlayerDiscarded(ulong clientId);
-        void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, MatchDiceSimulationTraces diceTraces);
+        void Server_BroadcastMatchStartDraftingPhase(ulong[] clientIds, GameState gameState, GameSimulationMatchTrace trace);
         Task<bool> Client_RequestMatchDraftDiscard(ulong matchId, DraftDiscardMessage message);
         void Server_BroadcastMatchStartPlayingPhase(ulong[] clientIds, GameState gameState);
         Task<bool> Client_RequestMatchPlayToken(ulong matchId, TokenIntentMessage message);
         void Server_BroadcastMatchTokenResolved(ulong[] clientIds, TokenResolutionMessage message);
         Task Client_MessageMatchAnimatedTokenResolved(ulong matchId);
         void Server_BroadcastMatchNextTurn(ulong[] clientIds, GameState gameState);
-        void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, MatchDiceSimulationTraces diceTraces);
+        void Server_BroadcastMatchNextRound(ulong[] clientIds, GameState gameState, GameSimulationMatchTrace trace);
     }
-}
+}

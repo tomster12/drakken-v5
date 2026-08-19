@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Drakken.Domain;
-using Drakken.Domain.Dice;
-using Drakken.Domain.Tokens;
+using Drakken.Presentation;
+using Drakken.Gameplay.Simulation;
+using Drakken.Gameplay.Tokens;
 using UnityEngine;
 
 namespace Drakken.Client.World
@@ -32,7 +33,7 @@ namespace Drakken.Client.World
     {
         public TokenView[] TokenViews { get; set; } = new TokenView[0];
         public Dictionary<int, DiceView> DiceViews { get; set; } = new();
-        public DiceSimulationReplayer DiceSimReplayer { get; } = new();
+        public GameSimulationReplayer SimReplayer { get; } = new();
 
         private SceneLayout sceneLayout;
         private AssetDatabase assets;
@@ -54,14 +55,14 @@ namespace Drakken.Client.World
             this.gameClient = gameClient;
             this.clientIndex = clientIndex;
 
-            DiceSimReplayer.Init(assets, gameClient);
+            SimReplayer.Init(assets, gameClient);
         }
 
         public void OnDisconnect()
         {
             DestroyAllTokens();
             DestroyAllDice();
-            DiceSimReplayer.Cleanup();
+            SimReplayer.Cleanup();
         }
 
         // ------------------------------ Dice
@@ -132,4 +133,4 @@ namespace Drakken.Client.World
             TokenViews = new TokenView[0];
         }
     }
-}
+}

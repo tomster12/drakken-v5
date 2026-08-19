@@ -1,9 +1,9 @@
 using Drakken.Client.States;
 using Drakken.Client.World;
-using Drakken.Common.Utility;
+using Drakken.Utility;
 using Drakken.Config;
 using Drakken.Domain;
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -157,4 +157,4 @@ namespace Drakken.Client
             return false;
         }
     }
-}
+}

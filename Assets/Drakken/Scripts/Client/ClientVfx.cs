@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Drakken.Client.World.Vfx;
+using Drakken.Client.Vfx;
 using UnityEngine;
 
 namespace Drakken.Client

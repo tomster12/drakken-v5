@@ -1,4 +1,4 @@
-namespace Drakken.Common.Utility
+namespace Drakken.Utility
 {
     public static class Assert
     {

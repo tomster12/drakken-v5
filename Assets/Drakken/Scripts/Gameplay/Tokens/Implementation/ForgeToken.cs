@@ -1,0 +1,249 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Drakken.Client;
+using Drakken.Client.World;
+using Drakken.Utility;
+using Drakken.Presentation.Animation;
+using Drakken.Presentation;
+using Drakken.Gameplay.Simulation;
+using Drakken.Gameplay.Tokens.Implementation.Common;
+using Drakken.Gameplay.Tokens.Logic;
+using Unity.Netcode;
+using UnityEngine;
+using Drakken.Domain;
+
+namespace Drakken.Gameplay.Tokens.Implementation
+{
+    public class ForgeOutcome : EventResolution
+    {
+        public int FirstInstanceId;
+        public int SecondInstanceId;
+        public bool DidMerge;
+        public DiceInstance MergedDiceInstance;
+
+        public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
+        {
+            serializer.SerializeValue(ref FirstInstanceId);
+            serializer.SerializeValue(ref SecondInstanceId);
+            serializer.SerializeValue(ref DidMerge);
+
+            if (!DidMerge) return;
+
+            if (serializer.IsReader) MergedDiceInstance = new DiceInstance();
+            serializer.SerializeValue(ref MergedDiceInstance);
+        }
+    }
+
+    public class ForgeTokenLogic : TokenLogic<PickDiceTokenIntent, ForgeOutcome>
+    {
+        private const float FlightDuration = 0.5f;
+        private const float FlightLiftHeight = 1.3f;
+        private const float FlightSideGap = 0.9f;
+        private const float FlightArchHeight = 0.6f;
+        private const float ForgePopUpwardSpeed = 1.2f;
+        private const float ForgePopHorizontalSpeed = 0.3f;
+        private const float ForgePopTorque = 4f;
+
+        private const float PullTogetherDuration = 0.35f;
+        private const float PullTogetherArchHeight = 0.5f;
+
+        public override int EffectId => TokenEventIds.Forge;
+
+        protected override TokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
+        {
+            var client = gameState.Clients[sourceClientIndex];
+
+            Assert.True(client.Dice.Count >= 2);
+            Assert.True(intent.TargetDiceInstanceIds != null && intent.TargetDiceInstanceIds.Count == 2);
+            Assert.True(intent.TargetDiceInstanceIds[0] != intent.TargetDiceInstanceIds[1]);
+
+            var firstDice = client.Dice.Find(d => d.InstanceId == intent.TargetDiceInstanceIds[0]);
+            var secondDice = client.Dice.Find(d => d.InstanceId == intent.TargetDiceInstanceIds[1]);
+
+            Assert.NotNull(firstDice);
+            Assert.NotNull(secondDice);
+
+            var outcome = new ForgeOutcome
+            {
+                FirstInstanceId = firstDice.InstanceId,
+                SecondInstanceId = secondDice.InstanceId,
+            };
+
+            // Drive the 2 dice up next to each other in the midpoint
+            world.BeginSession(client.Dice);
+
+            var (firstStartPos, firstStartRot) = world.GetDicePose(firstDice.InstanceId);
+            var (secondStartPos, secondStartRot) = world.GetDicePose(secondDice.InstanceId);
+
+            Vector3 liftedMidpoint = (firstStartPos + secondStartPos) / 2f + Vector3.up * FlightLiftHeight;
+            Vector3 sideDirection = secondStartPos - firstStartPos;
+            sideDirection = sideDirection.sqrMagnitude > 0.0001f ? sideDirection.normalized : Vector3.right;
+
+            Vector3 firstTarget = liftedMidpoint - sideDirection * (FlightSideGap / 2f);
+            Vector3 secondTarget = liftedMidpoint + sideDirection * (FlightSideGap / 2f);
+
+            Vector3 firstControlPosition = Vector3.Lerp(firstStartPos, firstTarget, 0.5f) + Vector3.up * FlightArchHeight;
+            Vector3 secondControlPosition = Vector3.Lerp(secondStartPos, secondTarget, 0.5f) + Vector3.up * FlightArchHeight;
+
+            var firstArc = AnimationCurves.QuadraticBezier(firstStartPos, firstControlPosition, firstTarget);
+            var secondArc = AnimationCurves.QuadraticBezier(secondStartPos, secondControlPosition, secondTarget);
+
+            var flightDriveIds = new List<string>
+            {
+                world.DriveDice(
+                    firstDice.InstanceId, FlightDuration,
+                    t => firstArc(Easing.EaseOutCubic(t)),
+                    _ => firstStartRot),
+                world.DriveDice(
+                    secondDice.InstanceId, FlightDuration,
+                    t => secondArc(Easing.EaseOutCubic(t)),
+                    _ => secondStartRot),
+            };
+
+            world.Simulate(untilDrivesComplete: flightDriveIds);
+
+            var liftTrace = world.EndSession();
+
+            // Now try and merge the 2 dice together
+            world.BeginSession(client.Dice);
+
+            bool firstCanModify = TokenExecutionLogic.TryModify(firstDice, world);
+            bool secondCanModify = TokenExecutionLogic.TryModify(secondDice, world);
+
+            if (!firstCanModify || !secondCanModify)
+            {
+                outcome.DidMerge = false;
+
+                // Merge is off - let both dice drop and settle naturally rather than scripting them back
+                world.WakeDice(firstDice.InstanceId);
+                world.WakeDice(secondDice.InstanceId);
+
+                world.Simulate(untilAllSettled: true);
+            }
+
+            else
+            {
+                outcome.DidMerge = true;
+
+                // Merge into a new dice, with sides = (v1 + v2) rounded up, minimum 4
+                int mergedSides = TokenExecutionLogic.RoundUpToEven(firstDice.Value + secondDice.Value);
+                mergedSides = Mathf.Max(mergedSides, 4);
+
+                var mergedDice = DiceInstance.Create(sides: mergedSides);
+                mergedDice.Roll();
+
+                world.RemoveDice(firstDice.InstanceId);
+                world.RemoveDice(secondDice.InstanceId);
+
+                // Pop the forged dice straight up with a small random horizontal drift and spin, then let it fall
+                Quaternion mergedRotation = Random.rotationUniform;
+                Vector3 popImpulse = Vector3.up * ForgePopUpwardSpeed
+                    + new Vector3(Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed), 0f, Random.Range(-ForgePopHorizontalSpeed, ForgePopHorizontalSpeed));
+                Vector3 popTorque = Random.insideUnitSphere * ForgePopTorque;
+
+                world.SpawnDice(mergedDice, liftedMidpoint, mergedRotation, popImpulse, popTorque);
+
+                world.Simulate(untilAllSettled: true);
+
+                outcome.MergedDiceInstance = mergedDice.Clone();
+            }
+
+            world.FreezeAllDice();
+
+            world.RecordEvent(EffectId, EventKind.Token, outcome.FirstInstanceId, 0, outcome);
+
+            return new TokenResolution(liftTrace, world.EndSession());
+        }
+
+        protected override void Apply(GameState gameState, ForgeOutcome outcome, int clientIndex, int sourceInstanceId)
+        {
+            if (!outcome.DidMerge) return;
+
+            var client = gameState.Clients[clientIndex];
+
+            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == outcome.FirstInstanceId);
+            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == outcome.SecondInstanceId);
+            if (firstIndex < 0 || secondIndex < 0) return;
+
+            // Keep the merged dice at the lower of the two original slots, preserving stable ordering
+            int insertIndex = Mathf.Min(firstIndex, secondIndex);
+            client.Dice.RemoveAll(d => d.InstanceId == outcome.FirstInstanceId || d.InstanceId == outcome.SecondInstanceId);
+            client.Dice.Insert(insertIndex, outcome.MergedDiceInstance);
+        }
+
+        public override async Task Animate(
+            ClientMatch match,
+            TokenVisualContext visualContext,
+            int sourceClientIndex,
+            int tokenInstanceId,
+            TokenResolution resolution,
+            CancellationToken ct)
+        {
+            var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
+            var outcome = FindOutcome(resolution);
+
+            // Shrink the token out the way
+            await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
+
+            // Replay the lift simulation
+            await sourcePlayerObjects.SimReplayer.Play(
+                resolution.Traces[0], ct, sourcePlayerObjects);
+
+            if (outcome.DidMerge)
+            {
+                var firstDiceView = sourcePlayerObjects.DiceViews[outcome.FirstInstanceId];
+                var secondDiceView = sourcePlayerObjects.DiceViews[outcome.SecondInstanceId];
+
+                // Do a final client-side animation to merge the 2 dice
+                Vector3 firstStartPosition = firstDiceView.transform.position;
+                Vector3 secondStartPosition = secondDiceView.transform.position;
+                Vector3 midpoint = (firstStartPosition + secondStartPosition) / 2f;
+
+                Vector3 firstControlPosition = Vector3.Lerp(firstStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
+                Vector3 secondControlPosition = Vector3.Lerp(secondStartPosition, midpoint, 0.5f) + Vector3.up * PullTogetherArchHeight;
+
+                var firstArc = AnimationCurves.QuadraticBezier(firstStartPosition, firstControlPosition, midpoint);
+                var secondArc = AnimationCurves.QuadraticBezier(secondStartPosition, secondControlPosition, midpoint);
+
+                await Task.WhenAll(
+                    firstDiceView.Animator.Play(AnimationSequenceBuilder.Start()
+                        .Next(
+                            AnimationTracks.PositionFunc(PullTogetherDuration, firstDiceView.transform, firstArc, Easing.EaseInOutQuad),
+                            AnimationTracks.LocalScale(PullTogetherDuration, firstDiceView.transform, firstDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                        .Build(), ct),
+                    secondDiceView.Animator.Play(AnimationSequenceBuilder.Start()
+                        .Next(
+                            AnimationTracks.PositionFunc(PullTogetherDuration, secondDiceView.transform, secondArc, Easing.EaseInOutQuad),
+                            AnimationTracks.LocalScale(PullTogetherDuration, secondDiceView.transform, secondDiceView.transform.localScale, Vector3.zero, Easing.EaseInCubic))
+                        .Build(), ct));
+
+                // Both dice have already shrunk to nothing at the midpoint, so just clean them up
+                GameObject.Destroy(firstDiceView.gameObject);
+                GameObject.Destroy(secondDiceView.gameObject);
+                sourcePlayerObjects.DiceViews.Remove(outcome.FirstInstanceId);
+                sourcePlayerObjects.DiceViews.Remove(outcome.SecondInstanceId);
+            }
+
+            // Replay the final merge simulation (either merge or just drop)
+            await sourcePlayerObjects.SimReplayer.Play(
+                resolution.Traces[1], ct, sourcePlayerObjects);
+
+            visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
+        }
+
+        private static ForgeOutcome FindOutcome(TokenResolution resolution)
+        {
+            foreach (var trace in resolution.Traces)
+            {
+                foreach (var evt in trace.Events)
+                {
+                    if (evt.Kind == EventKind.Token && evt.EffectId == TokenEventIds.Forge)
+                        return (ForgeOutcome)evt.Resolution;
+                }
+            }
+
+            return new ForgeOutcome();
+        }
+    }
+}

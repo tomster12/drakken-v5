@@ -1,10 +1,11 @@
 using Drakken.Client.World;
-using Drakken.Common.Utility;
+using Drakken.Utility;
 using Drakken.Domain;
-using Drakken.Domain.Dice;
+using Drakken.Presentation;
 using Drakken.Domain.Networking;
+using Drakken.Gameplay.Simulation;
 using Drakken.Domain.Static;
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 using Drakken.Networking;
 using System;
 using System.Collections.Generic;
@@ -24,7 +25,7 @@ namespace Drakken.Server
         private readonly IGameConnection connection;
         private readonly DiceTrayLayout diceLayout;
         public GameState GameState { get; private set; }
-        public DiceSimulationWorld[] DiceWorlds { get; }
+        public GameSimulationWorld[] DiceWorlds { get; }
         private readonly ulong[] clientIds = new ulong[2];
         private readonly Dictionary<ulong, int> clientIdIndexAssignment = new();
         private readonly ulong matchId;
@@ -49,7 +50,7 @@ namespace Drakken.Server
             matchId = nextMatchId++;
             GameState = new();
 
-            DiceWorlds = new DiceSimulationWorld[2]
+            DiceWorlds = new GameSimulationWorld[2]
             {
                 new($"Match-{matchId} Dice World P1", diceLayout.P1),
                 new($"Match-{matchId} Dice World P2", diceLayout.P2),
@@ -122,9 +123,9 @@ namespace Drakken.Server
             DealGameDice();
             DealDraftTokens();
 
-            var diceTraces = SimulateRollDice();
+            var trace = SimulateRollDice();
 
-            connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, diceTraces);
+            connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, trace);
         }
 
         private void DealGameDice()
@@ -305,8 +306,8 @@ namespace Drakken.Server
 
             DealDraftTokens();
 
-            var diceTraces = SimulateRerollDice();
-            connection.Server_BroadcastMatchNextRound(clientIds, GameState, diceTraces);
+            var trace = SimulateRerollDice();
+            connection.Server_BroadcastMatchNextRound(clientIds, GameState, trace);
         }
 
         // -------------------------------- Dice Simulation
@@ -381,11 +382,14 @@ namespace Drakken.Server
             return (velocity, torque);
         }
 
-        private MatchDiceSimulationTraces SimulateRollDice()
+        private GameSimulationMatchTrace SimulateRollDice()
         {
+            // Simulate on a clone then commit back
+            var simulationState = GameState.Clone();
+
             for (int p = 0; p < 2; p++)
             {
-                var diceInstances = GameState.Clients[p].Dice;
+                var diceInstances = simulationState.Clients[p].Dice;
                 var tray = diceLayout.Player(p);
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
@@ -407,9 +411,12 @@ namespace Drakken.Server
 
                 world.Simulate(untilAllSettled: true);
                 world.FreezeAllDice();
+
+                // Commit back to GameState
+                GameState.Clients[p].Dice = diceInstances;
             }
 
-            var traces = new MatchDiceSimulationTraces
+            var traces = new GameSimulationMatchTrace
             {
                 P1 = DiceWorlds[0].EndSession(),
                 P2 = DiceWorlds[1].EndSession(),
@@ -421,11 +428,14 @@ namespace Drakken.Server
             return traces;
         }
 
-        private MatchDiceSimulationTraces SimulateRerollDice()
+        private GameSimulationMatchTrace SimulateRerollDice()
         {
+            // Simulate on a clone then commit back
+            var simulationState = GameState.Clone();
+
             for (int p = 0; p < 2; p++)
             {
-                var diceInstances = GameState.Clients[p].Dice;
+                var diceInstances = simulationState.Clients[p].Dice;
                 var tray = diceLayout.Player(p);
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
@@ -464,9 +474,12 @@ namespace Drakken.Server
 
                 world.Simulate(untilAllSettled: true);
                 world.FreezeAllDice();
+
+                // Commit back to GameState
+                GameState.Clients[p].Dice = diceInstances;
             }
 
-            var traces = new MatchDiceSimulationTraces
+            var traces = new GameSimulationMatchTrace
             {
                 P1 = DiceWorlds[0].EndSession(),
                 P2 = DiceWorlds[1].EndSession(),

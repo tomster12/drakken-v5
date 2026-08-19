@@ -4,11 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Drakken.Client.World;
-using Drakken.Domain.Animation;
-using Drakken.Common.Utility;
-using Drakken.Networking;
-using Drakken.Domain.Tokens.Logic;
+using Drakken.Presentation.Animation;
 using Drakken.Utility;
+using Drakken.Networking;
+using Drakken.Gameplay.Tokens.Logic;
 using UnityEngine;
 using Drakken.Domain.Networking;
 

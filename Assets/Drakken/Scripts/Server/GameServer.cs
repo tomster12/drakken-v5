@@ -1,6 +1,6 @@
-using Drakken.Common.Utility;
+using Drakken.Utility;
 using Drakken.Config;
-using Drakken.Domain.Tokens;
+using Drakken.Gameplay.Tokens;
 using Drakken.Domain.Networking;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
