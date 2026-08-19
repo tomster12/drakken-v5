@@ -24,8 +24,16 @@ namespace Drakken.Domain
         {
             foreach (var evt in Events)
             {
-                var logic = EventRegistry.Get(evt.EffectId, evt.Kind);
-                logic?.Apply(gameState, evt.Resolution, clientIndex, evt.SourceInstanceId);
+                var logic = EventRegistry.Get(evt.EventId, evt.Kind);
+                logic?.ApplyEvent(gameState, evt.Resolution, clientIndex, evt.SourceInstanceId);
+            }
+        }
+
+        public static void ApplyAll(List<GameSimulationTrace> traces, GameState gameState, int clientIndex)
+        {
+            foreach (var trace in traces)
+            {
+                trace?.ApplyEffects(gameState, clientIndex);
             }
         }
     }
@@ -76,7 +84,7 @@ namespace Drakken.Domain
 
     public class SimulationEvent : INetworkSerializable
     {
-        public int EffectId;
+        public int EventId;
         public EventKind Kind;
         public int Tick;
         public int SourceInstanceId;
@@ -85,7 +93,7 @@ namespace Drakken.Domain
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
-            serializer.SerializeValue(ref EffectId);
+            serializer.SerializeValue(ref EventId);
             serializer.SerializeValue(ref Kind);
             serializer.SerializeValue(ref Tick);
             serializer.SerializeValue(ref SourceInstanceId);
@@ -93,7 +101,7 @@ namespace Drakken.Domain
 
             if (serializer.IsReader)
             {
-                var logic = EventRegistry.Get(EffectId, Kind);
+                var logic = EventRegistry.Get(EventId, Kind);
                 Resolution = (EventResolution)Activator.CreateInstance(logic.ResolutionType);
             }
 

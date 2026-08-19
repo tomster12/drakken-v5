@@ -1,4 +1,4 @@
-using Drakken.Gameplay.Tokens.Logic;
+using System.Collections.Generic;
 using Unity.Netcode;
 
 namespace Drakken.Domain.Networking
@@ -9,7 +9,7 @@ namespace Drakken.Domain.Networking
         public string TokenId;
         public int TokenInstanceId;
         public int SourceClientIndex;
-        public TokenResolution Resolution;
+        public List<GameSimulationTrace> Traces;
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -17,13 +17,7 @@ namespace Drakken.Domain.Networking
             serializer.SerializeValue(ref TokenId);
             serializer.SerializeValue(ref TokenInstanceId);
             serializer.SerializeValue(ref SourceClientIndex);
-
-            if (serializer.IsReader)
-            {
-                Resolution = new TokenResolution();
-            }
-
-            Resolution.NetworkSerialize(serializer);
+            serializer.SerializeList(ref Traces);
         }
     }
 }

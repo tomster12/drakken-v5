@@ -23,7 +23,7 @@ namespace Drakken.Gameplay.Dice.Logic
     public abstract class DiceEffectLogic<TResolution> : IDiceEffectLogic
         where TResolution : EventResolution
     {
-        public abstract int EffectId { get; }
+        public abstract int EventId { get; }
 
         Type IEventLogic.ResolutionType => typeof(TResolution);
 
@@ -35,17 +35,17 @@ namespace Drakken.Gameplay.Dice.Logic
 
         protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, int sourceInstanceId, CancellationToken ct) => Task.CompletedTask;
 
-        void IEventLogic.Apply(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
+        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
             => Apply(gameState, (TResolution)resolution, clientIndex, sourceInstanceId);
 
-        Task IEventLogic.Animate(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
+        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
             => Animate(ctx, (TResolution)resolution, sourceInstanceId, ct);
     }
 
     public abstract class FaceEffectLogic<TResolution> : IFaceEffectLogic
         where TResolution : EventResolution
     {
-        public abstract int EffectId { get; }
+        public abstract int EventId { get; }
         Type IEventLogic.ResolutionType => typeof(TResolution);
 
         public virtual void Execute(DiceEffectExecuteContext ctx) { }
@@ -56,10 +56,10 @@ namespace Drakken.Gameplay.Dice.Logic
 
         protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, int sourceInstanceId, CancellationToken ct) => Task.CompletedTask;
 
-        void IEventLogic.Apply(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
+        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
             => Apply(gameState, (TResolution)resolution, clientIndex, sourceInstanceId);
 
-        Task IEventLogic.Animate(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
+        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
             => Animate(ctx, (TResolution)resolution, sourceInstanceId, ct);
     }
 }

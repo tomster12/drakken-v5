@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Drakken.Presentation;
 using Drakken.Gameplay.Simulation;
 using Drakken.Gameplay.Tokens.Implementation.Common;
@@ -6,20 +7,18 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class BlankOutcome : EventResolution { }
-
-    public class BlankTokenLogic : TokenLogic<EmptyTokenIntent, BlankOutcome>
+    public class BlankTokenLogic : TokenLogic<EmptyTokenIntent, EmptyEventResolution>
     {
-        public override int EffectId => TokenEventIds.Blank;
+        public override int EventId => 7;
 
-        protected override TokenResolution Execute(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
+        protected override List<GameSimulationTrace> ExecuteToken(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
         {
             // TODO
 
-            return new TokenResolution();
+            return new List<GameSimulationTrace>();
         }
 
-        protected override void Apply(GameState gameState, BlankOutcome outcome, int clientIndex, int sourceInstanceId)
+        protected override void ApplyEvent(GameState gameState, EmptyEventResolution resolution, int clientIndex, int sourceInstanceId)
         {
             // TODO
         }

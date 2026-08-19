@@ -134,13 +134,13 @@ namespace Drakken.Gameplay.Simulation
             // Build a trace of a dice over this session, rebased to 0 at session start
             List<DicePoseTrace> poseTraces = new(body.SessionPoseTraces.Count);
 
-            foreach (var pose in body.SessionPoseTraces)
+            foreach (var poseTrace in body.SessionPoseTraces)
             {
                 poseTraces.Add(new DicePoseTrace
                 {
-                    Tick = pose.Tick - sessionStartTick,
-                    Position = pose.Position,
-                    Rotation = pose.Rotation,
+                    Tick = poseTrace.Tick - sessionStartTick,
+                    Position = poseTrace.Position,
+                    Rotation = poseTrace.Rotation,
                 });
             }
 
@@ -165,13 +165,13 @@ namespace Drakken.Gameplay.Simulation
             };
         }
 
-        public void RecordEvent(int effectId, EventKind kind, int sourceInstanceId, int side, EventResolution resolution)
+        public void RecordEvent(int eventId, EventKind kind, int sourceInstanceId, int side, EventResolution resolution)
         {
             Assert.True(isInSession, "Cannot record an event outside of a session");
 
             sessionEvents.Add(new SimulationEvent
             {
-                EffectId = effectId,
+                EventId = eventId,
                 Kind = kind,
                 Tick = currentTick - sessionStartTick,
                 SourceInstanceId = sourceInstanceId,

@@ -9,13 +9,18 @@ namespace Drakken.Gameplay.Tokens
 {
     public class TokenRegistry
     {
-        private readonly Dictionary<string, TokenRegistryEntry> entries = new();
+        // Used from SimulationEvent network serialization
+
+        public static readonly TokenRegistry Shared = TokenRegistryBuilder.BuildServerRegistry();
+
+        private readonly Dictionary<string, TokenRegistryEntry> entriesByTokenId = new();
+        private readonly Dictionary<int, TokenRegistryEntry> entriesByEventId = new();
 
         public IEnumerable<TokenDefinition> AllDefinitions
         {
             get
             {
-                foreach (var entry in entries.Values)
+                foreach (var entry in entriesByTokenId.Values)
                 {
                     yield return entry.Definition;
                 }
@@ -29,16 +34,21 @@ namespace Drakken.Gameplay.Tokens
         {
             Assert.NotNullOrEmpty(definition.TokenId, "TokenDefinition must have a non-empty TokenId");
 
-            entries[definition.TokenId] = new TokenRegistryEntry(definition, logic, visuals);
+            var entry = new TokenRegistryEntry(definition, logic, visuals);
+            entriesByTokenId[definition.TokenId] = entry;
+            entriesByEventId[logic.EventId] = entry;
         }
 
         public TokenRegistryEntry GetEntryOrThrow(string tokenId)
         {
-            if (!entries.TryGetValue(tokenId, out var entry))
+            if (!entriesByTokenId.TryGetValue(tokenId, out var entry))
                 throw new InvalidOperationException($"No registry entry for TokenId={tokenId}");
 
             return entry;
         }
+
+        public TokenRegistryEntry GetEntryByEventId(int eventId)
+            => entriesByEventId.TryGetValue(eventId, out var entry) ? entry : null;
     }
 
     public class TokenRegistryEntry

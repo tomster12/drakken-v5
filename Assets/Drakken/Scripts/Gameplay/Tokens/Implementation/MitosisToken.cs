@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Drakken.Utility;
 using Drakken.Presentation;
@@ -11,7 +12,7 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class MitosisOutcome : EventResolution
+    public class MitosisResolution : EventResolution
     {
         // Null when it split instead - the split is recorded as its own MitosisSplitResolution event
         public DiceInstance FinalTargetDice;
@@ -28,16 +29,16 @@ namespace Drakken.Gameplay.Tokens.Implementation
         }
     }
 
-    public class MitosisTokenLogic : TokenLogic<PickDiceTokenIntent, MitosisOutcome>
+    public class MitosisTokenLogic : TokenLogic<PickDiceTokenIntent, MitosisResolution>
     {
         private const float TossUpwardMin = 5.5f;
         private const float TossUpwardMax = 7.5f;
         private const float TossSideways = 0.6f;
         private const float TossTorque = 20f;
 
-        public override int EffectId => TokenEventIds.Mitosis;
+        public override int EventId => 3;
 
-        protected override TokenResolution Execute(
+        protected override List<GameSimulationTrace> ExecuteToken(
             GameState gameState,
             PickDiceTokenIntent intent,
             int sourceClientIndex,
@@ -55,7 +56,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             if (!TokenExecutionLogic.TryModify(targetDice, world))
             {
-                return new TokenResolution(world.EndSession());
+                return new List<GameSimulationTrace> { world.EndSession() };
             }
 
             MitosisFaceEffect.MarkRandomHalf(targetDice);
@@ -76,21 +77,21 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.FreezeAllDice();
 
-            world.RecordEvent(EffectId, EventKind.Token, originalInstanceId, targetDice.CurrentSide, new MitosisOutcome
+            world.RecordEvent(EventId, EventKind.Token, originalInstanceId, targetDice.CurrentSide, new MitosisResolution
             {
                 FinalTargetDice = finalTargetDice?.Clone(),
             });
 
-            return new TokenResolution(world.EndSession());
+            return new List<GameSimulationTrace> { world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, MitosisOutcome outcome, int clientIndex, int sourceInstanceId)
+        protected override void ApplyEvent(GameState gameState, MitosisResolution Resolution, int clientIndex, int sourceInstanceId)
         {
-            if (outcome.FinalTargetDice == null) return;
+            if (Resolution.FinalTargetDice == null) return;
 
             var client = gameState.Clients[clientIndex];
-            int index = client.Dice.FindIndex(d => d.InstanceId == outcome.FinalTargetDice.InstanceId);
-            if (index >= 0) client.Dice[index] = outcome.FinalTargetDice;
+            int index = client.Dice.FindIndex(d => d.InstanceId == Resolution.FinalTargetDice.InstanceId);
+            if (index >= 0) client.Dice[index] = Resolution.FinalTargetDice;
         }
     }
 }

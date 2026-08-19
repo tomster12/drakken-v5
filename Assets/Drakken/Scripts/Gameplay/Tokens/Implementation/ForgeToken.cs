@@ -15,7 +15,7 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class ForgeOutcome : EventResolution
+    public class ForgeResolution : EventResolution
     {
         public int FirstInstanceId;
         public int SecondInstanceId;
@@ -35,7 +35,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
         }
     }
 
-    public class ForgeTokenLogic : TokenLogic<PickDiceTokenIntent, ForgeOutcome>
+    public class ForgeTokenLogic : TokenLogic<PickDiceTokenIntent, ForgeResolution>
     {
         private const float FlightDuration = 0.5f;
         private const float FlightLiftHeight = 1.3f;
@@ -48,9 +48,11 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float PullTogetherDuration = 0.35f;
         private const float PullTogetherArchHeight = 0.5f;
 
-        public override int EffectId => TokenEventIds.Forge;
+        private const int Id = 2;
 
-        protected override TokenResolution Execute(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
+        public override int EventId => Id;
+
+        protected override List<GameSimulationTrace> ExecuteToken(GameState gameState, PickDiceTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
         {
             var client = gameState.Clients[sourceClientIndex];
 
@@ -64,7 +66,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
             Assert.NotNull(firstDice);
             Assert.NotNull(secondDice);
 
-            var outcome = new ForgeOutcome
+            var Resolution = new ForgeResolution
             {
                 FirstInstanceId = firstDice.InstanceId,
                 SecondInstanceId = secondDice.InstanceId,
@@ -113,7 +115,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             if (!firstCanModify || !secondCanModify)
             {
-                outcome.DidMerge = false;
+                Resolution.DidMerge = false;
 
                 // Merge is off - let both dice drop and settle naturally rather than scripting them back
                 world.WakeDice(firstDice.InstanceId);
@@ -124,7 +126,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             else
             {
-                outcome.DidMerge = true;
+                Resolution.DidMerge = true;
 
                 // Merge into a new dice, with sides = (v1 + v2) rounded up, minimum 4
                 int mergedSides = TokenExecutionLogic.RoundUpToEven(firstDice.Value + secondDice.Value);
@@ -146,54 +148,54 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
                 world.Simulate(untilAllSettled: true);
 
-                outcome.MergedDiceInstance = mergedDice.Clone();
+                Resolution.MergedDiceInstance = mergedDice.Clone();
             }
 
             world.FreezeAllDice();
 
-            world.RecordEvent(EffectId, EventKind.Token, outcome.FirstInstanceId, 0, outcome);
+            world.RecordEvent(EventId, EventKind.Token, Resolution.FirstInstanceId, 0, Resolution);
 
-            return new TokenResolution(liftTrace, world.EndSession());
+            return new List<GameSimulationTrace> { liftTrace, world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, ForgeOutcome outcome, int clientIndex, int sourceInstanceId)
+        protected override void ApplyEvent(GameState gameState, ForgeResolution Resolution, int clientIndex, int sourceInstanceId)
         {
-            if (!outcome.DidMerge) return;
+            if (!Resolution.DidMerge) return;
 
             var client = gameState.Clients[clientIndex];
 
-            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == outcome.FirstInstanceId);
-            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == outcome.SecondInstanceId);
+            int firstIndex = client.Dice.FindIndex(d => d.InstanceId == Resolution.FirstInstanceId);
+            int secondIndex = client.Dice.FindIndex(d => d.InstanceId == Resolution.SecondInstanceId);
             if (firstIndex < 0 || secondIndex < 0) return;
 
             // Keep the merged dice at the lower of the two original slots, preserving stable ordering
             int insertIndex = Mathf.Min(firstIndex, secondIndex);
-            client.Dice.RemoveAll(d => d.InstanceId == outcome.FirstInstanceId || d.InstanceId == outcome.SecondInstanceId);
-            client.Dice.Insert(insertIndex, outcome.MergedDiceInstance);
+            client.Dice.RemoveAll(d => d.InstanceId == Resolution.FirstInstanceId || d.InstanceId == Resolution.SecondInstanceId);
+            client.Dice.Insert(insertIndex, Resolution.MergedDiceInstance);
         }
 
-        public override async Task Animate(
+        public override async Task AnimateToken(
             ClientMatch match,
             TokenVisualContext visualContext,
             int sourceClientIndex,
             int tokenInstanceId,
-            TokenResolution resolution,
+            List<GameSimulationTrace> traces,
             CancellationToken ct)
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
-            var outcome = FindOutcome(resolution);
+            var Resolution = FindResolution(traces);
 
             // Shrink the token out the way
             await visualContext.TokenView.AnimateShrinkAfter(0.5f, ct);
 
             // Replay the lift simulation
             await sourcePlayerObjects.SimReplayer.Play(
-                resolution.Traces[0], ct, sourcePlayerObjects);
+                traces[0], ct, sourcePlayerObjects);
 
-            if (outcome.DidMerge)
+            if (Resolution.DidMerge)
             {
-                var firstDiceView = sourcePlayerObjects.DiceViews[outcome.FirstInstanceId];
-                var secondDiceView = sourcePlayerObjects.DiceViews[outcome.SecondInstanceId];
+                var firstDiceView = sourcePlayerObjects.DiceViews[Resolution.FirstInstanceId];
+                var secondDiceView = sourcePlayerObjects.DiceViews[Resolution.SecondInstanceId];
 
                 // Do a final client-side animation to merge the 2 dice
                 Vector3 firstStartPosition = firstDiceView.transform.position;
@@ -221,29 +223,29 @@ namespace Drakken.Gameplay.Tokens.Implementation
                 // Both dice have already shrunk to nothing at the midpoint, so just clean them up
                 GameObject.Destroy(firstDiceView.gameObject);
                 GameObject.Destroy(secondDiceView.gameObject);
-                sourcePlayerObjects.DiceViews.Remove(outcome.FirstInstanceId);
-                sourcePlayerObjects.DiceViews.Remove(outcome.SecondInstanceId);
+                sourcePlayerObjects.DiceViews.Remove(Resolution.FirstInstanceId);
+                sourcePlayerObjects.DiceViews.Remove(Resolution.SecondInstanceId);
             }
 
             // Replay the final merge simulation (either merge or just drop)
             await sourcePlayerObjects.SimReplayer.Play(
-                resolution.Traces[1], ct, sourcePlayerObjects);
+                traces[1], ct, sourcePlayerObjects);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }
 
-        private static ForgeOutcome FindOutcome(TokenResolution resolution)
+        private static ForgeResolution FindResolution(List<GameSimulationTrace> traces)
         {
-            foreach (var trace in resolution.Traces)
+            foreach (var trace in traces)
             {
                 foreach (var evt in trace.Events)
                 {
-                    if (evt.Kind == EventKind.Token && evt.EffectId == TokenEventIds.Forge)
-                        return (ForgeOutcome)evt.Resolution;
+                    if (evt.Kind == EventKind.Token && evt.EventId == Id)
+                        return (ForgeResolution)evt.Resolution;
                 }
             }
 
-            return new ForgeOutcome();
+            return new ForgeResolution();
         }
     }
 }

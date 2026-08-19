@@ -1,24 +1,13 @@
+using System.Collections.Generic;
 using Drakken.Gameplay.Simulation;
 using Drakken.Gameplay.Tokens.Implementation.Common;
 using Drakken.Gameplay.Tokens.Logic;
-using Unity.Netcode;
 using UnityEngine;
 using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class BolsterOutcome : EventResolution
-    {
-        public DiceInstance AddedDiceInstance;
-
-        public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
-        {
-            if (serializer.IsReader) AddedDiceInstance = new DiceInstance();
-            serializer.SerializeValue(ref AddedDiceInstance);
-        }
-    }
-
-    public class BolsterTokenLogic : TokenLogic<EmptyTokenIntent, BolsterOutcome>
+    public class BolsterTokenLogic : TokenLogic<EmptyTokenIntent, EmptyEventResolution>
     {
         private const float TossUpwardMin = 4.5f;
         private const float TossUpwardMax = 6f;
@@ -26,9 +15,9 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float TossTorque = 20f;
         private const float SpawnHeight = 1f;
 
-        public override int EffectId => TokenEventIds.Bolster;
+        public override int EventId => 4;
 
-        protected override TokenResolution Execute(
+        protected override List<GameSimulationTrace> ExecuteToken(
             GameState gameState,
             EmptyTokenIntent intent,
             int sourceClientIndex,
@@ -36,11 +25,12 @@ namespace Drakken.Gameplay.Tokens.Implementation
         {
             var client = gameState.Clients[sourceClientIndex];
 
-            // The bolster dice always shows 1 on every face for now, upgradeable later
+            // Dice with "Bolster" dice effect and 1 on every face
             var bolsterDice = DiceInstance.Create(sides: 4);
             foreach (var face in bolsterDice.Faces) face.Value = 1;
             bolsterDice.DiceEffects.Add(DiceEffectIds.Bolster);
 
+            // Spawn dice into world with an impulse from the centre
             world.BeginSession(client.Dice);
 
             var trayPosition = world.Tray.position;
@@ -53,21 +43,21 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.SpawnDice(bolsterDice, spawnPosition, Random.rotationUniform, tossImpulse, Random.insideUnitSphere * TossTorque);
 
-            world.Simulate(untilAllSettled: true);
-
-            world.FreezeAllDice();
-
-            world.RecordEvent(EffectId, EventKind.Token, bolsterDice.InstanceId, bolsterDice.CurrentSide, new BolsterOutcome
+            world.RecordEvent(CommonEventIds.AddDice, EventKind.Common, bolsterDice.InstanceId, bolsterDice.CurrentSide, new AddDiceResolution
             {
                 AddedDiceInstance = bolsterDice.Clone(),
             });
 
-            return new TokenResolution(world.EndSession());
+            world.Simulate(untilAllSettled: true);
+
+            world.FreezeAllDice();
+
+            // Record the completion of the token
+            world.RecordEvent(EventId, EventKind.Token, bolsterDice.InstanceId, bolsterDice.CurrentSide, new EmptyEventResolution());
+
+            return new List<GameSimulationTrace> { world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, BolsterOutcome outcome, int clientIndex, int sourceInstanceId)
-        {
-            gameState.Clients[clientIndex].Dice.Add(outcome.AddedDiceInstance);
-        }
+        protected override void ApplyEvent(GameState gameState, EmptyEventResolution resolution, int clientIndex, int sourceInstanceId) { }
     }
 }

@@ -15,7 +15,7 @@ using Drakken.Domain.Networking;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class DragonOutcome : EventResolution
+    public class DragonResolution : EventResolution
     {
         public int ReplaceCount;
         public List<int> ReplacedInstanceIds = new();
@@ -29,7 +29,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
         }
     }
 
-    public class DragonTokenLogic : TokenLogic<EmptyTokenIntent, DragonOutcome>
+    public class DragonTokenLogic : TokenLogic<EmptyTokenIntent, DragonResolution>
     {
         private const float LiftHeight = 1.2f;
         private const float LiftDuration = 0.5f;
@@ -41,9 +41,11 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float HighlightDuration = 0.9f;
         private const float D4OffsetDistance = 1.5f;
 
-        public override int EffectId => TokenEventIds.Dragon;
+        private const int Id = 1;
 
-        protected override TokenResolution Execute(
+        public override int EventId => Id;
+
+        protected override List<GameSimulationTrace> ExecuteToken(
             GameState gameState,
             EmptyTokenIntent intent,
             int sourceClientIndex,
@@ -62,7 +64,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
                 .ToList();
 
             int sourceInstanceId = client.Dice[replacedIndices[0]].InstanceId;
-            var outcome = new DragonOutcome { ReplaceCount = replaceCount };
+            var resolution = new DragonResolution { ReplaceCount = replaceCount };
 
             world.BeginSession(client.Dice);
 
@@ -100,7 +102,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
                 var newDice = DiceInstance.Create(sides: 8);
                 addedDice.Add(newDice);
-                outcome.ReplacedInstanceIds.Add(replacedDice.InstanceId);
+                resolution.ReplacedInstanceIds.Add(replacedDice.InstanceId);
 
                 Vector3 hoverPosition = liftPositions[replacedIndex];
                 Quaternion spawnRotation = Random.rotationUniform;
@@ -130,42 +132,42 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.FreezeAllDice();
 
-            outcome.AddedDiceInstances = addedDice.Select(d => d.Clone()).ToList();
-            world.RecordEvent(EffectId, EventKind.Token, sourceInstanceId, 0, outcome);
+            resolution.AddedDiceInstances = addedDice.Select(d => d.Clone()).ToList();
+            world.RecordEvent(EventId, EventKind.Token, sourceInstanceId, 0, resolution);
 
-            return new TokenResolution(world.EndSession());
+            return new List<GameSimulationTrace> { world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, DragonOutcome outcome, int clientIndex, int sourceInstanceId)
+        protected override void ApplyEvent(GameState gameState, DragonResolution Resolution, int clientIndex, int sourceInstanceId)
         {
             var client = gameState.Clients[clientIndex];
 
-            Assert.True(outcome.ReplacedInstanceIds.Count == outcome.AddedDiceInstances.Count);
+            Assert.True(Resolution.ReplacedInstanceIds.Count == Resolution.AddedDiceInstances.Count);
 
             // Directly overwrite replaced indices with new dice instances
-            for (int i = 0; i < outcome.ReplacedInstanceIds.Count; i++)
+            for (int i = 0; i < Resolution.ReplacedInstanceIds.Count; i++)
             {
-                var index = client.Dice.FindIndex(d => d.InstanceId == outcome.ReplacedInstanceIds[i]);
+                var index = client.Dice.FindIndex(d => d.InstanceId == Resolution.ReplacedInstanceIds[i]);
                 if (index < 0) continue;
-                client.Dice[index] = outcome.AddedDiceInstances[i];
+                client.Dice[index] = Resolution.AddedDiceInstances[i];
             }
         }
 
-        public override async Task Animate(
+        public override async Task AnimateToken(
             ClientMatch match,
             TokenVisualContext visualContext,
             int sourceClientIndex,
             int tokenInstanceId,
-            TokenResolution resolution,
+            List<GameSimulationTrace> traces,
             CancellationToken ct)
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
             var tokenView = visualContext.TokenView.transform;
 
-            var outcome = FindOutcome(resolution);
+            var Resolution = FindResolution(traces);
 
             // Spawn a D4 next to the token showing how many dice it's about to replace
-            var d4Instance = DiceInstance.Create(sides: 4, currentSide: outcome.ReplaceCount - 1);
+            var d4Instance = DiceInstance.Create(sides: 4, currentSide: Resolution.ReplaceCount - 1);
             var d4View = DiceView.Create(visualContext.Client.Assets, d4Instance, scale: 1.2f);
             Vector3 d4Pos = tokenView.position + tokenView.right * D4OffsetDistance;
             d4View.transform.SetPositionAndRotation(d4Pos, tokenView.rotation);
@@ -182,7 +184,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
             };
 
             // Highlight each of the selected dice views
-            foreach (var instanceId in outcome.ReplacedInstanceIds)
+            foreach (var instanceId in Resolution.ReplacedInstanceIds)
             {
                 Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
                 tasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
@@ -192,25 +194,25 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             // Replay the full simulation
             await sourcePlayerObjects.SimReplayer.Play(
-                resolution.Traces[0], ct, sourcePlayerObjects);
+                traces[0], ct, sourcePlayerObjects);
 
             await Task.WhenAll(tasks);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }
 
-        private static DragonOutcome FindOutcome(TokenResolution resolution)
+        private static DragonResolution FindResolution(List<GameSimulationTrace> traces)
         {
-            foreach (var trace in resolution.Traces)
+            foreach (var trace in traces)
             {
                 foreach (var evt in trace.Events)
                 {
-                    if (evt.Kind == EventKind.Token && evt.EffectId == TokenEventIds.Dragon)
-                        return (DragonOutcome)evt.Resolution;
+                    if (evt.Kind == EventKind.Token && evt.EventId == Id)
+                        return (DragonResolution)evt.Resolution;
                 }
             }
 
-            return new DragonOutcome();
+            return new DragonResolution();
         }
     }
 }

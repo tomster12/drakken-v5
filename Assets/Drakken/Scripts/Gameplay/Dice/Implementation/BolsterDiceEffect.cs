@@ -31,7 +31,7 @@ namespace Drakken.Gameplay.Dice.Implementation
         private const float HighlightDuration = 0.9f;
         private const float LabelRiseHeight = 0.6f;
 
-        public override int EffectId => DiceEffectIds.Bolster;
+        public override int EventId => DiceEffectIds.Bolster;
 
         public override void Execute(DiceEffectExecuteContext ctx)
         {
@@ -56,7 +56,7 @@ namespace Drakken.Gameplay.Dice.Implementation
             }
 
             if (resolution.AffectedInstanceIds.Count > 0)
-                ctx.World.RecordEvent(EffectId, EventKind.Dice, ctx.SettledDice.InstanceId, ctx.SettledDice.CurrentSide, resolution);
+                ctx.World.RecordEvent(EventId, EventKind.Dice, ctx.SettledDice.InstanceId, ctx.SettledDice.CurrentSide, resolution);
         }
 
         protected override void Apply(GameState gameState, BolsterDiceEffectResolution resolution, int clientIndex, int sourceInstanceId)

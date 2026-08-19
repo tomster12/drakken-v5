@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Drakken.Utility;
 using Drakken.Presentation;
@@ -10,7 +11,7 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class ReinforceOutcome : EventResolution
+    public class ReinforceResolution : EventResolution
     {
         public int OriginalInstanceId;
         public bool DiceExpanded;
@@ -26,7 +27,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
         }
     }
 
-    public class ReinforceTokenLogic : TokenLogic<PickDiceTokenIntent, ReinforceOutcome>
+    public class ReinforceTokenLogic : TokenLogic<PickDiceTokenIntent, ReinforceResolution>
     {
         private const int FaceIncrease = 2;
         private const int SidesIncrease = 2;
@@ -39,9 +40,9 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float RollTorque = 12f;
         private const float PopUpwardSpeed = 3f;
 
-        public override int EffectId => TokenEventIds.Reinforce;
+        public override int EventId => 6;
 
-        protected override TokenResolution Execute(
+        protected override List<GameSimulationTrace> ExecuteToken(
             GameState gameState,
             PickDiceTokenIntent intent,
             int sourceClientIndex,
@@ -61,7 +62,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
             // Ensure we can modify the dice
             if (!TokenExecutionLogic.TryModify(targetDice, world))
             {
-                return new TokenResolution(world.EndSession());
+                return new List<GameSimulationTrace> { world.EndSession() };
             }
 
             // Calculate if we are expanding the sides
@@ -132,23 +133,23 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.FreezeAllDice();
 
-            world.RecordEvent(EffectId, EventKind.Token, originalInstanceId, finalDice.CurrentSide, new ReinforceOutcome
+            world.RecordEvent(EventId, EventKind.Token, originalInstanceId, finalDice.CurrentSide, new ReinforceResolution
             {
                 OriginalInstanceId = originalInstanceId,
                 DiceExpanded = diceExpanded,
                 FinalDiceInstance = finalDice.Clone(),
             });
 
-            return new TokenResolution(world.EndSession());
+            return new List<GameSimulationTrace> { world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, ReinforceOutcome outcome, int clientIndex, int sourceInstanceId)
+        protected override void ApplyEvent(GameState gameState, ReinforceResolution Resolution, int clientIndex, int sourceInstanceId)
         {
             var client = gameState.Clients[clientIndex];
 
-            int index = client.Dice.FindIndex(d => d.InstanceId == outcome.OriginalInstanceId);
+            int index = client.Dice.FindIndex(d => d.InstanceId == Resolution.OriginalInstanceId);
             if (index < 0) return;
-            client.Dice[index] = outcome.FinalDiceInstance;
+            client.Dice[index] = Resolution.FinalDiceInstance;
         }
 
         private static Quaternion GetFaceUpRotation(int sides, int faceIndex)

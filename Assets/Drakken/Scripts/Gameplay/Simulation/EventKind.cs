@@ -1,4 +1,4 @@
 namespace Drakken.Gameplay.Simulation
 {
-    public enum EventKind { Dice, Face, Token }
+    public enum EventKind { Dice, Face, Token, Common }
 }

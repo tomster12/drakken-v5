@@ -236,8 +236,10 @@ namespace Drakken.Server
             // Important to note that the diceWorld is leaky and is modified by the Execute()
             var diceWorld = DiceWorlds[sourceClientIndex];
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            var resolution = entry.Logic.Execute(GameState.Clone(), message.Intent, sourceClientIndex, diceWorld);
-            entry.Logic.Apply(GameState, resolution, sourceClientIndex);
+            
+            var traces = entry.Logic.ExecuteToken(GameState.Clone(), message.Intent, sourceClientIndex, diceWorld);
+
+            GameSimulationTrace.ApplyAll(traces, GameState, sourceClientIndex);
 
             GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);
 
@@ -248,7 +250,7 @@ namespace Drakken.Server
                 TokenId = message.TokenId,
                 TokenInstanceId = message.InstanceId,
                 SourceClientIndex = sourceClientIndex,
-                Resolution = resolution
+                Traces = traces
             });
         }
 

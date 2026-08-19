@@ -52,7 +52,7 @@ namespace Drakken.Gameplay.Simulation
                 float rawTick = elapsedSeconds / trace.FixedTimestep;
 
                 ApplyAtTime(relevantTraces, existingViews, liveViews, nextSettleIndices, rawTick, ct);
-                nextEventIndex = ProcessEvents(trace, existingViews, liveViews, nextEventIndex, rawTick, effectTasks, ct);
+                nextEventIndex = ProcessSimulationEvents(trace, existingViews, liveViews, nextEventIndex, rawTick, effectTasks, ct);
 
                 await Task.Yield();
             }
@@ -61,7 +61,7 @@ namespace Drakken.Gameplay.Simulation
             {
                 float finalTick = maxTimeSeconds / trace.FixedTimestep;
                 ApplyAtTime(relevantTraces, existingViews, liveViews, nextSettleIndices, finalTick, ct);
-                ProcessEvents(trace, existingViews, liveViews, nextEventIndex, finalTick, effectTasks, ct);
+                ProcessSimulationEvents(trace, existingViews, liveViews, nextEventIndex, finalTick, effectTasks, ct);
             }
 
             await Task.WhenAll(effectTasks);
@@ -113,7 +113,7 @@ namespace Drakken.Gameplay.Simulation
             nextSettleIndices[instanceId] = nextIndex;
         }
 
-        private int ProcessEvents(
+        private int ProcessSimulationEvents(
             GameSimulationTrace trace,
             ScenePlayerObjects existingViews,
             Dictionary<int, DiceView> liveViews,
@@ -127,11 +127,11 @@ namespace Drakken.Gameplay.Simulation
             while (nextEventIndex < trace.Events.Count && rawTick >= trace.Events[nextEventIndex].Tick)
             {
                 var evt = trace.Events[nextEventIndex];
-                var logic = EventRegistry.Get(evt.EffectId, evt.Kind);
+                var logic = EventRegistry.Get(evt.EventId, evt.Kind);
 
                 if (logic != null)
                 {
-                    effectTasks.Add(logic.Animate(animateCtx, evt.Resolution, evt.SourceInstanceId, ct));
+                    effectTasks.Add(logic.AnimateEvent(animateCtx, evt.Resolution, evt.SourceInstanceId, ct));
                 }
 
                 nextEventIndex++;

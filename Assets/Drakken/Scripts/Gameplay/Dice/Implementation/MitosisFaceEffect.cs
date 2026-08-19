@@ -39,7 +39,7 @@ namespace Drakken.Gameplay.Dice.Implementation
             serializer.SerializeValue(ref ChildB);
         }
     }
-    
+
     public class MitosisFaceEffect : FaceEffectLogic<MitosisSplitResolution>
     {
         public const int MinSides = 4;
@@ -50,7 +50,7 @@ namespace Drakken.Gameplay.Dice.Implementation
         private const float SplitOutwardSpeed = 1.5f;
         private const float SplitTorque = 5f;
 
-        public override int EffectId => FaceEffectIds.MitosisMark;
+        public override int EventId => FaceEffectIds.MitosisMark;
 
         public override void Execute(DiceEffectExecuteContext ctx)
         {
@@ -100,7 +100,7 @@ namespace Drakken.Gameplay.Dice.Implementation
 
             // Snapshot the children now - they're still live/mutable in the simulation and must
             // not be able to pick up any later mutation that happens after this event is recorded
-            world.RecordEvent(EffectId, EventKind.Face, parent.InstanceId, parent.CurrentSide, new MitosisSplitResolution
+            world.RecordEvent(EventId, EventKind.Face, parent.InstanceId, parent.CurrentSide, new MitosisSplitResolution
             {
                 DidSplit = true,
                 ChildA = childA.Clone(),
@@ -121,7 +121,7 @@ namespace Drakken.Gameplay.Dice.Implementation
                 .Where(e => e != FaceEffectIds.MitosisMark)
                 .ToList();
 
-            ctx.World.RecordEvent(EffectId, EventKind.Face, dice.InstanceId, ctx.Side, new MitosisSplitResolution
+            ctx.World.RecordEvent(EventId, EventKind.Face, dice.InstanceId, ctx.Side, new MitosisSplitResolution
             {
                 DidSplit = false,
                 Side = ctx.Side,

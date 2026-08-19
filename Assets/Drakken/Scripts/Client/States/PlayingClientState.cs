@@ -330,12 +330,12 @@ namespace Drakken.Client.States
             var tokenRegistry = client.TokenRegistry;
             var tokenRegistryEntry = tokenRegistry.GetEntryOrThrow(message.TokenId);
 
-            await tokenRegistryEntry.Logic.Animate(
+            await tokenRegistryEntry.Logic.AnimateToken(
                 Match,
                 visualContext,
                 message.SourceClientIndex,
                 message.TokenInstanceId,
-                message.Resolution,
+                message.Traces,
                 cts.Token);
 
             // Remove the now-resolved token so it can't be interacted with again next turn

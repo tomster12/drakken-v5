@@ -13,7 +13,7 @@ namespace Drakken.Gameplay.Dice.Logic
         };
 
         public static IDiceEffectLogic Get(int effectId)
-            => byId.TryGetValue(effectId, out var effect) ? effect : null;
+            => byId.TryGetValue(effectId, out var logic) ? logic : null;
     }
 
     public static class FaceEffectRegistry
@@ -24,6 +24,6 @@ namespace Drakken.Gameplay.Dice.Logic
         };
 
         public static IFaceEffectLogic Get(int effectId)
-            => byId.TryGetValue(effectId, out var effect) ? effect : null;
+            => byId.TryGetValue(effectId, out var logic) ? logic : null;
     }
 }

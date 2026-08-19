@@ -1,24 +1,13 @@
+using System.Collections.Generic;
 using Drakken.Gameplay.Simulation;
 using Drakken.Gameplay.Tokens.Implementation.Common;
 using Drakken.Gameplay.Tokens.Logic;
-using Unity.Netcode;
 using UnityEngine;
 using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class GlassOutcome : EventResolution
-    {
-        public DiceInstance AddedDiceInstance;
-
-        public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
-        {
-            if (serializer.IsReader) AddedDiceInstance = new DiceInstance();
-            serializer.SerializeValue(ref AddedDiceInstance);
-        }
-    }
-
-    public class GlassTokenLogic : TokenLogic<EmptyTokenIntent, GlassOutcome>
+    public class GlassTokenLogic : TokenLogic<EmptyTokenIntent, EmptyEventResolution>
     {
         private const float TossUpwardMin = 4.5f;
         private const float TossUpwardMax = 6f;
@@ -26,9 +15,9 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float TossTorque = 20f;
         private const float SpawnHeight = 1f;
 
-        public override int EffectId => TokenEventIds.Glass;
+        public override int EventId => 5;
 
-        protected override TokenResolution Execute(
+        protected override List<GameSimulationTrace> ExecuteToken(
             GameState gameState,
             EmptyTokenIntent intent,
             int sourceClientIndex,
@@ -54,21 +43,22 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.SpawnDice(glassDice, spawnPosition, Random.rotationUniform, tossImpulse, Random.insideUnitSphere * TossTorque);
 
-            world.Simulate(untilAllSettled: true);
-
-            world.FreezeAllDice();
-
-            world.RecordEvent(EffectId, EventKind.Token, glassDice.InstanceId, glassDice.CurrentSide, new GlassOutcome
+            // Add the dice to GameState before simulating, since anything triggered while
+            // it settles must see it already present
+            world.RecordEvent(CommonEventIds.AddDice, EventKind.Common, glassDice.InstanceId, glassDice.CurrentSide, new AddDiceResolution
             {
                 AddedDiceInstance = glassDice.Clone(),
             });
 
-            return new TokenResolution(world.EndSession());
+            world.Simulate(untilAllSettled: true);
+
+            world.FreezeAllDice();
+
+            world.RecordEvent(EventId, EventKind.Token, glassDice.InstanceId, glassDice.CurrentSide, new EmptyEventResolution());
+
+            return new List<GameSimulationTrace> { world.EndSession() };
         }
 
-        protected override void Apply(GameState gameState, GlassOutcome outcome, int clientIndex, int sourceInstanceId)
-        {
-            gameState.Clients[clientIndex].Dice.Add(outcome.AddedDiceInstance);
-        }
+        protected override void ApplyEvent(GameState gameState, EmptyEventResolution resolution, int clientIndex, int sourceInstanceId) { }
     }
 }
