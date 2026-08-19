@@ -124,9 +124,9 @@ namespace Drakken.Domain.Dice
         {
             var animateCtx = new EffectAnimateContext(gameClient, existingViews, liveViews);
 
-            while (nextEffectIndex < trace.EffectOccurrences.Count && rawTick >= trace.EffectOccurrences[nextEffectIndex].Tick)
+            while (nextEffectIndex < trace.EffectEvents.Count && rawTick >= trace.EffectEvents[nextEffectIndex].Tick)
             {
-                var occurrence = trace.EffectOccurrences[nextEffectIndex];
+                var occurrence = trace.EffectEvents[nextEffectIndex];
                 var effect = EffectRegistry.Get(occurrence.EffectId, occurrence.IsFaceEffect);
 
                 if (effect != null)

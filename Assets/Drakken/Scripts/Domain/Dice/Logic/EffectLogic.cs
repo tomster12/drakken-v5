@@ -22,6 +22,8 @@ namespace Drakken.Domain.Dice.Logic
     public interface IFaceEffectLogic : IEffectLogic
     {
         void Execute(DiceEffectExecuteContext ctx);
+
+        void OnMiss(DiceEffectExecuteContext ctx);
     }
 
     public abstract class DiceEffectLogic<TResolution> : IDiceEffectLogic
@@ -53,6 +55,8 @@ namespace Drakken.Domain.Dice.Logic
         Type IEffectLogic.ResolutionType => typeof(TResolution);
 
         public virtual void Execute(DiceEffectExecuteContext ctx) { }
+
+        public virtual void OnMiss(DiceEffectExecuteContext ctx) { }
 
         protected abstract void Apply(GameState gameState, TResolution resolution, int clientIndex, int sourceInstanceId);
         protected abstract Task Animate(EffectAnimateContext ctx, TResolution resolution, int sourceInstanceId, CancellationToken ct);

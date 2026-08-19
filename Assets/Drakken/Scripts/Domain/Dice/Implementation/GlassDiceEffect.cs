@@ -13,7 +13,7 @@ namespace Drakken.Domain.Dice.Implementation
         {
             diceWorld.WakeDice(dice.InstanceId, Vector3.zero, Vector3.zero);
             diceWorld.RemoveDice(dice.InstanceId);
-            diceWorld.RecordEffectOccurrence(EffectId, isFaceEffect: false, dice.InstanceId, new EmptyEffectResolution());
+            diceWorld.RecordEffectEvent(EffectId, isFaceEffect: false, dice.InstanceId, new EmptyEffectResolution());
 
             return false;
         }

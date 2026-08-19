@@ -12,11 +12,16 @@ namespace Drakken.Domain.Dice.Implementation
 {
     public class MitosisSplitResolution : EffectResolution
     {
+        public bool DidSplit;
         public DiceInstance ChildA;
         public DiceInstance ChildB;
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
+            serializer.SerializeValue(ref DidSplit);
+
+            if (!DidSplit) return;
+
             if (serializer.IsReader)
             {
                 ChildA = new DiceInstance();
@@ -86,10 +91,33 @@ namespace Drakken.Domain.Dice.Implementation
                 -outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                 Random.insideUnitSphere * SplitTorque);
 
-            world.RecordEffectOccurrence(EffectId, isFaceEffect: true, parent.InstanceId, new MitosisSplitResolution
+            world.RecordEffectEvent(EffectId, isFaceEffect: true, parent.InstanceId, new MitosisSplitResolution
             {
+                DidSplit = true,
                 ChildA = childA,
                 ChildB = childB,
+            });
+        }
+
+        public override void OnMiss(DiceEffectExecuteContext ctx)
+        {
+            var dice = ctx.SettledDice;
+
+            bool wasMarked = dice.Faces.Any(f => f.FaceEffects.Contains(FaceEffectIds.MitosisMark));
+            if (!wasMarked) return;
+
+            // Landed on an unmarked face - the marks are spent, clear them rather than leaving
+            // them to persist indefinitely until it eventually lands on one
+            foreach (var face in dice.Faces)
+            {
+                face.FaceEffects = face.FaceEffects
+                    .Where(e => e != FaceEffectIds.MitosisMark)
+                    .ToList();
+            }
+
+            ctx.World.RecordEffectEvent(EffectId, isFaceEffect: true, dice.InstanceId, new MitosisSplitResolution
+            {
+                DidSplit = false,
             });
         }
 
@@ -99,8 +127,19 @@ namespace Drakken.Domain.Dice.Implementation
             int index = client.Dice.FindIndex(d => d.InstanceId == sourceInstanceId);
             if (index < 0) return;
 
-            client.Dice.RemoveAt(index);
-            client.Dice.InsertRange(index, new[] { resolution.ChildA, resolution.ChildB });
+            if (resolution.DidSplit)
+            {
+                client.Dice.RemoveAt(index);
+                client.Dice.InsertRange(index, new[] { resolution.ChildA, resolution.ChildB });
+                return;
+            }
+
+            foreach (var face in client.Dice[index].Faces)
+            {
+                face.FaceEffects = face.FaceEffects
+                    .Where(e => e != FaceEffectIds.MitosisMark)
+                    .ToList();
+            }
         }
 
         protected override Task Animate(EffectAnimateContext ctx, MitosisSplitResolution resolution, int sourceInstanceId, CancellationToken ct)

@@ -11,18 +11,18 @@ namespace Drakken.Domain
     {
         public float FixedTimestep;
         public List<DiceSessionTrace> Dice = new();
-        public List<EffectOccurrence> EffectOccurrences = new();
+        public List<EffectEvent> EffectEvents = new();
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref FixedTimestep);
             serializer.SerializeList(ref Dice);
-            serializer.SerializeList(ref EffectOccurrences);
+            serializer.SerializeList(ref EffectEvents);
         }
 
         public void ApplyEffects(GameState gameState, int clientIndex)
         {
-            foreach (var occurrence in EffectOccurrences)
+            foreach (var occurrence in EffectEvents)
             {
                 var effect = EffectRegistry.Get(occurrence.EffectId, occurrence.IsFaceEffect);
                 effect?.Apply(gameState, occurrence.Resolution, clientIndex, occurrence.SourceInstanceId);
@@ -74,7 +74,7 @@ namespace Drakken.Domain
         }
     }
 
-    public class EffectOccurrence : INetworkSerializable
+    public class EffectEvent : INetworkSerializable
     {
         public int EffectId;
         public bool IsFaceEffect;

@@ -80,16 +80,8 @@ namespace Drakken.Domain.Tokens.Implementation
 
             diceWorld.Simulate(untilAllSettled: true);
 
-            foreach (var dice in diceWorld.LiveInstances)
-            {
-                foreach (var face in dice.Faces)
-                {
-                    face.FaceEffects = face.FaceEffects
-                        .Where(e => e != FaceEffectIds.MitosisMark)
-                        .ToList();
-                }
-            }
-
+            // If it landed on an unmarked face, MitosisFaceEffect.OnMiss (dispatched from within
+            // Simulate) already cleared the marks - if it split instead, it won't be in LiveInstances
             resolution.FinalTargetDice = diceWorld.LiveInstances
                 .FirstOrDefault(d => d.InstanceId == originalInstanceId);
 

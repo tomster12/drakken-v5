@@ -54,7 +54,7 @@ namespace Drakken.Domain.Dice.Implementation
             }
 
             if (resolution.AffectedInstanceIds.Count > 0)
-                ctx.World.RecordEffectOccurrence(EffectId, isFaceEffect: false, ctx.SettledDice.InstanceId, resolution);
+                ctx.World.RecordEffectEvent(EffectId, isFaceEffect: false, ctx.SettledDice.InstanceId, resolution);
         }
 
         protected override void Apply(GameState gameState, BolsterDiceEffectResolution resolution, int clientIndex, int sourceInstanceId)

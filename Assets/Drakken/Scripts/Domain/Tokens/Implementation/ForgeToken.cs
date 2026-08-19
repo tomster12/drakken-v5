@@ -123,31 +123,11 @@ namespace Drakken.Domain.Tokens.Implementation
             {
                 resolution.DidMerge = false;
 
-                // One of the 2 failed so fling the other away
-                var returnDriveIds = new List<string>();
+                // Merge is off - let both dice drop and settle naturally rather than scripting them back
+                diceWorld.WakeDice(firstDice.InstanceId);
+                diceWorld.WakeDice(secondDice.InstanceId);
 
-                if (firstCanModify)
-                {
-                    var returnArc = AnimationCurves.QuadraticBezier(firstTarget, firstControlPosition, firstStartPos);
-                    returnDriveIds.Add(diceWorld.DriveDice(
-                        firstDice.InstanceId, FlightDuration,
-                        t => returnArc(Easing.EaseOutCubic(t)),
-                        _ => firstStartRot));
-                }
-
-                if (secondCanModify)
-                {
-                    var returnArc = AnimationCurves.QuadraticBezier(secondTarget, secondControlPosition, secondStartPos);
-                    returnDriveIds.Add(diceWorld.DriveDice(
-                        secondDice.InstanceId, FlightDuration,
-                        t => returnArc(Easing.EaseOutCubic(t)),
-                        _ => secondStartRot));
-                }
-
-                if (returnDriveIds.Count > 0)
-                {
-                    diceWorld.Simulate(untilDrivesComplete: returnDriveIds);
-                }
+                diceWorld.Simulate(untilAllSettled: true);
             }
 
             else

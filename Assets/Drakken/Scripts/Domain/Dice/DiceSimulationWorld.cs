@@ -21,7 +21,7 @@ namespace Drakken.Domain.Dice
         private readonly PhysicsScene physicsScene;
         private readonly Dictionary<int, DiceBody> diceBodiesByInstanceId = new();
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
-        private readonly List<EffectOccurrence> sessionEffectOccurrences = new();
+        private readonly List<EffectEvent> sessionEffectEvents = new();
         private readonly List<KinematicDrive> activeDrives = new();
         private GameObject trayGO;
         private int currentTick;
@@ -119,8 +119,8 @@ namespace Drakken.Domain.Dice
             }
             sessionRemovedTraces.Clear();
 
-            traces.EffectOccurrences.AddRange(sessionEffectOccurrences);
-            sessionEffectOccurrences.Clear();
+            traces.EffectEvents.AddRange(sessionEffectEvents);
+            sessionEffectEvents.Clear();
 
             isInSession = false;
             return traces;
@@ -162,11 +162,11 @@ namespace Drakken.Domain.Dice
             };
         }
 
-        public void RecordEffectOccurrence(int effectId, bool isFaceEffect, int sourceInstanceId, EffectResolution resolution)
+        public void RecordEffectEvent(int effectId, bool isFaceEffect, int sourceInstanceId, EffectResolution resolution)
         {
             Assert.True(isInSession, "Cannot record an effect outside of a session");
 
-            sessionEffectOccurrences.Add(new EffectOccurrence
+            sessionEffectEvents.Add(new EffectEvent
             {
                 EffectId = effectId,
                 IsFaceEffect = isFaceEffect,
@@ -440,8 +440,20 @@ namespace Drakken.Domain.Dice
             foreach (var effectId in dice.DiceEffects.ToList())
                 DiceEffectRegistry.Get(effectId)?.Execute(ctx);
 
-            foreach (var effectId in dice.Faces[dice.CurrentSide].FaceEffects.ToList())
+            var landedFaceEffects = dice.Faces[dice.CurrentSide].FaceEffects;
+
+            foreach (var effectId in landedFaceEffects.ToList())
                 FaceEffectRegistry.Get(effectId)?.Execute(ctx);
+
+            // Any face effect present on a face that didn't land gets a chance to react to being missed
+            var missedFaceEffects = dice.Faces
+                .Where((_, i) => i != dice.CurrentSide)
+                .SelectMany(f => f.FaceEffects)
+                .Distinct()
+                .Except(landedFaceEffects);
+
+            foreach (var effectId in missedFaceEffects.ToList())
+                FaceEffectRegistry.Get(effectId)?.OnMiss(ctx);
         }
 
         public int PeekDiceSide(int diceInstanceId)
