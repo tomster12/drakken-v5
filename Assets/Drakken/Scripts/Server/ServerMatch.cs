@@ -120,19 +120,21 @@ namespace Drakken.Server
 
             GameState.Phase = GamePhase.Drafting;
 
-            DealGameDice();
+            var newDices = DealGameDice();
+
             DealDraftTokens();
 
-            var trace = SimulateRollDice();
+            var trace = SimulateRollDice(newDices);
 
             connection.Server_BroadcastMatchStartDraftingPhase(clientIds, GameState, trace);
         }
 
-        private void DealGameDice()
+        private List<DiceInstance>[] DealGameDice()
         {
             Assert.True(GameState.Phase == GamePhase.Drafting);
 
-            // Give each client a set of new dice
+            var newDicePerPlayer = new List<DiceInstance>[2];
+
             for (int p = 0; p < 2; p++)
             {
                 List<DiceInstance> newDice = new();
@@ -142,8 +144,10 @@ namespace Drakken.Server
                     newDice.Add(DiceInstance.Create(sides: GameConstants.StandardDiceSideCount));
                 }
 
-                GameState.Clients[p].Dice.AddRange(newDice);
+                newDicePerPlayer[p] = newDice;
             }
+
+            return newDicePerPlayer;
         }
 
         private void DealDraftTokens()
@@ -231,16 +235,14 @@ namespace Drakken.Server
             if (tokenInstance == null || tokenInstance.TokenId != message.TokenId)
                 throw new InvalidOperationException("Client attempted to play a token they do not own");
 
-            // Calculate the token on a copy of gamestate then apply to real game state afterwards
-            // This lets us ensure it occurs the same on server as on the client
-            // Important to note that the diceWorld is leaky and is modified by the Execute()
+            // Calculate the token on a copy of gamestate 
+            // Note: diceWorld is leaky and is modified by the Execute
             var diceWorld = DiceWorlds[sourceClientIndex];
             var entry = tokenRegistry.GetEntryOrThrow(message.TokenId);
-            
-            var traces = entry.Logic.ExecuteToken(GameState.Clone(), message.Intent, sourceClientIndex, diceWorld);
+            var (traces, summary) = entry.Logic.ExecuteToken(GameState.Clone(), message.Intent, sourceClientIndex, diceWorld);
 
+            // Apply to real GameState
             GameSimulationTrace.ApplyAll(traces, GameState, sourceClientIndex);
-
             GameState.Clients[sourceClientIndex].Tokens.Remove(tokenInstance);
 
             respond(true);
@@ -250,7 +252,8 @@ namespace Drakken.Server
                 TokenId = message.TokenId,
                 TokenInstanceId = message.InstanceId,
                 SourceClientIndex = sourceClientIndex,
-                Traces = traces
+                Traces = traces,
+                Summary = summary,
             });
         }
 
@@ -384,14 +387,11 @@ namespace Drakken.Server
             return (velocity, torque);
         }
 
-        private GameSimulationMatchTrace SimulateRollDice()
+        private GameSimulationMatchTrace SimulateRollDice(List<DiceInstance>[] newDices)
         {
-            // Simulate on a clone then commit back
-            var simulationState = GameState.Clone();
-
             for (int p = 0; p < 2; p++)
             {
-                var diceInstances = simulationState.Clients[p].Dice;
+                var diceInstances = newDices[p];
                 var tray = diceLayout.Player(p);
                 var trayCenter = tray.transform.position;
                 var slots = CalculateDiceRowLayout(diceInstances.Count, tray, p);
@@ -407,15 +407,13 @@ namespace Drakken.Server
                     var slotPos = slots[i].Position;
                     var slotRot = slots[i].Rotation;
 
+                    // SpawnDice records its own GameState-updating AddDice event
                     var (throwVelocity, throwTorque) = CalculateDiceThrow(slotPos, trayCenter);
                     world.SpawnDice(diceInstances[i], slotPos, slotRot, throwVelocity, throwTorque);
                 }
 
                 world.Simulate(untilAllSettled: true);
                 world.FreezeAllDice();
-
-                // Commit back to GameState
-                GameState.Clients[p].Dice = diceInstances;
             }
 
             var traces = new GameSimulationMatchTrace
@@ -424,15 +422,15 @@ namespace Drakken.Server
                 P2 = DiceWorlds[1].EndSession(),
             };
 
-            traces.P1.ApplyEffects(GameState, clientIndex: 0);
-            traces.P2.ApplyEffects(GameState, clientIndex: 1);
+            traces.P1.ApplyEvents(GameState, clientIndex: 0);
+            traces.P2.ApplyEvents(GameState, clientIndex: 1);
 
             return traces;
         }
 
         private GameSimulationMatchTrace SimulateRerollDice()
         {
-            // Simulate on a clone then commit back
+            // Simulate on a clone
             var simulationState = GameState.Clone();
 
             for (int p = 0; p < 2; p++)
@@ -476,9 +474,6 @@ namespace Drakken.Server
 
                 world.Simulate(untilAllSettled: true);
                 world.FreezeAllDice();
-
-                // Commit back to GameState
-                GameState.Clients[p].Dice = diceInstances;
             }
 
             var traces = new GameSimulationMatchTrace
@@ -487,8 +482,8 @@ namespace Drakken.Server
                 P2 = DiceWorlds[1].EndSession(),
             };
 
-            traces.P1.ApplyEffects(GameState, clientIndex: 0);
-            traces.P2.ApplyEffects(GameState, clientIndex: 1);
+            traces.P1.ApplyEvents(GameState, clientIndex: 0);
+            traces.P2.ApplyEvents(GameState, clientIndex: 1);
 
             return traces;
         }

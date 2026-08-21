@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Drakken.Client;
 using Drakken.Client.World;
 using Drakken.Domain;
+using Drakken.Utility;
 using UnityEngine;
 
 namespace Drakken.Gameplay.Simulation
@@ -12,11 +13,13 @@ namespace Drakken.Gameplay.Simulation
     {
         private AssetDatabase assets;
         private GameClient gameClient;
+        private int clientIndex;
 
-        public void Init(AssetDatabase assets, GameClient gameClient)
+        public void Init(AssetDatabase assets, GameClient gameClient, int clientIndex)
         {
             this.assets = assets;
             this.gameClient = gameClient;
+            this.clientIndex = clientIndex;
         }
 
         public void Cleanup()
@@ -43,6 +46,7 @@ namespace Drakken.Gameplay.Simulation
             int nextEventIndex = 0;
             List<Task> effectTasks = new();
 
+            // While not finished tick forward
             float elapsedSeconds = 0f;
             while (elapsedSeconds < maxTimeSeconds)
             {
@@ -51,12 +55,14 @@ namespace Drakken.Gameplay.Simulation
                 elapsedSeconds += Time.deltaTime;
                 float rawTick = elapsedSeconds / trace.FixedTimestep;
 
+                // Apply the trace at the current and process events
                 ApplyAtTime(relevantTraces, existingViews, liveViews, nextSettleIndices, rawTick, ct);
                 nextEventIndex = ProcessSimulationEvents(trace, existingViews, liveViews, nextEventIndex, rawTick, effectTasks, ct);
 
                 await Task.Yield();
             }
 
+            // Apply the trace at the final tick and process any remaining events            
             if (!ct.IsCancellationRequested)
             {
                 float finalTick = maxTimeSeconds / trace.FixedTimestep;
@@ -77,40 +83,47 @@ namespace Drakken.Gameplay.Simulation
         {
             foreach (var diceTrace in traces)
             {
+                // Spawn / remove dice view if need be
                 var diceView = EnsureLiveDiceView(diceTrace, rawTick, existingViews, liveViews);
                 if (diceView == null) continue;
 
+                // Apply position and rotation for this dice interpolated
                 var (lower, upper, t) = SampleAt(diceTrace.PoseTraces, rawTick);
 
                 diceView.transform.SetPositionAndRotation(
                     Vector3.Lerp(lower.Position, upper.Position, t),
                     Quaternion.Slerp(lower.Rotation, upper.Rotation, t));
 
-                ApplySettleEvents(diceTrace, diceView, rawTick, nextSettleIndices, ct);
+                // And now handle settle events    
+                int instanceId = diceTrace.Instance.InstanceId;
+                nextSettleIndices.TryGetValue(diceTrace.Instance.InstanceId, out int nextEventIndex);
+                nextSettleIndices[instanceId] = ProcessSettleEvents(diceTrace, diceView, rawTick, nextEventIndex, ct);
             }
         }
 
-        private static void ApplySettleEvents(
+        private int ProcessSettleEvents(
             DiceSessionTrace diceTrace,
             DiceView diceView,
             float rawTick,
-            Dictionary<int, int> nextSettleIndices,
+            int nextEventIndex,
             CancellationToken ct)
         {
             int instanceId = diceTrace.Instance.InstanceId;
-            nextSettleIndices.TryGetValue(instanceId, out int nextIndex);
 
-            while (nextIndex < diceTrace.SettleEvents.Count && rawTick >= diceTrace.SettleEvents[nextIndex].Tick)
+            while (nextEventIndex < diceTrace.SettleEvents.Count && rawTick >= diceTrace.SettleEvents[nextEventIndex].Tick)
             {
-                var settleEvent = diceTrace.SettleEvents[nextIndex];
+                var settleEvent = diceTrace.SettleEvents[nextEventIndex];
+                var dice = gameClient.GameState.Clients[clientIndex].Dice.Find(d => d.InstanceId == instanceId);
+                Assert.NotNull(dice);
 
-                diceView.RefreshEffects(diceTrace.Instance);
+                // Update dice instance and view
+                dice.CurrentSide = settleEvent.Side;
                 _ = diceView.SetSettledFace(diceTrace.Instance, settleEvent.Side, ct);
 
-                nextIndex++;
+                nextEventIndex++;
             }
 
-            nextSettleIndices[instanceId] = nextIndex;
+            return nextEventIndex;
         }
 
         private int ProcessSimulationEvents(
@@ -131,13 +144,31 @@ namespace Drakken.Gameplay.Simulation
 
                 if (logic != null)
                 {
-                    effectTasks.Add(logic.AnimateEvent(animateCtx, evt.Resolution, evt.SourceInstanceId, ct));
+                    // Apply effect logic and ensure views are updated
+                    logic.ApplyEvent(gameClient.GameState, evt.Resolution, clientIndex);
+                    RefreshLiveDiceEffects(existingViews, liveViews);
+
+                    effectTasks.Add(logic.AnimateEvent(animateCtx, evt.Resolution, ct));
                 }
 
                 nextEventIndex++;
             }
 
             return nextEventIndex;
+        }
+
+        private void RefreshLiveDiceEffects(
+            ScenePlayerObjects existingViews,
+            Dictionary<int, DiceView> liveViews)
+        {
+            foreach (var dice in gameClient.GameState.Clients[clientIndex].Dice)
+            {
+                var diceView = liveViews.TryGetValue(dice.InstanceId, out var view)
+                    ? view
+                    : existingViews?.FindDiceView(dice.InstanceId);
+
+                diceView?.RefreshEffects(dice);
+            }
         }
 
         private DiceView EnsureLiveDiceView(
@@ -173,8 +204,14 @@ namespace Drakken.Gameplay.Simulation
                 if (diceView == null) diceView = DiceView.Create(assets, diceTrace.Instance, gameClient);
                 liveViews[instanceId] = diceView;
 
-                diceView.UnsetSettledFace();
-                diceView.RefreshEffects(diceTrace.Instance);
+                // Only clear the settled-face highlight if this dice is actually going to resettle
+                // during this trace - a dice that was merely woken to test whether it needed to
+                // move (see GameSimulationWorld.WakeOtherSettledDice) but didn't should keep
+                // showing whatever it last settled on
+                if (diceTrace.SettleEvents.Count > 0) diceView.UnsetSettledFace();
+
+                var currentDice = gameClient.GameState.Clients[clientIndex].Dice.Find(d => d.InstanceId == instanceId);
+                if (currentDice != null) diceView.RefreshEffects(currentDice);
 
                 if (existingViews != null) existingViews.DiceViews[instanceId] = diceView;
             }

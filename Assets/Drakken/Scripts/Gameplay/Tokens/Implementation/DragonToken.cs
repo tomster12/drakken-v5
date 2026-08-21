@@ -15,21 +15,19 @@ using Drakken.Domain.Networking;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class DragonResolution : EventResolution
+    public class DragonSummary : TokenSummary
     {
         public int ReplaceCount;
         public List<int> ReplacedInstanceIds = new();
-        public List<DiceInstance> AddedDiceInstances = new();
 
         public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
         {
             serializer.SerializeValue(ref ReplaceCount);
             serializer.SerializeList(ref ReplacedInstanceIds);
-            serializer.SerializeList(ref AddedDiceInstances);
         }
     }
 
-    public class DragonTokenLogic : TokenLogic<EmptyTokenIntent, DragonResolution>
+    public class DragonTokenLogic : TokenLogic<EmptyTokenIntent, DragonSummary>
     {
         private const float LiftHeight = 1.2f;
         private const float LiftDuration = 0.5f;
@@ -41,11 +39,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float HighlightDuration = 0.9f;
         private const float D4OffsetDistance = 1.5f;
 
-        private const int Id = 1;
-
-        public override int EventId => Id;
-
-        protected override List<GameSimulationTrace> ExecuteToken(
+        protected override (List<GameSimulationTrace> Traces, DragonSummary Summary) ExecuteToken(
             GameState gameState,
             EmptyTokenIntent intent,
             int sourceClientIndex,
@@ -63,8 +57,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
                 .Take(replaceCount)
                 .ToList();
 
-            int sourceInstanceId = client.Dice[replacedIndices[0]].InstanceId;
-            var resolution = new DragonResolution { ReplaceCount = replaceCount };
+            var summary = new DragonSummary { ReplaceCount = replaceCount };
 
             world.BeginSession(client.Dice);
 
@@ -102,12 +95,12 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
                 var newDice = DiceInstance.Create(sides: 8);
                 addedDice.Add(newDice);
-                resolution.ReplacedInstanceIds.Add(replacedDice.InstanceId);
+                summary.ReplacedInstanceIds.Add(replacedDice.InstanceId);
 
                 Vector3 hoverPosition = liftPositions[replacedIndex];
                 Quaternion spawnRotation = Random.rotationUniform;
                 Vector3 spinAxis = Random.insideUnitSphere.normalized;
-
+                // RemoveDice/SpawnDice above already recorded the GameState-updating events
                 world.SpawnDice(newDice, hoverPosition, spawnRotation);
 
                 hoverDriveIds.Add(world.DriveDice(
@@ -132,25 +125,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.FreezeAllDice();
 
-            resolution.AddedDiceInstances = addedDice.Select(d => d.Clone()).ToList();
-            world.RecordEvent(EventId, EventKind.Token, sourceInstanceId, 0, resolution);
-
-            return new List<GameSimulationTrace> { world.EndSession() };
-        }
-
-        protected override void ApplyEvent(GameState gameState, DragonResolution Resolution, int clientIndex, int sourceInstanceId)
-        {
-            var client = gameState.Clients[clientIndex];
-
-            Assert.True(Resolution.ReplacedInstanceIds.Count == Resolution.AddedDiceInstances.Count);
-
-            // Directly overwrite replaced indices with new dice instances
-            for (int i = 0; i < Resolution.ReplacedInstanceIds.Count; i++)
-            {
-                var index = client.Dice.FindIndex(d => d.InstanceId == Resolution.ReplacedInstanceIds[i]);
-                if (index < 0) continue;
-                client.Dice[index] = Resolution.AddedDiceInstances[i];
-            }
+            return (new List<GameSimulationTrace> { world.EndSession() }, summary);
         }
 
         public override async Task AnimateToken(
@@ -159,15 +134,14 @@ namespace Drakken.Gameplay.Tokens.Implementation
             int sourceClientIndex,
             int tokenInstanceId,
             List<GameSimulationTrace> traces,
+            DragonSummary summary,
             CancellationToken ct)
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
             var tokenView = visualContext.TokenView.transform;
 
-            var Resolution = FindResolution(traces);
-
             // Spawn a D4 next to the token showing how many dice it's about to replace
-            var d4Instance = DiceInstance.Create(sides: 4, currentSide: Resolution.ReplaceCount - 1);
+            var d4Instance = DiceInstance.Create(sides: 4, currentSide: summary.ReplaceCount - 1);
             var d4View = DiceView.Create(visualContext.Client.Assets, d4Instance, scale: 1.2f);
             Vector3 d4Pos = tokenView.position + tokenView.right * D4OffsetDistance;
             d4View.transform.SetPositionAndRotation(d4Pos, tokenView.rotation);
@@ -184,7 +158,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
             };
 
             // Highlight each of the selected dice views
-            foreach (var instanceId in Resolution.ReplacedInstanceIds)
+            foreach (var instanceId in summary.ReplacedInstanceIds)
             {
                 Assert.True(sourcePlayerObjects.DiceViews.TryGetValue(instanceId, out var diceView));
                 tasks.Add(diceView.FlashHighlight(HighlightColor, HighlightDuration, ct));
@@ -192,27 +166,13 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             await Task.Delay(500);
 
-            // Replay the full simulation
+            // Replay the simulation with the lift / change / hover
             await sourcePlayerObjects.SimReplayer.Play(
                 traces[0], ct, sourcePlayerObjects);
 
             await Task.WhenAll(tasks);
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
-        }
-
-        private static DragonResolution FindResolution(List<GameSimulationTrace> traces)
-        {
-            foreach (var trace in traces)
-            {
-                foreach (var evt in trace.Events)
-                {
-                    if (evt.Kind == EventKind.Token && evt.EventId == Id)
-                        return (DragonResolution)evt.Resolution;
-                }
-            }
-
-            return new DragonResolution();
         }
     }
 }

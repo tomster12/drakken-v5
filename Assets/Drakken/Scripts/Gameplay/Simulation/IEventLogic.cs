@@ -10,8 +10,8 @@ namespace Drakken.Gameplay.Simulation
         int EventId { get; }
         Type ResolutionType { get; }
 
-        void ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId);
+        void ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex);
 
-        Task AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct);
+        Task AnimateEvent(EventAnimateContext ctx, EventResolution resolution, CancellationToken ct);
     }
 }

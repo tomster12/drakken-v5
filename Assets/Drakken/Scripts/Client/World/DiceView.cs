@@ -206,9 +206,12 @@ namespace Drakken.Client.World
             {
                 Assert.True(faceIndex >= 0 && faceIndex < dice.Faces.Count);
 
+                // Effect tint always wins, otherwise preserve the settled-face highlight instead of
+                // stomping it back to the plain label color - this runs on every dice any time any
+                // event is applied during a token's replay, not just events belonging to this dice
                 label.color = TryGetFaceEffectColor(dice, faceIndex, out Color effectColor)
                     ? effectColor
-                    : FaceLabelColor;
+                    : settledFaceIndex == faceIndex ? SettledFaceLabelColor : FaceLabelColor;
             }
         }
 

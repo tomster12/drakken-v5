@@ -31,15 +31,15 @@ namespace Drakken.Gameplay.Dice.Logic
 
         public virtual void Execute(DiceEffectExecuteContext ctx) { }
 
-        protected abstract void Apply(GameState gameState, TResolution resolution, int clientIndex, int sourceInstanceId);
+        protected abstract void Apply(GameState gameState, TResolution resolution, int clientIndex);
 
-        protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, int sourceInstanceId, CancellationToken ct) => Task.CompletedTask;
+        protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, CancellationToken ct) => Task.CompletedTask;
 
-        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
-            => Apply(gameState, (TResolution)resolution, clientIndex, sourceInstanceId);
+        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex)
+            => Apply(gameState, (TResolution)resolution, clientIndex);
 
-        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
-            => Animate(ctx, (TResolution)resolution, sourceInstanceId, ct);
+        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, CancellationToken ct)
+            => Animate(ctx, (TResolution)resolution, ct);
     }
 
     public abstract class FaceEffectLogic<TResolution> : IFaceEffectLogic
@@ -52,14 +52,14 @@ namespace Drakken.Gameplay.Dice.Logic
 
         public virtual void OnMiss(DiceEffectExecuteContext ctx) { }
 
-        protected abstract void Apply(GameState gameState, TResolution resolution, int clientIndex, int sourceInstanceId);
+        protected abstract void Apply(GameState gameState, TResolution resolution, int clientIndex);
 
-        protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, int sourceInstanceId, CancellationToken ct) => Task.CompletedTask;
+        protected virtual Task Animate(EventAnimateContext ctx, TResolution resolution, CancellationToken ct) => Task.CompletedTask;
 
-        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
-            => Apply(gameState, (TResolution)resolution, clientIndex, sourceInstanceId);
+        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex)
+            => Apply(gameState, (TResolution)resolution, clientIndex);
 
-        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
-            => Animate(ctx, (TResolution)resolution, sourceInstanceId, ct);
+        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, CancellationToken ct)
+            => Animate(ctx, (TResolution)resolution, ct);
     }
 }

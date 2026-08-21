@@ -1,5 +1,4 @@
 using Drakken.Gameplay.Dice.Logic;
-using Drakken.Gameplay.Tokens;
 
 namespace Drakken.Gameplay.Simulation
 {
@@ -9,7 +8,6 @@ namespace Drakken.Gameplay.Simulation
         {
             EventKind.Dice => DiceEffectRegistry.Get(eventId),
             EventKind.Face => FaceEffectRegistry.Get(eventId),
-            EventKind.Token => TokenRegistry.Shared.GetEntryByEventId(eventId)?.Logic,
             EventKind.Common => CommonEventRegistry.Get(eventId),
             _ => null,
         };

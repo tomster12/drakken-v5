@@ -56,10 +56,10 @@ namespace Drakken.Gameplay.Dice.Implementation
             }
 
             if (resolution.AffectedInstanceIds.Count > 0)
-                ctx.World.RecordEvent(EventId, EventKind.Dice, ctx.SettledDice.InstanceId, ctx.SettledDice.CurrentSide, resolution);
+                ctx.World.RecordEvent(EventId, EventKind.Dice, resolution);
         }
 
-        protected override void Apply(GameState gameState, BolsterDiceEffectResolution resolution, int clientIndex, int sourceInstanceId)
+        protected override void Apply(GameState gameState, BolsterDiceEffectResolution resolution, int clientIndex)
         {
             var client = gameState.Clients[clientIndex];
 
@@ -70,7 +70,7 @@ namespace Drakken.Gameplay.Dice.Implementation
             }
         }
 
-        protected override async Task Animate(EventAnimateContext ctx, BolsterDiceEffectResolution resolution, int sourceInstanceId, CancellationToken ct)
+        protected override async Task Animate(EventAnimateContext ctx, BolsterDiceEffectResolution resolution, CancellationToken ct)
         {
             var tasks = new List<Task>();
 

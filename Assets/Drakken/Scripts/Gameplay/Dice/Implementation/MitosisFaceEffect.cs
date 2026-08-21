@@ -5,42 +5,11 @@ using Drakken.Gameplay.Simulation;
 using Drakken.Gameplay.Tokens.Logic;
 using Drakken.Utility;
 using Drakken.Domain;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Drakken.Gameplay.Dice.Implementation
 {
-    public class MitosisSplitResolution : EventResolution
-    {
-        public bool DidSplit;
-        public DiceInstance ChildA;
-        public DiceInstance ChildB;
-
-        // Only set when !DidSplit - the specific missed face that had its mark cleared
-        public int Side;
-
-        public override void NetworkSerialize<T>(BufferSerializer<T> serializer)
-        {
-            serializer.SerializeValue(ref DidSplit);
-
-            if (!DidSplit)
-            {
-                serializer.SerializeValue(ref Side);
-                return;
-            }
-
-            if (serializer.IsReader)
-            {
-                ChildA = new DiceInstance();
-                ChildB = new DiceInstance();
-            }
-
-            serializer.SerializeValue(ref ChildA);
-            serializer.SerializeValue(ref ChildB);
-        }
-    }
-
-    public class MitosisFaceEffect : FaceEffectLogic<MitosisSplitResolution>
+    public class MitosisFaceEffect : FaceEffectLogic<EmptyEventResolution>
     {
         public const int MinSides = 4;
         private const int MaxTotalDice = 32; // shouldn't hit this but just in case
@@ -50,6 +19,8 @@ namespace Drakken.Gameplay.Dice.Implementation
         private const float SplitOutwardSpeed = 1.5f;
         private const float SplitTorque = 5f;
 
+        // Not actually recorded as an event any more (see below) - kept only to satisfy
+        // IFaceEffectLogic's landed/missed dispatch, which is keyed by this id
         public override int EventId => FaceEffectIds.MitosisMark;
 
         public override void Execute(DiceEffectExecuteContext ctx)
@@ -84,10 +55,13 @@ namespace Drakken.Gameplay.Dice.Implementation
 
             if (childSides > MinSides)
             {
+                // Mark before spawning - SpawnDice snapshots the dice for its AddDice event, so the
+                // marks need to already be in place for the client's replay to see them
                 MarkRandomHalf(childA);
                 MarkRandomHalf(childB);
             }
 
+            // RemoveDice/SpawnDice above and below already record the GameState-updating events
             world.SpawnDice(
                 childA, liftedPosition, Random.rotationUniform,
                 outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
@@ -97,15 +71,6 @@ namespace Drakken.Gameplay.Dice.Implementation
                 childB, liftedPosition, Random.rotationUniform,
                 -outward * SplitOutwardSpeed + Vector3.up * SplitUpwardSpeed,
                 Random.insideUnitSphere * SplitTorque);
-
-            // Snapshot the children now - they're still live/mutable in the simulation and must
-            // not be able to pick up any later mutation that happens after this event is recorded
-            world.RecordEvent(EventId, EventKind.Face, parent.InstanceId, parent.CurrentSide, new MitosisSplitResolution
-            {
-                DidSplit = true,
-                ChildA = childA.Clone(),
-                ChildB = childB.Clone(),
-            });
         }
 
         public override void OnMiss(DiceEffectExecuteContext ctx)
@@ -121,30 +86,37 @@ namespace Drakken.Gameplay.Dice.Implementation
                 .Where(e => e != FaceEffectIds.MitosisMark)
                 .ToList();
 
-            ctx.World.RecordEvent(EventId, EventKind.Face, dice.InstanceId, ctx.Side, new MitosisSplitResolution
+            ctx.World.RecordEvent(CommonEventIds.SetFaceEffects, EventKind.Common, new SetFaceEffectsResolution
             {
-                DidSplit = false,
-                Side = ctx.Side,
+                SourceInstanceId = dice.InstanceId,
+                EffectId = FaceEffectIds.MitosisMark,
+                Replace = false,
+                FaceIndices = { ctx.Side },
             });
         }
 
-        protected override void Apply(GameState gameState, MitosisSplitResolution resolution, int clientIndex, int sourceInstanceId)
-        {
-            var client = gameState.Clients[clientIndex];
-            int index = client.Dice.FindIndex(d => d.InstanceId == sourceInstanceId);
-            if (index < 0) return;
+        protected override void Apply(GameState gameState, EmptyEventResolution resolution, int clientIndex) { }
 
-            if (resolution.DidSplit)
+        // Marks a random half of the dice's faces and records an event so the client can animate
+        // the marks appearing at the correct point in time, instead of only reflecting them once
+        // the whole trace (including any later misses) has already resolved
+        public static void MarkRandomHalf(GameSimulationWorld world, DiceInstance dice)
+        {
+            MarkRandomHalf(dice);
+
+            var markedSides = new List<int>(dice.Sides / 2);
+            for (int i = 0; i < dice.Faces.Count; i++)
             {
-                client.Dice.RemoveAt(index);
-                client.Dice.InsertRange(index, new[] { resolution.ChildA, resolution.ChildB });
-                return;
+                if (dice.Faces[i].FaceEffects.Contains(FaceEffectIds.MitosisMark)) markedSides.Add(i);
             }
 
-            var face = client.Dice[index].Faces[resolution.Side];
-            face.FaceEffects = face.FaceEffects
-                .Where(e => e != FaceEffectIds.MitosisMark)
-                .ToList();
+            world.RecordEvent(CommonEventIds.SetFaceEffects, EventKind.Common, new SetFaceEffectsResolution
+            {
+                SourceInstanceId = dice.InstanceId,
+                EffectId = FaceEffectIds.MitosisMark,
+                Replace = true,
+                FaceIndices = markedSides,
+            });
         }
 
         public static void MarkRandomHalf(DiceInstance dice)

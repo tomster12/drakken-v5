@@ -14,7 +14,6 @@ namespace Drakken.Gameplay.Tokens
         public static readonly TokenRegistry Shared = TokenRegistryBuilder.BuildServerRegistry();
 
         private readonly Dictionary<string, TokenRegistryEntry> entriesByTokenId = new();
-        private readonly Dictionary<int, TokenRegistryEntry> entriesByEventId = new();
 
         public IEnumerable<TokenDefinition> AllDefinitions
         {
@@ -36,7 +35,6 @@ namespace Drakken.Gameplay.Tokens
 
             var entry = new TokenRegistryEntry(definition, logic, visuals);
             entriesByTokenId[definition.TokenId] = entry;
-            entriesByEventId[logic.EventId] = entry;
         }
 
         public TokenRegistryEntry GetEntryOrThrow(string tokenId)
@@ -46,9 +44,6 @@ namespace Drakken.Gameplay.Tokens
 
             return entry;
         }
-
-        public TokenRegistryEntry GetEntryByEventId(int eventId)
-            => entriesByEventId.TryGetValue(eventId, out var entry) ? entry : null;
     }
 
     public class TokenRegistryEntry

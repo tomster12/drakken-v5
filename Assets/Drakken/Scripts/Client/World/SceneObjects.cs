@@ -55,7 +55,7 @@ namespace Drakken.Client.World
             this.gameClient = gameClient;
             this.clientIndex = clientIndex;
 
-            SimReplayer.Init(assets, gameClient);
+            SimReplayer.Init(assets, gameClient, clientIndex);
         }
 
         public void OnDisconnect()

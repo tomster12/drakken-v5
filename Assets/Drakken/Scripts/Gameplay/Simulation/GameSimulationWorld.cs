@@ -19,6 +19,9 @@ namespace Drakken.Gameplay.Simulation
         private const float settledLinearVelocity = 0.001f;
         private const float settledAngularVelocity = 0.001f;
         private const float settledDuration = 0.25f;
+        private const float settleMovementPositionThreshold = 0.02f;
+        private const float settleMovementAngleThreshold = 3f;
+        private const float touchingDiceQueryMargin = 0.05f;
 
         private readonly Scene scene;
         private readonly PhysicsScene physicsScene;
@@ -26,6 +29,7 @@ namespace Drakken.Gameplay.Simulation
         private readonly List<DiceSessionTrace> sessionRemovedTraces = new();
         private readonly List<SimulationEvent> sessionEvents = new();
         private readonly List<KinematicDrive> activeDrives = new();
+        private readonly Collider[] touchingDiceQueryResults = new Collider[16];
         private GameObject trayGO;
         private int currentTick;
         private int sessionStartTick;
@@ -83,7 +87,7 @@ namespace Drakken.Gameplay.Simulation
         {
             Assert.True(!isInSession, "Cannot begin a session while one is already in progress");
 
-            // Execute() on tokens runs on a fresh GameState.Clone()
+            // Execute on tokens runs on a fresh GameState Clone
             // This means the persistent DiceBody points at an old DiceInstance
             // This is the tradeoff for leaky simulation, but the execute on a cloned gamestate
             // Vaguely mirrors TokenViews usage of the real GameState dice instance
@@ -165,7 +169,7 @@ namespace Drakken.Gameplay.Simulation
             };
         }
 
-        public void RecordEvent(int eventId, EventKind kind, int sourceInstanceId, int side, EventResolution resolution)
+        public void RecordEvent(int eventId, EventKind kind, EventResolution resolution)
         {
             Assert.True(isInSession, "Cannot record an event outside of a session");
 
@@ -174,8 +178,6 @@ namespace Drakken.Gameplay.Simulation
                 EventId = eventId,
                 Kind = kind,
                 Tick = currentTick - sessionStartTick,
-                SourceInstanceId = sourceInstanceId,
-                Side = side,
                 Resolution = resolution,
             });
         }
@@ -214,6 +216,12 @@ namespace Drakken.Gameplay.Simulation
             diceBody.RecordPose(currentTick);
 
             diceBodiesByInstanceId[instance.InstanceId] = diceBody;
+
+            RecordEvent(CommonEventIds.AddDice, EventKind.Common, new AddDiceResolution
+            {
+                AddedDiceInstance = instance.Clone(),
+            });
+
             return instance.InstanceId;
         }
 
@@ -229,6 +237,10 @@ namespace Drakken.Gameplay.Simulation
             // Record resting pose as the start of this session
             diceBody.RecordPose(currentTick);
 
+            // Remember the pose it woke at for detecting genuine settles
+            diceBody.WakePosition = diceBody.Rigidbody.position;
+            diceBody.WakeRotation = diceBody.Rigidbody.rotation;
+
             diceBody.Rigidbody.isKinematic = false;
             if (linearImpulse.HasValue) diceBody.Rigidbody.AddForce(linearImpulse.Value, ForceMode.VelocityChange);
             if (angularImpulse.HasValue) diceBody.Rigidbody.AddTorque(angularImpulse.Value, ForceMode.VelocityChange);
@@ -240,6 +252,9 @@ namespace Drakken.Gameplay.Simulation
         {
             Assert.True(isInSession, "Cannot remove dice outside of a session");
 
+            // Wake other settled dice before this one's support disappears
+            WakeTouchingSettledDice(diceInstanceId);
+
             // Remove body from simulation
             var diceBody = diceBodiesByInstanceId[diceInstanceId];
             diceBodiesByInstanceId.Remove(diceInstanceId);
@@ -247,11 +262,57 @@ namespace Drakken.Gameplay.Simulation
             // Add a "removed trace" for this dice with correct removeTick
             sessionRemovedTraces.Add(BuildSessionTrace(diceBody, removeTick: currentTick));
 
+            RecordEvent(CommonEventIds.RemoveDice, EventKind.Common, new RemoveDiceResolution
+            {
+                InstanceId = diceInstanceId,
+            });
+
             // Disable colliders as well because Destroy() is deferred until end of tick
             GameObject.Destroy(diceBody.Rigidbody.gameObject);
 
             foreach (var diceCollider in diceBody.Rigidbody.GetComponentsInChildren<Collider>())
                 diceCollider.enabled = false;
+        }
+
+        // A kinematic dice body ignores gravity and collisions entirely, so removing or lifting a
+        // dice away could leave anything resting against it - on top, leaning, wedged between
+        // others - floating in place forever. Can't just wake every kinematic dice though:
+        // kinematic isn't only "settled at rest" - it's also the state a dice sits in while it's
+        // mid-lift/mid-hover, deliberately held there by a token's own in-progress choreography
+        // (e.g. Dragon lifts several dice up front, then processes them one at a time - waking
+        // the others the moment the first is removed would yank them out of the air prematurely).
+        // A real physics overlap query only picks up dice actually touching this one, not merely
+        // kinematic or merely nearby
+        private void WakeTouchingSettledDice(int diceInstanceId)
+        {
+            if (!diceBodiesByInstanceId.TryGetValue(diceInstanceId, out var targetBody)) return;
+
+            var targetCollider = targetBody.Rigidbody.GetComponentInChildren<Collider>();
+            if (targetCollider == null) return;
+
+            Bounds bounds = targetCollider.bounds;
+            bounds.Expand(touchingDiceQueryMargin);
+
+            int count = physicsScene.OverlapBox(bounds.center, bounds.extents, touchingDiceQueryResults, Quaternion.identity);
+
+            for (int i = 0; i < count; i++)
+            {
+                var rigidbody = touchingDiceQueryResults[i].attachedRigidbody;
+                if (rigidbody == null || rigidbody == targetBody.Rigidbody || !rigidbody.isKinematic) continue;
+
+                foreach (var body in diceBodiesByInstanceId.Values)
+                {
+                    if (body.Rigidbody == rigidbody)
+                    {
+                        // Kinematic also covers a dice mid-drive right now (e.g. Forge's two dice
+                        // flying toward each other) - waking it would fight Step()'s MovePosition/
+                        // MoveRotation calls on it every tick, so leave actively-driven dice alone
+                        bool isActivelyDriven = activeDrives.Any(d => d.InstanceId == body.Instance.InstanceId);
+                        if (!isActivelyDriven) WakeDice(body.Instance.InstanceId);
+                        break;
+                    }
+                }
+            }
         }
 
         public void FreezeAllDice()
@@ -261,7 +322,19 @@ namespace Drakken.Gameplay.Simulation
             // Officially lock all dices in place as kinematic and record value
             foreach (var body in diceBodiesByInstanceId.Values)
             {
-                if (body.Rigidbody.isKinematic) continue;
+                if (body.Rigidbody.isKinematic)
+                {
+                    // Make sure when we freeze a dice it definetly has a settle
+                    // We rely on this in tokens where we drive a token to rest
+                    if (body.SessionSettleEvents.Count == 0)
+                    {
+                        int side = PeekDiceSide(body.Instance.InstanceId);
+                        body.Instance.CurrentSide = side;
+                        body.SessionSettleEvents.Add(new DiceSettleEvent { Tick = currentTick, Side = side });
+                    }
+
+                    continue;
+                }
 
                 body.Instance.CurrentSide = PeekDiceSide(body.Instance.InstanceId);
                 body.RecordPose(currentTick);
@@ -277,6 +350,9 @@ namespace Drakken.Gameplay.Simulation
             Action onComplete = null)
         {
             Assert.True(isInSession, "Cannot drive dice outside of a session");
+
+            // Wake other settled dice before this one gets lifted/moved out from under them
+            WakeTouchingSettledDice(diceInstanceId);
 
             // Script a dice to move along a path, returns an identifying drive ID
             var body = diceBodiesByInstanceId[diceInstanceId];
@@ -393,7 +469,7 @@ namespace Drakken.Gameplay.Simulation
                     continue;
                 }
 
-                // Record body for instanceId for this tick
+                // Record pose for this dice for this tick
                 body.RecordPose(currentTick);
 
                 // Check if this body is settled
@@ -407,12 +483,26 @@ namespace Drakken.Gameplay.Simulation
                     if (!body.IsSettled && body.SettledTimer >= settledDuration)
                     {
                         body.IsSettled = true;
-                        settled.Add(instanceId);
-                        body.SessionSettleEvents.Add(new DiceSettleEvent
+
+                        // A dice can be woken just to test whether it lost support (see
+                        // GameSimulationWorld.WakeTouchingSettledDice) without actually needing to
+                        // move. Only register a genuine settle - and so only trigger dice/face
+                        // effects via OnDiceSettle below - if it moved meaningfully since waking;
+                        // otherwise it's just re-freezing back where it already was
+                        bool movedSinceWake =
+                            (body.Rigidbody.position - body.WakePosition).sqrMagnitude
+                                > settleMovementPositionThreshold * settleMovementPositionThreshold ||
+                            Quaternion.Angle(body.Rigidbody.rotation, body.WakeRotation) > settleMovementAngleThreshold;
+
+                        if (movedSinceWake)
                         {
-                            Tick = currentTick,
-                            Side = DiceMeshFactory.GetFaceUpSide(body.Rigidbody.transform, body.MeshFaces),
-                        });
+                            settled.Add(instanceId);
+                            body.SessionSettleEvents.Add(new DiceSettleEvent
+                            {
+                                Tick = currentTick,
+                                Side = DiceMeshFactory.GetFaceUpSide(body.Rigidbody.transform, body.MeshFaces),
+                            });
+                        }
                     }
                 }
                 else
@@ -422,8 +512,7 @@ namespace Drakken.Gameplay.Simulation
                 }
             }
 
-            // Dispatch after the structural iteration above so effects are free to spawn/remove
-            // dice (e.g. Mitosis splitting) without invalidating it
+            // Trigger dice settled after all dice have finished settling
             foreach (var instanceId in settled)
             {
                 if (diceBodiesByInstanceId.TryGetValue(instanceId, out var settledBody))
@@ -520,6 +609,8 @@ namespace Drakken.Gameplay.Simulation
             public int SpawnTick;
             public bool IsSettled;
             public float SettledTimer;
+            public Vector3 WakePosition;
+            public Quaternion WakeRotation;
             public readonly List<DicePoseTrace> SessionPoseTraces = new();
             public readonly List<DiceSettleEvent> SessionSettleEvents = new();
 

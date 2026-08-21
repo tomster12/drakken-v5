@@ -336,6 +336,7 @@ namespace Drakken.Client.States
                 message.SourceClientIndex,
                 message.TokenInstanceId,
                 message.Traces,
+                message.Summary,
                 cts.Token);
 
             // Remove the now-resolved token so it can't be interacted with again next turn

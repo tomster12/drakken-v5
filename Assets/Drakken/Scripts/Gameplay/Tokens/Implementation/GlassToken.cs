@@ -7,7 +7,7 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class GlassTokenLogic : TokenLogic<EmptyTokenIntent, EmptyEventResolution>
+    public class GlassTokenLogic : TokenLogic<EmptyTokenIntent>
     {
         private const float TossUpwardMin = 4.5f;
         private const float TossUpwardMax = 6f;
@@ -15,9 +15,7 @@ namespace Drakken.Gameplay.Tokens.Implementation
         private const float TossTorque = 20f;
         private const float SpawnHeight = 1f;
 
-        public override int EventId => 5;
-
-        protected override List<GameSimulationTrace> ExecuteToken(
+        protected override (List<GameSimulationTrace> Traces, EmptyTokenSummary Summary) ExecuteToken(
             GameState gameState,
             EmptyTokenIntent intent,
             int sourceClientIndex,
@@ -43,22 +41,11 @@ namespace Drakken.Gameplay.Tokens.Implementation
 
             world.SpawnDice(glassDice, spawnPosition, Random.rotationUniform, tossImpulse, Random.insideUnitSphere * TossTorque);
 
-            // Add the dice to GameState before simulating, since anything triggered while
-            // it settles must see it already present
-            world.RecordEvent(CommonEventIds.AddDice, EventKind.Common, glassDice.InstanceId, glassDice.CurrentSide, new AddDiceResolution
-            {
-                AddedDiceInstance = glassDice.Clone(),
-            });
-
             world.Simulate(untilAllSettled: true);
 
             world.FreezeAllDice();
 
-            world.RecordEvent(EventId, EventKind.Token, glassDice.InstanceId, glassDice.CurrentSide, new EmptyEventResolution());
-
-            return new List<GameSimulationTrace> { world.EndSession() };
+            return (new List<GameSimulationTrace> { world.EndSession() }, new EmptyTokenSummary());
         }
-
-        protected override void ApplyEvent(GameState gameState, EmptyEventResolution resolution, int clientIndex, int sourceInstanceId) { }
     }
 }

@@ -7,20 +7,14 @@ using Drakken.Domain;
 
 namespace Drakken.Gameplay.Tokens.Implementation
 {
-    public class BlankTokenLogic : TokenLogic<EmptyTokenIntent, EmptyEventResolution>
+    public class BlankTokenLogic : TokenLogic<EmptyTokenIntent>
     {
-        public override int EventId => 7;
-
-        protected override List<GameSimulationTrace> ExecuteToken(GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
+        protected override (List<GameSimulationTrace> Traces, EmptyTokenSummary Summary) ExecuteToken(
+            GameState gameState, EmptyTokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
         {
             // TODO
 
-            return new List<GameSimulationTrace>();
-        }
-
-        protected override void ApplyEvent(GameState gameState, EmptyEventResolution resolution, int clientIndex, int sourceInstanceId)
-        {
-            // TODO
+            return (new List<GameSimulationTrace>(), new EmptyTokenSummary());
         }
     }
 }

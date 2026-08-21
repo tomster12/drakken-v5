@@ -151,7 +151,9 @@ namespace Drakken.Client
 
             Log.Info($"ClientMatch-{MatchId}", $"Token resolution received for TokenId={message.TokenId}");
 
-            GameSimulationTrace.ApplyAll(message.Traces, GameState, message.SourceClientIndex);
+            // Dice-affecting events are applied progressively by GameSimulationReplayer as the
+            // animation actually reaches them, not eagerly here - GameState should only ever
+            // reflect what's already been shown on screen, never jump ahead of the animation
             GameState.Clients[message.SourceClientIndex].Tokens.RemoveAll(t => t.InstanceId == message.TokenInstanceId);
 
             OnTokenResolved.Invoke(message);

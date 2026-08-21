@@ -20,12 +20,25 @@ namespace Drakken.Domain
             serializer.SerializeList(ref Events);
         }
 
-        public void ApplyEffects(GameState gameState, int clientIndex)
+        public void ApplyEvents(GameState gameState, int clientIndex)
         {
             foreach (var evt in Events)
             {
                 var logic = EventRegistry.Get(evt.EventId, evt.Kind);
-                logic?.ApplyEvent(gameState, evt.Resolution, clientIndex, evt.SourceInstanceId);
+                logic?.ApplyEvent(gameState, evt.Resolution, clientIndex);
+            }
+
+            // Settle events aren't part of the SimulationEvent/IEventLogic system - they're trace
+            // bookkeeping the client's replayer separately uses to animate the settled-face label -
+            // but GameState still needs each dice's final settled side, whether it's a dice that was
+            // just added above or one that kept its identity and simply landed on a new face
+            var dice = gameState.Clients[clientIndex].Dice;
+            foreach (var diceTrace in Dice)
+            {
+                if (diceTrace.SettleEvents.Count == 0) continue;
+
+                var instance = dice.Find(d => d.InstanceId == diceTrace.Instance.InstanceId);
+                if (instance != null) instance.CurrentSide = diceTrace.SettleEvents[^1].Side;
             }
         }
 
@@ -33,7 +46,7 @@ namespace Drakken.Domain
         {
             foreach (var trace in traces)
             {
-                trace?.ApplyEffects(gameState, clientIndex);
+                trace?.ApplyEvents(gameState, clientIndex);
             }
         }
     }
@@ -87,8 +100,6 @@ namespace Drakken.Domain
         public int EventId;
         public EventKind Kind;
         public int Tick;
-        public int SourceInstanceId;
-        public int Side;
         public EventResolution Resolution;
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -96,8 +107,6 @@ namespace Drakken.Domain
             serializer.SerializeValue(ref EventId);
             serializer.SerializeValue(ref Kind);
             serializer.SerializeValue(ref Tick);
-            serializer.SerializeValue(ref SourceInstanceId);
-            serializer.SerializeValue(ref Side);
 
             if (serializer.IsReader)
             {

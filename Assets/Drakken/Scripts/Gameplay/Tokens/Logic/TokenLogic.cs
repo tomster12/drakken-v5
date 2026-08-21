@@ -8,11 +8,13 @@ using Drakken.Gameplay.Simulation;
 
 namespace Drakken.Gameplay.Tokens.Logic
 {
-    public interface ITokenLogic : IEventLogic
+    public interface ITokenLogic
     {
         Type IntentType { get; }
+        Type SummaryType { get; }
 
-        List<GameSimulationTrace> ExecuteToken(GameState gameState, TokenIntent intent, int sourceClientIndex, GameSimulationWorld world);
+        (List<GameSimulationTrace> Traces, TokenSummary Summary) ExecuteToken(
+            GameState gameState, TokenIntent intent, int sourceClientIndex, GameSimulationWorld world);
 
         Task AnimateToken(
             ClientMatch match,
@@ -20,24 +22,36 @@ namespace Drakken.Gameplay.Tokens.Logic
             int sourceClientIndex,
             int tokenInstanceId,
             List<GameSimulationTrace> traces,
+            TokenSummary summary,
             CancellationToken ct);
     }
 
-    public abstract class TokenLogic<TIntent, TEventResolution> : ITokenLogic
+    public abstract class TokenLogic<TIntent, TSummary> : ITokenLogic
         where TIntent : TokenIntent
-        where TEventResolution : EventResolution
+        where TSummary : TokenSummary, new()
     {
-        public abstract int EventId { get; }
-
         Type ITokenLogic.IntentType => typeof(TIntent);
-        Type IEventLogic.ResolutionType => typeof(TEventResolution);
+        Type ITokenLogic.SummaryType => typeof(TSummary);
 
-        // --------------------------------------------------- Token Lifetime
+        (List<GameSimulationTrace> Traces, TokenSummary Summary) ITokenLogic.ExecuteToken(
+            GameState gameState, TokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
+        {
+            var (traces, summary) = ExecuteToken(gameState, (TIntent)intent, sourceClientIndex, world);
+            return (traces, summary);
+        }
 
-        public List<GameSimulationTrace> ExecuteToken(GameState gameState, TokenIntent intent, int sourceClientIndex, GameSimulationWorld world)
-            => ExecuteToken(gameState, (TIntent)intent, sourceClientIndex, world);
+        protected abstract (List<GameSimulationTrace> Traces, TSummary Summary) ExecuteToken(
+            GameState gameState, TIntent intent, int sourceClientIndex, GameSimulationWorld world);
 
-        protected abstract List<GameSimulationTrace> ExecuteToken(GameState gameState, TIntent intent, int sourceClientIndex, GameSimulationWorld world);
+        Task ITokenLogic.AnimateToken(
+            ClientMatch match,
+            TokenVisualContext visualContext,
+            int sourceClientIndex,
+            int tokenInstanceId,
+            List<GameSimulationTrace> traces,
+            TokenSummary summary,
+            CancellationToken ct)
+            => AnimateToken(match, visualContext, sourceClientIndex, tokenInstanceId, traces, (TSummary)summary, ct);
 
         public virtual async Task AnimateToken(
             ClientMatch match,
@@ -45,6 +59,7 @@ namespace Drakken.Gameplay.Tokens.Logic
             int sourceClientIndex,
             int tokenInstanceId,
             List<GameSimulationTrace> traces,
+            TSummary summary,
             CancellationToken ct)
         {
             var sourcePlayerObjects = visualContext.Client.SceneObjects.Player(sourceClientIndex);
@@ -58,18 +73,9 @@ namespace Drakken.Gameplay.Tokens.Logic
 
             visualContext.Client.UI.UpdateDiceTotal(match.ClientIndex, sourceClientIndex);
         }
-
-        // --------------------------------------------------- Event Lifetime
-
-        void IEventLogic.ApplyEvent(GameState gameState, EventResolution resolution, int clientIndex, int sourceInstanceId)
-            => ApplyEvent(gameState, (TEventResolution)resolution, clientIndex, sourceInstanceId);
-
-        protected abstract void ApplyEvent(GameState gameState, TEventResolution resolution, int clientIndex, int sourceInstanceId);
-
-        Task IEventLogic.AnimateEvent(EventAnimateContext ctx, EventResolution resolution, int sourceInstanceId, CancellationToken ct)
-            => AnimateEvent(ctx, (TEventResolution)resolution, sourceInstanceId, ct);
-
-        protected virtual Task AnimateEvent(EventAnimateContext ctx, TEventResolution resolution, int sourceInstanceId, CancellationToken ct)
-            => Task.CompletedTask;
     }
+
+    public abstract class TokenLogic<TIntent> : TokenLogic<TIntent, EmptyTokenSummary>
+        where TIntent : TokenIntent
+    { }
 }
